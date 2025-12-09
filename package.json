@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "echarts": "^6.0.0",
     "naive-ui": "^2.43.2",
     "nuxt": "^4.2.1",
     "nuxtjs-naive-ui": "^1.0.2",
