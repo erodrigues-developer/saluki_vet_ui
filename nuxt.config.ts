@@ -8,6 +8,9 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['nuxtjs-naive-ui'],
   css: ['vfonts/Lato.css', 'vfonts/FiraCode.css'],
+  build: {
+    transpile: ['vueuc', 'naive-ui', '@css-render/vue3-ssr', 'date-fns', 'lodash-es'],
+  },
   vite: {
     plugins: [
       AutoImport({
@@ -26,5 +29,8 @@ export default defineNuxtConfig({
         resolvers: [NaiveUiResolver()],
       }),
     ],
+    optimizeDeps: {
+      include: ['vueuc', 'naive-ui', '@css-render/vue3-ssr', 'date-fns', 'lodash-es'],
+    },
   },
 })
