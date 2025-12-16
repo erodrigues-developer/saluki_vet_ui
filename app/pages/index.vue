@@ -600,7 +600,7 @@ h3 {
 }
 
 .card {
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.92), rgba(230, 233, 239, 0.92));
+  background: #ffffff;
   border: 1px solid var(--color-neutral-100);
   border-radius: 12px;
   padding: 18px;
@@ -822,6 +822,7 @@ h3 {
   border-radius: 12px;
   border: 1px solid var(--color-neutral-100);
   gap: 10px;
+  box-shadow: 0 4px 12px rgba(14, 58, 86, 0.06);
 }
 
 .mini-list li + li {

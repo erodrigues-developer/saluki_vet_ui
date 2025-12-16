@@ -236,8 +236,14 @@ const fetchAddressByZip = async (zip: string) => {
 
 const validateDocument = (value: string) => {
   if (!value) return true
-  const len = digitsOnly(value).length
-  return len === 11 || len === 14 || new Error('CPF/CNPJ deve ter 11 ou 14 dígitos')
+  const digits = digitsOnly(value)
+  if (digits.length === 11) {
+    return isValidCpf(digits) || new Error('CPF inválido')
+  }
+  if (digits.length === 14) {
+    return isValidCnpj(digits) || new Error('CNPJ inválido')
+  }
+  return new Error('CPF/CNPJ deve ter 11 ou 14 dígitos')
 }
 
 const validatePhone = (value: string, isMobile: boolean) => {
@@ -245,6 +251,37 @@ const validatePhone = (value: string, isMobile: boolean) => {
   const len = digitsOnly(value).length
   const expected = isMobile ? 11 : 10
   return len === expected || new Error(`Telefone deve ter ${expected} dígitos`)
+}
+
+const isValidCpf = (cpf: string) => {
+  if (!cpf || cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false
+  const calcCheck = (len: number) => {
+    const sum = cpf
+      .slice(0, len)
+      .split('')
+      .reduce((acc, cur, idx) => acc + parseInt(cur, 10) * (len + 1 - idx), 0)
+    const res = (sum * 10) % 11
+    return res === 10 ? 0 : res
+  }
+  const d1 = calcCheck(9)
+  const d2 = calcCheck(10)
+  return d1 === parseInt(cpf[9], 10) && d2 === parseInt(cpf[10], 10)
+}
+
+const isValidCnpj = (cnpj: string) => {
+  if (!cnpj || cnpj.length !== 14 || /^(\d)\1+$/.test(cnpj)) return false
+  const calcCheck = (len: number) => {
+    const weights = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+    const slice = cnpj.slice(0, len)
+    const sum = slice
+      .split('')
+      .reduce((acc, cur, idx) => acc + parseInt(cur, 10) * weights[weights.length - len + idx], 0)
+    const res = sum % 11
+    return res < 2 ? 0 : 11 - res
+  }
+  const d1 = calcCheck(12)
+  const d2 = calcCheck(13)
+  return d1 === parseInt(cnpj[12], 10) && d2 === parseInt(cnpj[13], 10)
 }
 </script>
 
