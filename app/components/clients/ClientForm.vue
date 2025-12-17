@@ -8,6 +8,9 @@
   :disabled="loading"
 >
   <div class="grid">
+    <n-form-item label="Ativo" path="isActive" class="full-row">
+      <n-switch v-model:value="model.isActive" />
+    </n-form-item>
     <n-form-item label="Nome" path="name" required>
       <n-input v-model:value="model.name" placeholder="Nome completo" />
     </n-form-item>
@@ -18,38 +21,50 @@
       <n-input v-model:value="model.document" placeholder="CPF/CNPJ" @input="onDocumentInput" />
     </n-form-item>
     <n-form-item label="Telefone" path="phone">
-      <n-input v-model:value="model.phone" placeholder="(11) 4002-8922" @input="onPhoneInput('phone')" />
+      <n-input
+        v-model:value="model.phone"
+        placeholder="(11) 4002-8922"
+        :input-props="{ maxlength: 15 }"
+        @update:value="onPhoneInput"
+      />
     </n-form-item>
     <n-form-item label="Celular" path="mobilePhone">
-      <n-input v-model:value="model.mobilePhone" placeholder="(11) 99999-9999" @input="onPhoneInput('mobilePhone')" />
+      <n-input
+        v-model:value="model.mobilePhone"
+        placeholder="(11) 99999-9999"
+        :input-props="{ maxlength: 15 }"
+        @update:value="onMobileInput"
+      />
+    </n-form-item>
+    <n-form-item label="CEP" path="zipCode">
+      <n-input
+        v-model:value="model.zipCode"
+        placeholder="00000-000"
+        :input-props="{ maxlength: 9 }"
+        @update:value="onZipInput"
+      />
     </n-form-item>
     <n-form-item label="Rua" path="street">
       <n-input v-model:value="model.street" placeholder="Rua / Avenida" />
     </n-form-item>
     <n-form-item label="Número" path="number">
-        <n-input v-model:value="model.number" placeholder="1000" />
-      </n-form-item>
-      <n-form-item label="Complemento" path="complement">
-        <n-input v-model:value="model.complement" placeholder="Apto, sala..." />
-      </n-form-item>
-      <n-form-item label="Bairro" path="district">
-        <n-input v-model:value="model.district" placeholder="Bairro" />
-      </n-form-item>
-      <n-form-item label="Cidade" path="city">
-        <n-input v-model:value="model.city" placeholder="Cidade" />
-      </n-form-item>
+      <n-input v-model:value="model.number" placeholder="1000" />
+    </n-form-item>
+    <n-form-item label="Complemento" path="complement">
+      <n-input v-model:value="model.complement" placeholder="Apto, sala..." />
+    </n-form-item>
+    <n-form-item label="Bairro" path="district">
+      <n-input v-model:value="model.district" placeholder="Bairro" />
+    </n-form-item>
+    <n-form-item label="Cidade" path="city">
+      <n-input v-model:value="model.city" placeholder="Cidade" />
+    </n-form-item>
     <n-form-item label="UF" path="state">
       <n-input v-model:value="model.state" placeholder="SP" />
-    </n-form-item>
-    <n-form-item label="CEP" path="zipCode">
-      <n-input v-model:value="model.zipCode" placeholder="00000-000" @input="onZipInput" />
     </n-form-item>
     <n-form-item label="Observações" path="notes">
       <n-input v-model:value="model.notes" type="textarea" :rows="3" placeholder="Preferências, recados..." />
     </n-form-item>
-    <n-form-item label="Ativo" path="isActive">
-        <n-switch v-model:value="model.isActive" />
-      </n-form-item>
     </div>
     <div class="actions">
       <n-button tertiary @click="$emit('cancel')" :disabled="loading">Cancelar</n-button>
@@ -169,20 +184,27 @@ const handleSubmit = async () => {
 
 const digitsOnly = (val: string) => (val || '').replace(/\D+/g, '')
 
-const formatPhone = (val: string, isMobile: boolean) => {
-  const digits = digitsOnly(val).slice(0, isMobile ? 11 : 10)
+const formatPhone = (val: string) => {
+  const digits = digitsOnly(val).slice(0, 11)
   if (digits.length <= 2) return digits
-  if (digits.length <= (isMobile ? 7 : 6)) {
+  if (digits.length <= 6) {
     return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
   }
-  if (isMobile) {
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+  }
+  if (digits.length === 11) {
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
   }
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`
 }
 
-const onPhoneInput = (field: 'phone' | 'mobilePhone') => (val: string) => {
-  model[field] = formatPhone(val, field === 'mobilePhone')
+const onPhoneInput = (val: string) => {
+  model.phone = formatPhone(val)
+}
+
+const onMobileInput = (val: string) => {
+  model.mobilePhone = formatPhone(val)
 }
 
 const formatDocument = (val: string) => {
@@ -246,11 +268,10 @@ const validateDocument = (value: string) => {
   return new Error('CPF/CNPJ deve ter 11 ou 14 dígitos')
 }
 
-const validatePhone = (value: string, isMobile: boolean) => {
+const validatePhone = (value: string, _isMobile: boolean) => {
   if (!value) return true
   const len = digitsOnly(value).length
-  const expected = isMobile ? 11 : 10
-  return len === expected || new Error(`Telefone deve ter ${expected} dígitos`)
+  return (len === 10 || len === 11) || new Error('Telefone deve ter 10 ou 11 dígitos')
 }
 
 const isValidCpf = (cpf: string) => {
@@ -288,8 +309,13 @@ const isValidCnpj = (cnpj: string) => {
 <style scoped>
 .grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  margin-top: 6px;
+}
+
+.full-row {
+  grid-column: 1 / -1;
 }
 
 .actions {

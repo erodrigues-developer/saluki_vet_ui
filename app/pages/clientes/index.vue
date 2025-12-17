@@ -11,10 +11,36 @@
     </div>
 
     <div class="filters">
-      <n-input v-model:value="filters.name" placeholder="Nome" clearable />
-      <n-input v-model:value="filters.document" placeholder="Documento" clearable />
-      <n-input v-model:value="filters.email" placeholder="E-mail" clearable />
-      <n-select v-model:value="filters.isActive" :options="activeOptions" placeholder="Status" clearable />
+      <n-input v-model:value="filters.name" placeholder="Buscar por nome..." clearable />
+      <n-input v-model:value="filters.document" placeholder="Buscar por documento..." clearable />
+      <n-input v-model:value="filters.email" placeholder="Buscar por e-mail..." clearable />
+      <div class="status-chips">
+        <span class="chip-label">Status:</span>
+        <n-button
+          quaternary
+          :type="filters.isActive === null ? 'primary' : 'default'"
+          size="small"
+          @click="setStatusFilter(null)"
+        >
+          Todos
+        </n-button>
+        <n-button
+          quaternary
+          :type="filters.isActive === true ? 'primary' : 'default'"
+          size="small"
+          @click="setStatusFilter(true)"
+        >
+          Ativos
+        </n-button>
+        <n-button
+          quaternary
+          :type="filters.isActive === false ? 'primary' : 'default'"
+          size="small"
+          @click="setStatusFilter(false)"
+        >
+          Inativos
+        </n-button>
+      </div>
       <div class="filter-actions">
         <n-button secondary @click="handleClearFilters">Limpar</n-button>
         <n-button type="primary" @click="fetchClients">Filtrar</n-button>
@@ -28,6 +54,7 @@
       :pagination="false"
       :bordered="false"
       :sorter="sorter"
+      :row-props="rowProps"
       @update:sorter="onSorterChange"
     />
 
@@ -43,12 +70,18 @@
       />
     </div>
 
-    <n-modal v-model:show="showModal" :mask-closable="false" preset="card" style="width: 720px">
+    <n-modal
+      v-model:show="showModal"
+      :mask-closable="false"
+      preset="card"
+      style="width: 720px"
+      :content-style="{ padding: '12px 16px 16px 16px' }"
+      :header-style="{ padding: '12px 16px 8px 16px' }"
+    >
       <template #header>
         <div class="modal-header">
           <div>
-            <p class="eyebrow">Clientes</p>
-            <h3>{{ editingClient ? 'Editar cliente' : 'Novo cliente' }}</h3>
+            <p class="eyebrow">{{ editingClient ? 'Editar cliente' : 'Novo cliente' }}</p>
           </div>
         </div>
       </template>
@@ -85,12 +118,6 @@ const filters = reactive({
   email: '',
   isActive: null as null | boolean
 })
-
-const activeOptions = [
-  { label: 'Todos', value: null },
-  { label: 'Ativos', value: true },
-  { label: 'Inativos', value: false }
-]
 
 const clients = ref<Client[]>([])
 const loading = ref(false)
@@ -150,21 +177,12 @@ const columns = [
             tertiary: true,
             quaternary: true,
             circle: true,
-            title: 'Editar',
-            onClick: () => openEdit(row)
-          },
-          { default: () => '✏️' }
-        ),
-        h(
-          NButton,
-          {
-            size: 'small',
-            tertiary: true,
-            quaternary: true,
-            circle: true,
             type: 'error',
             title: 'Excluir',
-            onClick: () => confirmDelete(row)
+            onClick: (e) => {
+              e.stopPropagation()
+              confirmDelete(row)
+            }
           },
           { default: () => '🗑️' }
         )
@@ -297,6 +315,17 @@ const onSorterChange = (state: { columnKey?: string | number; order?: 'ascend' |
   fetchClients()
 }
 
+const setStatusFilter = (val: null | boolean) => {
+  filters.isActive = val
+  pagination.page = 1
+  fetchClients()
+}
+
+const rowProps = (row: Client) => ({
+  style: { cursor: 'pointer' },
+  onClick: () => openEdit(row)
+})
+
 onMounted(() => {
   fetchClients()
 })
@@ -341,6 +370,18 @@ h1 {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px;
   align-items: end;
+}
+
+.status-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip-label {
+  font-size: 12px;
+  color: #6b7280;
 }
 
 .filter-actions {
