@@ -25,13 +25,13 @@
     <nav class="menu">
       <div
         v-for="item in items"
-        :key="item.to"
+        :key="item.to || item.label"
         class="menu-group"
-        :class="{ open: isGroupOpen(item.to) }"
+        :class="{ open: isGroupOpen(item) }"
       >
         <div class="menu-parent">
           <NuxtLink
-            :to="item.to"
+            :to="item.to || '#'"
             class="menu-item"
             :class="[{ active: isActivePath(item) }, { 'has-children': item.children && item.children.length }]"
             @click="onParentClick(item, $event)"
@@ -43,14 +43,14 @@
             v-if="item.children && item.children.length && !isCollapsedComputed"
             type="button"
             class="caret-btn"
-            :aria-expanded="isGroupOpen(item.to)"
-            @click.stop.prevent="toggleGroup(item.to)"
+            :aria-expanded="isGroupOpen(item)"
+            @click.stop.prevent="toggleGroup(item)"
           >
-            <span :class="{ open: isGroupOpen(item.to) }">▾</span>
+            <span :class="{ open: isGroupOpen(item) }">▾</span>
           </button>
         </div>
         <div
-          v-if="item.children && item.children.length && !isCollapsedComputed && isGroupOpen(item.to)"
+          v-if="item.children && item.children.length && !isCollapsedComputed && isGroupOpen(item)"
           class="submenu"
         >
           <NuxtLink
@@ -87,17 +87,21 @@ const openGroups = ref(new Set())
 
 const isCollapsedComputed = computed(() => !isPinned.value && !isHovering.value)
 
-const isActive = (to) => route.path === to
+const isActive = (to) => (to ? route.path === to : false)
 const isActivePath = (item) => {
-  if (isActive(item.to)) return true
+  const key = item.to
+  if (key && isActive(key)) return true
   if (item.children) {
     return item.children.some((child) => isActive(child.to) || route.path.startsWith(`${child.to}/`))
   }
-  return route.path.startsWith(`${item.to}/`)
+  return key ? route.path.startsWith(`${key}/`) : false
 }
 
-const isGroupOpen = (key) => openGroups.value.has(key)
-const setGroupOpen = (key, open) => {
+const groupKey = (item) => item.to || item.label
+
+const isGroupOpen = (item) => openGroups.value.has(groupKey(item))
+const setGroupOpen = (item, open) => {
+  const key = groupKey(item)
   if (open) {
     openGroups.value = new Set([key])
   } else {
@@ -106,14 +110,14 @@ const setGroupOpen = (key, open) => {
     openGroups.value = next
   }
 }
-const toggleGroup = (key) => {
-  setGroupOpen(key, !isGroupOpen(key))
+const toggleGroup = (item) => {
+  setGroupOpen(item, !isGroupOpen(item))
 }
 
 const onParentClick = (item, event) => {
   if (item.children && item.children.length) {
     event.preventDefault()
-    toggleGroup(item.to)
+    toggleGroup(item)
   }
 }
 
@@ -151,11 +155,11 @@ const ensureActiveGroupsOpen = () => {
     if (opened) return
     if (item.children && item.children.length) {
       const shouldOpen =
-        isActive(item.to) ||
-        route.path.startsWith(`${item.to}/`) ||
+        (item.to && isActive(item.to)) ||
+        (item.to && route.path.startsWith(`${item.to}/`)) ||
         item.children.some((child) => isActive(child.to) || route.path.startsWith(`${child.to}/`))
       if (shouldOpen) {
-        setGroupOpen(item.to, true)
+        setGroupOpen(item, true)
         opened = true
       }
     }
@@ -259,8 +263,29 @@ watch(
 .menu {
   display: grid;
   gap: 6px;
+  overflow-y: auto;
+  padding-right: 4px;
+  max-height: calc(100vh - 70px);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
 }
 
+.menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+}
+
+.menu:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+}
 .menu-group {
   display: grid;
   gap: 4px;
