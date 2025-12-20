@@ -16,7 +16,35 @@
       </div>
     </div>
 
+    <div v-if="isMobile" class="card-list">
+      <div
+        v-for="item in species"
+        :key="item.id"
+        class="entity-card"
+        @click="openEdit(item)"
+      >
+        <div class="card-head">
+          <div>
+            <p class="card-title">{{ item.name }}</p>
+            <p class="card-subtitle">Atualizado {{ formatDate(item.updatedAt || '') || '-' }}</p>
+          </div>
+        </div>
+        <div class="card-grid">
+          <div class="card-item">
+            <span class="card-label">Criado em</span>
+            <span class="card-value">{{ formatDate(item.createdAt || '') || '-' }}</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <n-button size="small" tertiary type="error" @click.stop="confirmDelete(item)">
+            Excluir
+          </n-button>
+        </div>
+      </div>
+    </div>
+
     <n-data-table
+      v-else
       :loading="loading"
       :columns="columns"
       :data="species"
@@ -75,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { h, onMounted, reactive, ref } from 'vue'
+import { h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { NButton, NTag, useDialog, useMessage, type FormInst, type FormRules } from 'naive-ui'
 
 interface Species {
@@ -107,6 +135,11 @@ const saving = ref(false)
 const showModal = ref(false)
 const editingItem = ref<Species | null>(null)
 const formRef = ref<FormInst | null>(null)
+const isMobile = ref(false)
+let mediaQuery: MediaQueryList | null = null
+const updateIsMobile = () => {
+  isMobile.value = mediaQuery?.matches ?? false
+}
 
 const formModel = reactive<Species>({
   id: undefined,
@@ -292,6 +325,24 @@ const rowProps = (row: Species) => ({
 
 onMounted(() => {
   fetchSpecies()
+  if (typeof window !== 'undefined') {
+    mediaQuery = window.matchMedia('(max-width: 768px)')
+    updateIsMobile()
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', updateIsMobile)
+    } else {
+      mediaQuery.addListener(updateIsMobile)
+    }
+  }
+})
+
+onBeforeUnmount(() => {
+  if (!mediaQuery) return
+  if (mediaQuery.removeEventListener) {
+    mediaQuery.removeEventListener('change', updateIsMobile)
+  } else {
+    mediaQuery.removeListener(updateIsMobile)
+  }
 })
 
 const formatDate = (iso: string) => {
@@ -355,5 +406,81 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.entity-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.card-title {
+  font-weight: 600;
+  margin: 0 0 2px;
+  color: #111827;
+}
+
+.card-subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.card-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.card-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+}
+
+.card-value {
+  font-size: 13px;
+  color: #374151;
+  word-break: break-word;
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+  .page-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .filter-actions {
+    justify-content: flex-start;
+  }
 }
 </style>

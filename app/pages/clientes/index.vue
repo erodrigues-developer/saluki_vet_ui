@@ -47,7 +47,59 @@
       </div>
     </div>
 
+    <div v-if="isMobile" class="card-list">
+      <div
+        v-for="client in clients"
+        :key="client.id"
+        class="client-card"
+        @click="openEdit(client)"
+      >
+        <div class="card-head">
+          <div>
+            <p class="card-title">{{ client.name }}</p>
+            <p class="card-subtitle">{{ displayValue(client.document) }}</p>
+          </div>
+          <n-tag :type="client.isActive ? 'success' : 'error'" :bordered="false">
+            {{ client.isActive ? 'Ativo' : 'Inativo' }}
+          </n-tag>
+        </div>
+        <div class="card-grid">
+          <div class="card-item">
+            <span class="card-label">E-mail</span>
+            <span class="card-value">{{ displayValue(client.email) }}</span>
+          </div>
+          <div class="card-item">
+            <span class="card-label">Telefone</span>
+            <span class="card-value">{{ displayValue(client.phone) }}</span>
+          </div>
+          <div class="card-item">
+            <span class="card-label">Celular</span>
+            <span class="card-value">{{ displayValue(client.mobilePhone) }}</span>
+          </div>
+          <div class="card-item">
+            <span class="card-label">Cidade/UF</span>
+            <span class="card-value">{{ formatCityState(client) }}</span>
+          </div>
+          <div class="card-item">
+            <span class="card-label">Atualizado</span>
+            <span class="card-value">{{ formatDate(client.updatedAt || '') || '-' }}</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <n-button
+            size="small"
+            tertiary
+            type="error"
+            @click.stop="confirmDelete(client)"
+          >
+            Excluir
+          </n-button>
+        </div>
+      </div>
+    </div>
+
     <n-data-table
+      v-else
       :loading="loading"
       :columns="columns"
       :data="clients"
@@ -96,7 +148,7 @@
 </template>
 
 <script setup lang="ts">
-import { h, onMounted, reactive, ref } from 'vue'
+import { h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { NButton, NTag, useMessage, useDialog } from 'naive-ui'
 import ClientForm, { type Client } from '~/components/clients/ClientForm.vue'
 
@@ -125,6 +177,11 @@ const saving = ref(false)
 const showModal = ref(false)
 const editingClient = ref<Client | null>(null)
 const activeRequestId = ref(0)
+const isMobile = ref(false)
+let mediaQuery: MediaQueryList | null = null
+const updateIsMobile = () => {
+  isMobile.value = mediaQuery?.matches ?? false
+}
 
 const pagination = reactive({
   page: 1,
@@ -328,6 +385,24 @@ const rowProps = (row: Client) => ({
 
 onMounted(() => {
   fetchClients()
+  if (typeof window !== 'undefined') {
+    mediaQuery = window.matchMedia('(max-width: 768px)')
+    updateIsMobile()
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', updateIsMobile)
+    } else {
+      mediaQuery.addListener(updateIsMobile)
+    }
+  }
+})
+
+onBeforeUnmount(() => {
+  if (!mediaQuery) return
+  if (mediaQuery.removeEventListener) {
+    mediaQuery.removeEventListener('change', updateIsMobile)
+  } else {
+    mediaQuery.removeListener(updateIsMobile)
+  }
 })
 
 const formatDate = (iso: string) => {
@@ -336,6 +411,16 @@ const formatDate = (iso: string) => {
     dateStyle: 'short',
     timeStyle: 'short'
   }).format(new Date(iso))
+}
+
+const formatCityState = (client: Client) => {
+  const value = `${client.city ?? ''}${client.state ? ` / ${client.state}` : ''}`
+  return value || '-'
+}
+
+const displayValue = (value?: string | null) => {
+  const text = (value ?? '').trim()
+  return text ? text : '-'
 }
 </script>
 
@@ -397,5 +482,81 @@ h1 {
 .actions {
   display: flex;
   gap: 6px;
+}
+
+.card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.client-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.card-title {
+  font-weight: 600;
+  margin: 0 0 2px;
+  color: #111827;
+}
+
+.card-subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.card-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.card-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+}
+
+.card-value {
+  font-size: 13px;
+  color: #374151;
+  word-break: break-word;
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+  .page-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .filter-actions {
+    justify-content: flex-start;
+  }
 }
 </style>

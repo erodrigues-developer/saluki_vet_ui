@@ -23,7 +23,35 @@
       </div>
     </div>
 
+    <div v-if="isMobile" class="card-list">
+      <div
+        v-for="item in breeds"
+        :key="item.id"
+        class="entity-card"
+        @click="openEdit(item)"
+      >
+        <div class="card-head">
+          <div>
+            <p class="card-title">{{ item.name }}</p>
+            <p class="card-subtitle">{{ getSpeciesLabel(item) }}</p>
+          </div>
+        </div>
+        <div class="card-grid">
+          <div class="card-item">
+            <span class="card-label">Atualizado</span>
+            <span class="card-value">{{ formatDate(item.updatedAt || '') || '-' }}</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <n-button size="small" tertiary type="error" @click.stop="confirmDelete(item)">
+            Excluir
+          </n-button>
+        </div>
+      </div>
+    </div>
+
     <n-data-table
+      v-else
       :loading="loading"
       :columns="columns"
       :data="breeds"
@@ -70,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, onMounted, reactive, ref } from 'vue'
+import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { NButton, useDialog, useMessage } from 'naive-ui'
 import BreedForm, { type Breed } from '~/components/breeds/BreedForm.vue'
 
@@ -107,6 +135,11 @@ const saving = ref(false)
 const showModal = ref(false)
 const editingItem = ref<Breed | null>(null)
 const activeRequestId = ref(0)
+const isMobile = ref(false)
+let mediaQuery: MediaQueryList | null = null
+const updateIsMobile = () => {
+  isMobile.value = mediaQuery?.matches ?? false
+}
 
 const pagination = reactive({
   page: 1,
@@ -309,6 +342,24 @@ const rowProps = (row: Breed) => ({
 onMounted(() => {
   fetchSpeciesOptions()
   fetchBreeds()
+  if (typeof window !== 'undefined') {
+    mediaQuery = window.matchMedia('(max-width: 768px)')
+    updateIsMobile()
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', updateIsMobile)
+    } else {
+      mediaQuery.addListener(updateIsMobile)
+    }
+  }
+})
+
+onBeforeUnmount(() => {
+  if (!mediaQuery) return
+  if (mediaQuery.removeEventListener) {
+    mediaQuery.removeEventListener('change', updateIsMobile)
+  } else {
+    mediaQuery.removeListener(updateIsMobile)
+  }
 })
 
 const formatDate = (iso: string) => {
@@ -318,6 +369,9 @@ const formatDate = (iso: string) => {
     timeStyle: 'short'
   }).format(new Date(iso))
 }
+
+const getSpeciesLabel = (item: Breed) =>
+  item.species?.name || speciesNameMap.value.get(item.speciesId ?? -1) || 'Espécie não informada'
 </script>
 
 <style scoped>
@@ -372,5 +426,81 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.entity-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.card-title {
+  font-weight: 600;
+  margin: 0 0 2px;
+  color: #111827;
+}
+
+.card-subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.card-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.card-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+}
+
+.card-value {
+  font-size: 13px;
+  color: #374151;
+  word-break: break-word;
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+  .page-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .filter-actions {
+    justify-content: flex-start;
+  }
 }
 </style>
