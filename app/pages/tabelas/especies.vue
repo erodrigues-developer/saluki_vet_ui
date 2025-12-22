@@ -179,16 +179,13 @@ const columns = [
           {
             size: 'small',
             tertiary: true,
-            quaternary: true,
-            circle: true,
             type: 'error',
-            title: 'Excluir',
             onClick: (e) => {
               e.stopPropagation()
               confirmDelete(row)
             }
           },
-          { default: () => '🗑️' }
+          { default: () => 'Excluir' }
         )
       ])
   }

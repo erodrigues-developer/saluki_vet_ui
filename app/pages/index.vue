@@ -605,9 +605,6 @@ h3 {
   border-radius: 12px;
   padding: 18px;
   min-height: 240px;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.05),
-    0 4px 6px rgba(0, 0, 0, 0.06);
   color: var(--color-neutral-900);
 }
 
@@ -822,7 +819,6 @@ h3 {
   border-radius: 12px;
   border: 1px solid var(--color-neutral-100);
   gap: 10px;
-  box-shadow: 0 4px 12px rgba(14, 58, 86, 0.06);
 }
 
 .mini-list li + li {

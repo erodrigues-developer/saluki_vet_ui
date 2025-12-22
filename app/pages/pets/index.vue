@@ -2,48 +2,66 @@
   <div class="page">
     <div class="page-head">
       <div>
-        <p class="eyebrow">Tabelas</p>
-        <h1>Raças</h1>
+        <p class="eyebrow">Pets</p>
+        <h1>Pets</h1>
       </div>
-      <n-button type="primary" @click="openCreate">Nova raça</n-button>
+      <n-button type="primary" @click="openCreate">
+        Novo pet
+      </n-button>
     </div>
 
     <div class="filters">
       <n-input v-model:value="filters.name" placeholder="Buscar por nome..." clearable />
       <n-select
-        v-model:value="filters.speciesId"
-        :options="speciesOptions"
-        placeholder="Filtrar por espécie"
-        clearable
+        v-model:value="filters.clientId"
+        :options="clientOptions"
+        placeholder="Filtrar por tutor"
         filterable
+        remote
+        clearable
+        :loading="clientLoading"
+        @search="onClientSearch"
+        @focus="ensureClientsLoaded"
       />
+      <n-input v-model:value="filters.microchipCode" placeholder="Buscar por microchip..." clearable />
       <div class="filter-actions">
         <n-button secondary @click="handleClearFilters">Limpar</n-button>
-        <n-button type="primary" @click="fetchBreeds">Filtrar</n-button>
+        <n-button type="primary" @click="fetchPets">Filtrar</n-button>
       </div>
     </div>
 
     <div v-if="isMobile" class="card-list">
       <div
-        v-for="item in breeds"
-        :key="item.id"
+        v-for="pet in pets"
+        :key="pet.id"
         class="entity-card"
-        @click="openEdit(item)"
+        @click="openEdit(pet)"
       >
         <div class="card-head">
           <div>
-            <p class="card-title">{{ item.name }}</p>
-            <p class="card-subtitle">{{ getSpeciesLabel(item) }}</p>
+            <p class="card-title">{{ pet.name }}</p>
+            <p class="card-subtitle">{{ displayValue(pet.client?.name) }}</p>
           </div>
+          <n-tag :type="pet.isActive ? 'success' : 'error'" :bordered="false">
+            {{ pet.isActive ? 'Ativo' : 'Inativo' }}
+          </n-tag>
         </div>
         <div class="card-grid">
           <div class="card-item">
+            <span class="card-label">Espécie/Raça</span>
+            <span class="card-value">{{ formatSpeciesBreed(pet) }}</span>
+          </div>
+          <div class="card-item">
+            <span class="card-label">Microchip</span>
+            <span class="card-value">{{ displayValue(pet.microchipCode) }}</span>
+          </div>
+          <div class="card-item">
             <span class="card-label">Atualizado</span>
-            <span class="card-value">{{ formatDate(item.updatedAt || '') || '-' }}</span>
+            <span class="card-value">{{ formatDate(pet.updatedAt || '') || '-' }}</span>
           </div>
         </div>
         <div class="card-actions">
-          <n-button size="small" tertiary type="error" @click.stop="confirmDelete(item)">
+          <n-button size="small" tertiary type="error" @click.stop="confirmDelete(pet)">
             Excluir
           </n-button>
         </div>
@@ -54,7 +72,7 @@
       v-else
       :loading="loading"
       :columns="columns"
-      :data="breeds"
+      :data="pets"
       :pagination="false"
       :bordered="false"
       :sorter="sorter"
@@ -78,17 +96,17 @@
       v-model:show="showModal"
       :mask-closable="false"
       preset="card"
-      style="width: 620px"
+      style="width: 760px"
       :content-style="{ padding: '12px 16px 16px 16px' }"
       :header-style="{ padding: '12px 16px 8px 16px' }"
     >
       <template #header>
         <div class="modal-header">
-          <p class="eyebrow">{{ editingItem ? 'Editar raça' : 'Nova raça' }}</p>
+          <p class="eyebrow">{{ editingPet ? 'Editar pet' : 'Novo pet' }}</p>
         </div>
       </template>
-      <BreedForm
-        :value="editingItem"
+      <PetForm
+        :value="editingPet"
         :loading="saving"
         @submit="handleSubmit"
         @cancel="closeModal"
@@ -98,12 +116,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { NButton, useDialog, useMessage } from 'naive-ui'
-import BreedForm, { type Breed } from '~/components/breeds/BreedForm.vue'
+import { h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { NButton, useDialog, useMessage, type SelectOption } from 'naive-ui'
+import PetForm, { type Pet } from '~/components/pets/PetForm.vue'
 
-interface BreedsResponse {
-  data: Breed[]
+interface PetsResponse {
+  data: Pet[]
   meta: {
     page: number
     limit: number
@@ -111,12 +129,7 @@ interface BreedsResponse {
   }
 }
 
-interface SpeciesOption {
-  label: string
-  value: number
-}
-
-interface SpeciesResponse {
+interface ClientsResponse {
   data: { id: number; name: string }[]
 }
 
@@ -125,15 +138,15 @@ const dialog = useDialog()
 
 const filters = reactive({
   name: '',
-  speciesId: null as number | null
+  clientId: null as number | null,
+  microchipCode: ''
 })
 
-const breeds = ref<Breed[]>([])
-const speciesOptions = ref<SpeciesOption[]>([])
+const pets = ref<Pet[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const showModal = ref(false)
-const editingItem = ref<Breed | null>(null)
+const editingPet = ref<Pet | null>(null)
 const activeRequestId = ref(0)
 const isMobile = ref(false)
 let mediaQuery: MediaQueryList | null = null
@@ -152,37 +165,38 @@ const sorter = ref<{ columnKey: string; order: 'ascend' | 'descend' | false }>({
   order: 'descend'
 })
 
-const speciesNameMap = computed(() => {
-  const map = new Map<number, string>()
-  speciesOptions.value.forEach((opt) => {
-    if (typeof opt.value === 'number') {
-      map.set(opt.value, String(opt.label))
-    }
-  })
-  return map
-})
+const clientOptions = ref<SelectOption[]>([])
+const clientLoading = ref(false)
 
 const columns = [
   { title: 'Nome', key: 'name', sorter: true },
   {
+    title: 'Tutor',
+    key: 'clientId',
+    sorter: true,
+    render: (row: Pet) => row.client?.name || ''
+  },
+  {
     title: 'Espécie',
     key: 'speciesId',
-    sorter: true,
-    render: (row: Breed) =>
-      row.species?.name ||
-      speciesNameMap.value.get(row.speciesId ?? -1) ||
-      ''
+    render: (row: Pet) => row.species?.name || ''
   },
+  {
+    title: 'Raça',
+    key: 'breedId',
+    render: (row: Pet) => row.breed?.name || ''
+  },
+  { title: 'Microchip', key: 'microchipCode', sorter: true },
   {
     title: 'Atualizado em',
     key: 'updatedAt',
     sorter: true,
-    render: (row: Breed) => formatDate(row.updatedAt || '')
+    render: (row: Pet) => formatDate(row.updatedAt || '')
   },
   {
     title: 'Ações',
     key: 'actions',
-    render: (row: Breed) =>
+    render: (row: Pet) =>
       h('div', { class: 'actions' }, [
         h(
           NButton,
@@ -207,95 +221,87 @@ const buildQuery = () => {
     limit: pagination.limit
   }
   if (filters.name) params.name = filters.name
-  if (filters.speciesId !== null) params.speciesId = filters.speciesId
+  if (filters.clientId !== null) params.clientId = filters.clientId
+  if (filters.microchipCode) params.microchipCode = filters.microchipCode
   if (sorter.value.columnKey) params.sortBy = sorter.value.columnKey
   if (sorter.value.order) params.sortDirection = sorter.value.order === 'ascend' ? 'asc' : 'desc'
   return params
 }
 
-const fetchBreeds = async () => {
+const fetchPets = async () => {
   const requestId = ++activeRequestId.value
   loading.value = true
   try {
-    const { data, meta } = await $fetch<BreedsResponse>('http://localhost:3000/api/v1/breeds', {
+    const { data, meta } = await $fetch<PetsResponse>('http://localhost:3000/api/v1/pets', {
       query: buildQuery()
     })
     if (requestId !== activeRequestId.value) return
-    breeds.value = data
+    pets.value = data
     pagination.total = meta.total
     pagination.page = meta.page
     pagination.limit = meta.limit
   } catch (err: any) {
-    message.error(err?.data?.message || 'Erro ao carregar raças')
+    message.error(err?.data?.message || 'Erro ao carregar pets')
   } finally {
-    if (requestId === activeRequestId.value) loading.value = false
+    if (requestId === activeRequestId.value) {
+      loading.value = false
+    }
   }
 }
 
-const fetchSpeciesOptions = async () => {
-  try {
-    const { data } = await $fetch<SpeciesResponse>('http://localhost:3000/api/v1/species', {
-      query: { limit: 100 }
-    })
-    speciesOptions.value = data.map((item) => ({ label: item.name, value: item.id }))
-  } catch (err: any) {
-    message.error(err?.data?.message || 'Erro ao carregar espécies')
-  }
-}
-
-const handleSubmit = async (payload: Breed) => {
+const handleSubmit = async (payload: Pet) => {
   saving.value = true
   try {
-    const { id, species, ...body } = payload
-    if (id) {
-      await $fetch(`http://localhost:3000/api/v1/breeds/${id}`, {
+    const { id, client, species, breed, createdAt, updatedAt, deletedAt, ...body } = payload
+    if (payload.id) {
+      await $fetch(`http://localhost:3000/api/v1/pets/${payload.id}`, {
         method: 'PATCH',
         body
       })
-      message.success('Raça atualizada')
+      message.success('Pet atualizado')
     } else {
-      await $fetch('http://localhost:3000/api/v1/breeds', {
+      await $fetch('http://localhost:3000/api/v1/pets', {
         method: 'POST',
         body
       })
-      message.success('Raça criada')
+      message.success('Pet criado')
     }
     closeModal()
-    await fetchBreeds()
+    await fetchPets()
   } catch (err: any) {
-    message.error(err?.data?.message || 'Erro ao salvar raça')
+    message.error(err?.data?.message || 'Erro ao salvar pet')
   } finally {
     saving.value = false
   }
 }
 
-const confirmDelete = (item: Breed) => {
+const confirmDelete = (pet: Pet) => {
   dialog.warning({
     title: 'Confirmar exclusão',
-    content: `Deseja excluir ${item.name}?`,
+    content: `Deseja excluir ${pet.name}?`,
     positiveText: 'Excluir',
     negativeText: 'Cancelar',
     onPositiveClick: async () => {
       try {
-        await $fetch(`http://localhost:3000/api/v1/breeds/${item.id}`, {
+        await $fetch(`http://localhost:3000/api/v1/pets/${pet.id}`, {
           method: 'DELETE'
         })
-        message.success('Raça excluída')
-        await fetchBreeds()
+        message.success('Pet excluído')
+        await fetchPets()
       } catch (err: any) {
-        message.error(err?.data?.message || 'Erro ao excluir raça')
+        message.error(err?.data?.message || 'Erro ao excluir pet')
       }
     }
   })
 }
 
 const openCreate = () => {
-  editingItem.value = null
+  editingPet.value = null
   showModal.value = true
 }
 
-const openEdit = (item: Breed) => {
-  editingItem.value = item
+const openEdit = (pet: Pet) => {
+  editingPet.value = pet
   showModal.value = true
 }
 
@@ -305,21 +311,22 @@ const closeModal = () => {
 
 const handleClearFilters = () => {
   filters.name = ''
-  filters.speciesId = null
+  filters.clientId = null
+  filters.microchipCode = ''
   sorter.value = { columnKey: 'updatedAt', order: 'descend' }
   pagination.page = 1
-  fetchBreeds()
+  fetchPets()
 }
 
 const onPageChange = (page: number) => {
   pagination.page = page
-  fetchBreeds()
+  fetchPets()
 }
 
 const onPageSizeChange = (size: number) => {
   pagination.limit = size
   pagination.page = 1
-  fetchBreeds()
+  fetchPets()
 }
 
 const onSorterChange = (state: { columnKey?: string | number; order?: 'ascend' | 'descend' | false }) => {
@@ -328,17 +335,52 @@ const onSorterChange = (state: { columnKey?: string | number; order?: 'ascend' |
     order: state.order || 'descend'
   }
   pagination.page = 1
-  fetchBreeds()
+  fetchPets()
 }
 
-const rowProps = (row: Breed) => ({
+const rowProps = (row: Pet) => ({
   style: { cursor: 'pointer' },
   onClick: () => openEdit(row)
 })
 
+const fetchClientOptions = async (search?: string) => {
+  clientLoading.value = true
+  try {
+    const { data } = await $fetch<ClientsResponse>('http://localhost:3000/api/v1/clients', {
+      query: {
+        limit: 20,
+        ...(search ? { name: search } : {})
+      }
+    })
+    clientOptions.value = data.map((item) => ({ label: item.name, value: item.id }))
+    if (filters.clientId !== null) {
+      const exists = clientOptions.value.some((opt) => opt.value === filters.clientId)
+      if (!exists) {
+        clientOptions.value = [
+          { label: `ID ${filters.clientId}`, value: filters.clientId },
+          ...clientOptions.value
+        ]
+      }
+    }
+  } catch (err: any) {
+    message.error(err?.data?.message || 'Erro ao carregar clientes')
+  } finally {
+    clientLoading.value = false
+  }
+}
+
+const onClientSearch = (val: string) => {
+  fetchClientOptions(val || undefined)
+}
+
+const ensureClientsLoaded = () => {
+  if (!clientOptions.value.length && !clientLoading.value) {
+    fetchClientOptions()
+  }
+}
+
 onMounted(() => {
-  fetchSpeciesOptions()
-  fetchBreeds()
+  fetchPets()
   if (typeof window !== 'undefined') {
     mediaQuery = window.matchMedia('(max-width: 768px)')
     updateIsMobile()
@@ -367,8 +409,17 @@ const formatDate = (iso: string) => {
   }).format(new Date(iso))
 }
 
-const getSpeciesLabel = (item: Breed) =>
-  item.species?.name || speciesNameMap.value.get(item.speciesId ?? -1) || 'Espécie não informada'
+const displayValue = (value?: string | null) => {
+  const text = (value ?? '').trim()
+  return text ? text : '-'
+}
+
+const formatSpeciesBreed = (pet: Pet) => {
+  const species = pet.species?.name || (pet.speciesId ? `ID ${pet.speciesId}` : '')
+  const breed = pet.breed?.name || (pet.breedId ? `ID ${pet.breedId}` : '')
+  if (!species && !breed) return '-'
+  return [species, breed].filter(Boolean).join(' / ')
+}
 </script>
 
 <style scoped>
@@ -399,7 +450,7 @@ h1 {
 
 .filters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 10px;
   align-items: end;
 }

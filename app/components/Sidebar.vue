@@ -1,7 +1,7 @@
 <template>
   <aside
     class="sidebar"
-    :class="{ collapsed: isCollapsedComputed }"
+    :class="{ collapsed: isCollapsedComputed, mobile: isMobile }"
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
   >
@@ -11,7 +11,7 @@
         <span v-if="!isCollapsedComputed" class="brand-name">SalukiVet</span>
       </div>
       <button
-        v-if="!isCollapsedComputed"
+        v-if="!isCollapsedComputed && !isMobile"
         type="button"
         class="pin-btn"
         :aria-pressed="isPinned"
@@ -59,6 +59,7 @@
             :to="child.to"
             class="submenu-item"
             :class="{ active: isActive(child.to) }"
+            @click="handleNavigate"
           >
             <span class="icon">{{ child.icon }}</span>
             <span class="label">{{ child.label }}</span>
@@ -77,15 +78,21 @@ const props = defineProps({
   items: {
     type: Array,
     required: true
+  },
+  isMobile: {
+    type: Boolean,
+    default: false
   }
 })
+
+const emit = defineEmits(['navigate'])
 
 const route = useRoute()
 const isPinned = ref(false)
 const isHovering = ref(false)
 const openGroups = ref(new Set())
 
-const isCollapsedComputed = computed(() => !isPinned.value && !isHovering.value)
+const isCollapsedComputed = computed(() => (props.isMobile ? false : !isPinned.value && !isHovering.value))
 
 const isActive = (to) => (to ? route.path === to : false)
 const isActivePath = (item) => {
@@ -118,7 +125,9 @@ const onParentClick = (item, event) => {
   if (item.children && item.children.length) {
     event.preventDefault()
     toggleGroup(item)
+    return
   }
+  handleNavigate()
 }
 
 const togglePin = () => {
@@ -126,11 +135,15 @@ const togglePin = () => {
 }
 
 const handleMouseEnter = () => {
-  isHovering.value = true
+  if (!props.isMobile) {
+    isHovering.value = true
+  }
 }
 
 const handleMouseLeave = () => {
-  isHovering.value = false
+  if (!props.isMobile) {
+    isHovering.value = false
+  }
 }
 
 watch(
@@ -142,6 +155,7 @@ watch(
 )
 
 onMounted(() => {
+  if (props.isMobile) return
   if (typeof localStorage === 'undefined') return
   const saved = localStorage.getItem('sidebar:pinned')
   if (saved !== null) {
@@ -176,6 +190,12 @@ watch(
   },
   { immediate: true }
 )
+
+const handleNavigate = () => {
+  if (props.isMobile) {
+    emit('navigate')
+  }
+}
 </script>
 
 <style scoped>
@@ -183,9 +203,9 @@ watch(
   --primary: #0E3A56;
   --secondary: #2CB67D;
   --accent: #33B8C4;
-  --text-main: rgba(255, 255, 255, 0.85);
-  --text-muted: rgba(255, 255, 255, 0.55);
-  --bg: #050608;
+  --text-main: #111827;
+  --text-muted: #6b7280;
+  --bg: #f4f6fb;
 }
 
 .sidebar {
@@ -199,11 +219,17 @@ watch(
   flex-direction: column;
   padding: 14px 12px;
   gap: 14px;
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 8px 0 18px rgba(0, 0, 0, 0.18);
+  box-sizing: border-box;
+  border-right: 1px solid rgba(15, 23, 42, 0.08);
   transition: width 0.18s ease;
   overflow: hidden;
   font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+}
+
+.sidebar.mobile {
+  position: relative;
+  height: 100%;
+  width: 100%;
 }
 
 .sidebar.collapsed {
@@ -217,7 +243,7 @@ watch(
   gap: 8px;
   padding: 10px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(15, 23, 42, 0.04);
 }
 
 .brand {
@@ -243,7 +269,7 @@ watch(
 }
 
 .pin-btn {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(15, 23, 42, 0.08);
   border: none;
   color: var(--text-main);
   border-radius: 10px;
@@ -256,7 +282,7 @@ watch(
 }
 
 .pin-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.14);
   transform: translateY(-1px);
 }
 
@@ -267,7 +293,7 @@ watch(
   padding-right: 4px;
   max-height: calc(100vh - 70px);
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  scrollbar-color: rgba(15, 23, 42, 0.18) transparent;
 }
 
 .menu::-webkit-scrollbar {
@@ -279,12 +305,12 @@ watch(
 }
 
 .menu::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.18);
   border-radius: 999px;
 }
 
 .menu:hover::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(15, 23, 42, 0.3);
 }
 .menu-group {
   display: grid;
@@ -325,7 +351,7 @@ watch(
 }
 
 .menu-item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(15, 23, 42, 0.06);
 }
 
 .menu-item.has-children {
@@ -346,7 +372,7 @@ watch(
 }
 
 .caret-btn {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(15, 23, 42, 0);
   border: none;
   color: var(--text-muted);
   width: 28px;
@@ -359,7 +385,7 @@ watch(
 }
 
 .caret-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.1);
   color: var(--text-main);
   transform: translateY(-1px);
 }
@@ -406,7 +432,7 @@ watch(
 }
 
 .submenu-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(15, 23, 42, 0.06);
   color: var(--text-main);
 }
 
