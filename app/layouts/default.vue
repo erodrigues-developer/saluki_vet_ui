@@ -2,12 +2,7 @@
   <NConfigProvider :locale="ptBR" :date-locale="datePtBR">
     <NMessageProvider>
       <NDialogProvider>
-        <div
-          class="layout"
-          @touchstart="onEdgeTouchStart"
-          @touchmove="onEdgeTouchMove"
-          @touchend="onEdgeTouchEnd"
-        >
+        <div class="layout" @touchstart="onEdgeTouchStart" @touchmove="onEdgeTouchMove" @touchend="onEdgeTouchEnd">
           <Sidebar v-if="!isMobile" :items="menuItems" />
           <main class="content">
             <div v-if="isMobile" class="mobile-topbar">
@@ -21,12 +16,8 @@
           </main>
           <div v-if="isMobile" class="mobile-overlay" :class="{ open: sidebarOpen }">
             <div class="scrim" @click="closeSidebar" />
-            <div
-              class="drawer"
-              @touchstart="onDrawerTouchStart"
-              @touchmove="onDrawerTouchMove"
-              @touchend="onDrawerTouchEnd"
-            >
+            <div class="drawer" @touchstart="onDrawerTouchStart" @touchmove="onDrawerTouchMove"
+              @touchend="onDrawerTouchEnd">
               <Sidebar :items="menuItems" :is-mobile="true" @navigate="closeSidebar" />
             </div>
           </div>
@@ -172,9 +163,7 @@ const menuItems = [
     label: 'Pets',
     icon: '🐾',
     children: [
-      { label: 'Cadastro de pets', icon: '🐶', to: '/pets' },
-      { label: 'Espécies e raças', icon: '🧬', to: '/pets/especies-racas' },
-      { label: 'Arquivos', icon: '📁', to: '/pets/arquivos' }
+      { label: 'Cadastro de pets', icon: '🐶', to: '/pets' }
     ]
   },
   { label: 'Clientes', icon: '👥', to: '/clientes' },

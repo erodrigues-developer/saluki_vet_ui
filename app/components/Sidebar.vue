@@ -233,7 +233,7 @@ const handleNavigate = () => {
 }
 
 .sidebar.collapsed {
-  width: 64px;
+  width: 78px;
 }
 
 .sidebar-top {
