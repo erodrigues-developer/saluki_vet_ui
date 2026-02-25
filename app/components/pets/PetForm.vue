@@ -304,7 +304,7 @@ const handleSubmit = async () => {
 const fetchClientOptions = async (search?: string) => {
   clientLoading.value = true
   try {
-    const { data } = await $fetch<ClientsResponse>('http://localhost:3000/api/v1/clients', {
+    const { data } = await $fetch<ClientsResponse>('/api/v1/clients', {
       query: {
         limit: 20,
         ...(search ? { name: search } : {})
@@ -322,7 +322,7 @@ const fetchClientOptions = async (search?: string) => {
 const fetchSpeciesOptions = async (search?: string) => {
   speciesLoading.value = true
   try {
-    const { data } = await $fetch<SpeciesResponse>('http://localhost:3000/api/v1/species', {
+    const { data } = await $fetch<SpeciesResponse>('/api/v1/species', {
       query: {
         limit: 20,
         ...(search ? { name: search } : {})
@@ -341,7 +341,7 @@ const fetchBreedOptions = async (search?: string) => {
   if (!model.speciesId) return
   breedLoading.value = true
   try {
-    const { data } = await $fetch<BreedsResponse>('http://localhost:3000/api/v1/breeds', {
+    const { data } = await $fetch<BreedsResponse>('/api/v1/breeds', {
       query: {
         limit: 50,
         speciesId: model.speciesId,

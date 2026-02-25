@@ -20,6 +20,7 @@
     "vue-router": "^4.6.3"
   },
   "devDependencies": {
+    "@types/node": "^25.3.0",
     "unplugin-auto-import": "^20.3.0",
     "unplugin-vue-components": "^30.0.0"
   }

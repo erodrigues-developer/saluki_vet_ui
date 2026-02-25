@@ -262,7 +262,7 @@ const fetchClients = async () => {
   const requestId = ++activeRequestId.value
   loading.value = true
   try {
-    const { data, meta } = await $fetch<ClientsResponse>('http://localhost:3000/api/v1/clients', {
+    const { data, meta } = await $fetch<ClientsResponse>('/api/v1/clients', {
       query: buildQuery()
     })
     if (requestId !== activeRequestId.value) return
@@ -284,13 +284,13 @@ const handleSubmit = async (payload: Client) => {
   try {
     const { id, ...body } = payload
     if (payload.id) {
-      await $fetch(`http://localhost:3000/api/v1/clients/${payload.id}`, {
+      await $fetch(`/api/v1/clients/${payload.id}`, {
         method: 'PATCH',
         body
       })
       message.success('Cliente atualizado')
     } else {
-      await $fetch('http://localhost:3000/api/v1/clients', {
+      await $fetch('/api/v1/clients', {
         method: 'POST',
         body
       })
@@ -313,7 +313,7 @@ const confirmDelete = (client: Client) => {
     negativeText: 'Cancelar',
     onPositiveClick: async () => {
       try {
-        await $fetch(`http://localhost:3000/api/v1/clients/${client.id}`, {
+        await $fetch(`/api/v1/clients/${client.id}`, {
           method: 'DELETE'
         })
         message.success('Cliente excluído')

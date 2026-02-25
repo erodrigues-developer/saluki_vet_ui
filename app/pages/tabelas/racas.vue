@@ -217,7 +217,7 @@ const fetchBreeds = async () => {
   const requestId = ++activeRequestId.value
   loading.value = true
   try {
-    const { data, meta } = await $fetch<BreedsResponse>('http://localhost:3000/api/v1/breeds', {
+    const { data, meta } = await $fetch<BreedsResponse>('/api/v1/breeds', {
       query: buildQuery()
     })
     if (requestId !== activeRequestId.value) return
@@ -234,7 +234,7 @@ const fetchBreeds = async () => {
 
 const fetchSpeciesOptions = async () => {
   try {
-    const { data } = await $fetch<SpeciesResponse>('http://localhost:3000/api/v1/species', {
+    const { data } = await $fetch<SpeciesResponse>('/api/v1/species', {
       query: { limit: 100 }
     })
     speciesOptions.value = data.map((item) => ({ label: item.name, value: item.id }))
@@ -248,13 +248,13 @@ const handleSubmit = async (payload: Breed) => {
   try {
     const { id, species, ...body } = payload
     if (id) {
-      await $fetch(`http://localhost:3000/api/v1/breeds/${id}`, {
+      await $fetch(`/api/v1/breeds/${id}`, {
         method: 'PATCH',
         body
       })
       message.success('Raça atualizada')
     } else {
-      await $fetch('http://localhost:3000/api/v1/breeds', {
+      await $fetch('/api/v1/breeds', {
         method: 'POST',
         body
       })
@@ -277,7 +277,7 @@ const confirmDelete = (item: Breed) => {
     negativeText: 'Cancelar',
     onPositiveClick: async () => {
       try {
-        await $fetch(`http://localhost:3000/api/v1/breeds/${item.id}`, {
+        await $fetch(`/api/v1/breeds/${item.id}`, {
           method: 'DELETE'
         })
         message.success('Raça excluída')

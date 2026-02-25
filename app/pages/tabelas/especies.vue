@@ -208,7 +208,7 @@ const fetchSpecies = async () => {
   const requestId = ++activeRequestId.value
   loading.value = true
   try {
-    const { data, meta } = await $fetch<SpeciesResponse>('http://localhost:3000/api/v1/species', {
+    const { data, meta } = await $fetch<SpeciesResponse>('/api/v1/species', {
       query: buildQuery()
     })
     if (requestId !== activeRequestId.value) return
@@ -229,13 +229,13 @@ const handleSubmit = async () => {
   try {
     const { id, ...body } = formModel
     if (id) {
-      await $fetch(`http://localhost:3000/api/v1/species/${id}`, {
+      await $fetch(`/api/v1/species/${id}`, {
         method: 'PATCH',
         body
       })
       message.success('Espécie atualizada')
     } else {
-      await $fetch('http://localhost:3000/api/v1/species', {
+      await $fetch('/api/v1/species', {
         method: 'POST',
         body
       })
@@ -258,7 +258,7 @@ const confirmDelete = (item: Species) => {
     negativeText: 'Cancelar',
     onPositiveClick: async () => {
       try {
-        await $fetch(`http://localhost:3000/api/v1/species/${item.id}`, {
+        await $fetch(`/api/v1/species/${item.id}`, {
           method: 'DELETE'
         })
         message.success('Espécie excluída')

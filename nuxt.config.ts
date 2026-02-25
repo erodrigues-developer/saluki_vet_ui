@@ -11,6 +11,14 @@ export default defineNuxtConfig({
   build: {
     transpile: ['vueuc', 'naive-ui', '@css-render/vue3-ssr', 'date-fns', 'lodash-es'],
   },
+  runtimeConfig: {
+    public: {
+      apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'
+    }
+  },
+  routeRules: {
+    '/api/**': { proxy: `${process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/api/**` }
+  },
   vite: {
     plugins: [
       AutoImport({
