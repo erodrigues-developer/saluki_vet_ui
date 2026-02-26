@@ -1,7 +1,11 @@
 <template>
-  <NuxtLayout>
-    <NuxtPage />
-  </NuxtLayout>
+  <n-config-provider>
+    <n-message-provider>
+      <NuxtLayout>
+        <NuxtPage />
+      </NuxtLayout>
+    </n-message-provider>
+  </n-config-provider>
 </template>
 
 <style>

@@ -1,3 +1,4 @@
+import { defineNuxtConfig } from 'nuxt/config'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
@@ -6,10 +7,17 @@ import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
-  modules: ['nuxtjs-naive-ui'],
+  modules: ['nuxtjs-naive-ui', '@pinia/nuxt'],
   css: ['vfonts/Lato.css', 'vfonts/FiraCode.css'],
   build: {
-    transpile: ['vueuc', 'naive-ui', '@css-render/vue3-ssr', 'date-fns', 'lodash-es'],
+    transpile: [
+      'naive-ui',
+      'vueuc',
+      '@css-render/vue3-ssr',
+      '@juggle/resize-observer',
+      'date-fns',
+      'lodash-es',
+    ],
   },
   runtimeConfig: {
     public: {
@@ -34,11 +42,38 @@ export default defineNuxtConfig({
         ],
       }),
       Components({
-        resolvers: [NaiveUiResolver()],
+        resolvers: [
+          NaiveUiResolver({
+            importStyle: 'css',
+          }),
+        ],
       }),
     ],
     optimizeDeps: {
-      include: ['vueuc', 'naive-ui', '@css-render/vue3-ssr', 'date-fns', 'lodash-es'],
+      include: [
+        'naive-ui',
+        'vueuc',
+        'date-fns-tz/formatInTimeZone',
+        'evtd',
+        'seemly',
+        'treemate',
+        'vdirs',
+        'vooks',
+        'naive-ui/es/locales/common/ptBR',
+        'naive-ui/es/locales/date/ptBR',
+        'naive-ui/es/config-provider',
+        'naive-ui/es/card',
+        'naive-ui/es/form',
+        'naive-ui/es/form-item',
+        'naive-ui/es/input',
+        'naive-ui/es/button',
+        'naive-ui/es/alert'
+      ],
+    },
+    build: {
+      commonjsOptions: {
+        include: [/node_modules/],
+      },
     },
   },
 })

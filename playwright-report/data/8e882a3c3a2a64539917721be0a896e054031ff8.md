@@ -1,0 +1,45 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e6]:
+    - heading "Acesso ao Saluki ERP" [ref=e7]:
+      - heading "Acesso ao Saluki ERP" [ref=e8]
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - generic [ref=e12]: Email
+          - generic [ref=e13]: "*"
+        - generic [ref=e17]:
+          - textbox "Seu e-mail cadastrado" [ref=e18]
+          - generic:
+            - generic: Seu e-mail cadastrado
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]: Senha
+          - generic [ref=e23]: "*"
+        - generic [ref=e26]:
+          - generic [ref=e27]:
+            - textbox "Sua senha" [ref=e28]
+            - generic:
+              - generic: Sua senha
+          - img [ref=e32] [cursor=pointer]
+      - button "Entrar" [active] [ref=e39] [cursor=pointer]:
+        - generic [ref=e40]: Entrar
+  - generic:
+    - img
+  - generic:
+    - generic:
+      - generic:
+        - button "Go to parent" [disabled]
+        - button "Open in editor"
+        - button "Close"
+  - generic [ref=e41]:
+    - button "Toggle Nuxt DevTools" [ref=e42] [cursor=pointer]:
+      - img [ref=e43]
+    - generic "Page load time" [ref=e46]:
+      - generic [ref=e47]: "187"
+      - generic [ref=e48]: ms
+    - button "Toggle Component Inspector" [ref=e50] [cursor=pointer]:
+      - img [ref=e51]
+```
