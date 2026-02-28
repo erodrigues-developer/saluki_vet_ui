@@ -7,6 +7,9 @@ import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
+  devServer: {
+    port: 3001
+  },
   modules: ['nuxtjs-naive-ui', '@pinia/nuxt'],
   css: ['vfonts/Lato.css', 'vfonts/FiraCode.css'],
   build: {

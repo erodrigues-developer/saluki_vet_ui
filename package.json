@@ -6,7 +6,7 @@
     "build": "nuxt build",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
-    "preview": "nuxt preview",
+    "preview": "nuxt preview --port 3001",
     "postinstall": "nuxt prepare",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"

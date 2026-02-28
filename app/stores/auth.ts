@@ -1,5 +1,4 @@
 import { defineStore } from 'pinia';
-import { useRouter } from 'vue-router';
 
 interface User {
   id: number;
@@ -43,11 +42,8 @@ export const useAuthStore = defineStore('auth', {
       if (process.client) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
+        navigateTo('/login');
       }
-
-      // Redireciona para o login
-      const router = useRouter();
-      router.push('/login');
     },
     initAuth() {
       // Recupera o estado do localStorage na inicialização client-side
