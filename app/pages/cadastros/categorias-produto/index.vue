@@ -89,7 +89,8 @@ const columns = [
 const fetchCategories = async () => {
   loading.value = true
   try {
-    const res = await $fetch<any>('/api/v1/product-categories', {
+    const api = useApi()
+    const res = await api<any>('/api/v1/product-categories', {
       query: {
         page: pagination.page,
         limit: pagination.pageSize
@@ -117,15 +118,16 @@ const handlePageSizeChange = (s: number) => {
 
 const handleSubmit = async (payload: ProductCategory) => {
   saving.value = true
+  const api = useApi()
   try {
     if (payload.id) {
-      await $fetch(`/api/v1/product-categories/${payload.id}`, {
+      await api(`/api/v1/product-categories/${payload.id}`, {
         method: 'PATCH',
         body: payload
       })
       message.success('Categoria atualizada')
     } else {
-      await $fetch('/api/v1/product-categories', {
+      await api('/api/v1/product-categories', {
         method: 'POST',
         body: payload
       })
@@ -147,8 +149,9 @@ const confirmDelete = (category: ProductCategory) => {
     positiveText: 'Excluir',
     negativeText: 'Cancelar',
     onPositiveClick: async () => {
+      const api = useApi()
       try {
-        await $fetch(`/api/v1/product-categories/${category.id}`, { method: 'DELETE' })
+        await api(`/api/v1/product-categories/${category.id}`, { method: 'DELETE' })
         message.success('Categoria excluída')
         fetchCategories()
       } catch (err: any) {

@@ -262,7 +262,8 @@ const fetchClients = async () => {
   const requestId = ++activeRequestId.value
   loading.value = true
   try {
-    const { data, meta } = await $fetch<ClientsResponse>('/api/v1/clients', {
+    const api = useApi()
+    const { data, meta } = await api<ClientsResponse>('/api/v1/clients', {
       query: buildQuery()
     })
     if (requestId !== activeRequestId.value) return
@@ -281,16 +282,17 @@ const fetchClients = async () => {
 
 const handleSubmit = async (payload: Client) => {
   saving.value = true
+  const api = useApi()
   try {
     const { id, ...body } = payload
     if (payload.id) {
-      await $fetch(`/api/v1/clients/${payload.id}`, {
+      await api(`/api/v1/clients/${payload.id}`, {
         method: 'PATCH',
         body
       })
       message.success('Cliente atualizado')
     } else {
-      await $fetch('/api/v1/clients', {
+      await api('/api/v1/clients', {
         method: 'POST',
         body
       })
@@ -312,8 +314,9 @@ const confirmDelete = (client: Client) => {
     positiveText: 'Excluir',
     negativeText: 'Cancelar',
     onPositiveClick: async () => {
+      const api = useApi()
       try {
-        await $fetch(`/api/v1/clients/${client.id}`, {
+        await api(`/api/v1/clients/${client.id}`, {
           method: 'DELETE'
         })
         message.success('Cliente excluído')

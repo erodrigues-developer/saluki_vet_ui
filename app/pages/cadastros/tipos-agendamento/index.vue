@@ -83,7 +83,8 @@ const columns = [
 const fetchTypes = async () => {
   loading.value = true
   try {
-    const res = await $fetch<AppointmentType[]>('/api/v1/appointment-types')
+    const api = useApi()
+    const res = await api<AppointmentType[]>('/api/v1/appointment-types')
     types.value = res
   } catch (err) {
     message.error('Erro ao buscar tipos de agendamento')
@@ -94,15 +95,16 @@ const fetchTypes = async () => {
 
 const handleSubmit = async (payload: AppointmentType) => {
   saving.value = true
+  const api = useApi()
   try {
     if (payload.id) {
-      await $fetch(`/api/v1/appointment-types/${payload.id}`, {
+      await api(`/api/v1/appointment-types/${payload.id}`, {
         method: 'PATCH',
         body: payload
       })
       message.success('Tipo atualizado')
     } else {
-      await $fetch('/api/v1/appointment-types', {
+      await api('/api/v1/appointment-types', {
         method: 'POST',
         body: payload
       })
@@ -124,8 +126,9 @@ const confirmDelete = (type: AppointmentType) => {
     positiveText: 'Excluir',
     negativeText: 'Cancelar',
     onPositiveClick: async () => {
+      const api = useApi()
       try {
-        await $fetch(`/api/v1/appointment-types/${type.id}`, { method: 'DELETE' })
+        await api(`/api/v1/appointment-types/${type.id}`, { method: 'DELETE' })
         message.success('Tipo excluído')
         fetchTypes()
       } catch (err) {

@@ -120,8 +120,9 @@ const handleSubmit = async () => {
 
 const fetchSpeciesOptions = async (search?: string) => {
   speciesLoading.value = true
+  const api = useApi()
   try {
-    const { data } = await $fetch<SpeciesResponse>('/api/v1/species', {
+    const { data } = await api<SpeciesResponse>('/api/v1/species', {
       query: {
         limit: 20,
         ...(search ? { name: search } : {})

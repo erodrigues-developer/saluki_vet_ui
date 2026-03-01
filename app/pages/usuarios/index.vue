@@ -176,7 +176,8 @@ const fetchUsers = async () => {
     if (filters.email) params.email = filters.email
     if (filters.isActive !== null) params.isActive = filters.isActive
 
-    const res = await $fetch<UsersResponse>('/api/v1/users', { query: params })
+    const api = useApi()
+    const res = await api<UsersResponse>('/api/v1/users', { query: params })
     users.value = res.data
     pagination.total = res.meta.total
   } catch (err) {
@@ -188,15 +189,16 @@ const fetchUsers = async () => {
 
 const handleSubmit = async (payload: User) => {
   saving.value = true
+  const api = useApi()
   try {
     if (payload.id) {
-      await $fetch(`/api/v1/users/${payload.id}`, {
+      await api(`/api/v1/users/${payload.id}`, {
         method: 'PATCH',
         body: payload
       })
       message.success('Usuário atualizado')
     } else {
-      await $fetch('/api/v1/users', {
+      await api('/api/v1/users', {
         method: 'POST',
         body: payload
       })
@@ -218,8 +220,9 @@ const confirmDelete = (user: User) => {
     positiveText: 'Excluir',
     negativeText: 'Cancelar',
     onPositiveClick: async () => {
+      const api = useApi()
       try {
-        await $fetch(`/api/v1/users/${user.id}`, { method: 'DELETE' })
+        await api(`/api/v1/users/${user.id}`, { method: 'DELETE' })
         message.success('Usuário excluído')
         fetchUsers()
       } catch (err) {

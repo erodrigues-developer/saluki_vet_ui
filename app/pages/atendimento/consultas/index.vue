@@ -121,11 +121,12 @@ const columns = [
 ]
 
 const loadLookups = async () => {
+  const api = useApi()
   try {
     const [usersRes, clientsRes, petsRes] = await Promise.all([
-      $fetch<any>('/api/v1/users?limit=100'),
-      $fetch<any>('/api/v1/clients?limit=500'),
-      $fetch<any>('/api/v1/pets?limit=1000')
+      api<any>('/api/v1/users?limit=100'),
+      api<any>('/api/v1/clients?limit=500'),
+      api<any>('/api/v1/pets?limit=1000')
     ])
 
     usersRes.data.forEach((u: any) => { usersMap.value[u.id] = u.name })
@@ -147,7 +148,8 @@ const fetchConsultations = async () => {
     }
     if (filters.veterinarianId) queryParams.veterinarianId = filters.veterinarianId
 
-    const res = await $fetch<any>('/api/v1/consultations', {
+    const api = useApi()
+    const res = await api<any>('/api/v1/consultations', {
       query: queryParams
     })
     consultations.value = res.data
@@ -177,15 +179,16 @@ const handlePageSizeChange = (s: number) => {
 
 const handleSubmit = async (payload: ConsultationPayload) => {
   saving.value = true
+  const api = useApi()
   try {
     if (payload.id) {
-      await $fetch(`/api/v1/consultations/${payload.id}`, {
+      await api(`/api/v1/consultations/${payload.id}`, {
         method: 'PATCH',
         body: payload
       })
       message.success('Consulta atualizada com sucesso')
     } else {
-      await $fetch('/api/v1/consultations', {
+      await api('/api/v1/consultations', {
         method: 'POST',
         body: payload
       })

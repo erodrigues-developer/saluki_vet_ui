@@ -99,7 +99,8 @@ const columns = [
 const fetchProcedures = async () => {
   loading.value = true
   try {
-    const res = await $fetch<any>('/api/v1/procedures', {
+    const api = useApi()
+    const res = await api<any>('/api/v1/procedures', {
       query: {
         page: pagination.page,
         limit: pagination.pageSize
@@ -127,15 +128,16 @@ const handlePageSizeChange = (s: number) => {
 
 const handleSubmit = async (payload: Procedure) => {
   saving.value = true
+  const api = useApi()
   try {
     if (payload.id) {
-      await $fetch(`/api/v1/procedures/${payload.id}`, {
+      await api(`/api/v1/procedures/${payload.id}`, {
         method: 'PATCH',
         body: payload
       })
       message.success('Procedimento atualizado')
     } else {
-      await $fetch('/api/v1/procedures', {
+      await api('/api/v1/procedures', {
         method: 'POST',
         body: payload
       })
@@ -157,8 +159,9 @@ const confirmDelete = (procedure: Procedure) => {
     positiveText: 'Excluir',
     negativeText: 'Cancelar',
     onPositiveClick: async () => {
+      const api = useApi()
       try {
-        await $fetch(`/api/v1/procedures/${procedure.id}`, { method: 'DELETE' })
+        await api(`/api/v1/procedures/${procedure.id}`, { method: 'DELETE' })
         message.success('Procedimento excluído')
         fetchProcedures()
       } catch (err: any) {

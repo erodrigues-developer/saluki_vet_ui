@@ -161,12 +161,13 @@ const rules: FormRules = {
 }
 
 const loadLookups = async () => {
+  const api = useApi()
   try {
     const [clientsRes, petsRes, usersRes, apptsRes] = await Promise.all([
-      $fetch<any>('/api/v1/clients?limit=500'),
-      $fetch<any>('/api/v1/pets?limit=1000'),
-      $fetch<any>('/api/v1/users?limit=100'),
-      $fetch<any>('/api/v1/appointments?sortBy=startsAt&sortDirection=desc&limit=50')
+      api<any>('/api/v1/clients?limit=500'),
+      api<any>('/api/v1/pets?limit=1000'),
+      api<any>('/api/v1/users?limit=100'),
+      api<any>('/api/v1/appointments?sortBy=startsAt&sortDirection=desc&limit=50')
     ])
 
     clientOptions.value = clientsRes.data.map((i: any) => ({ label: i.name, value: Number(i.id) }))

@@ -232,7 +232,8 @@ const fetchPets = async () => {
   const requestId = ++activeRequestId.value
   loading.value = true
   try {
-    const { data, meta } = await $fetch<PetsResponse>('/api/v1/pets', {
+    const api = useApi()
+    const { data, meta } = await api<PetsResponse>('/api/v1/pets', {
       query: buildQuery()
     })
     if (requestId !== activeRequestId.value) return
@@ -251,16 +252,17 @@ const fetchPets = async () => {
 
 const handleSubmit = async (payload: Pet) => {
   saving.value = true
+  const api = useApi()
   try {
     const { id, client, species, breed, createdAt, updatedAt, deletedAt, ...body } = payload
     if (payload.id) {
-      await $fetch(`/api/v1/pets/${payload.id}`, {
+      await api(`/api/v1/pets/${payload.id}`, {
         method: 'PATCH',
         body
       })
       message.success('Pet atualizado')
     } else {
-      await $fetch('/api/v1/pets', {
+      await api('/api/v1/pets', {
         method: 'POST',
         body
       })
@@ -282,8 +284,9 @@ const confirmDelete = (pet: Pet) => {
     positiveText: 'Excluir',
     negativeText: 'Cancelar',
     onPositiveClick: async () => {
+      const api = useApi()
       try {
-        await $fetch(`/api/v1/pets/${pet.id}`, {
+        await api(`/api/v1/pets/${pet.id}`, {
           method: 'DELETE'
         })
         message.success('Pet excluído')
@@ -345,8 +348,9 @@ const rowProps = (row: Pet) => ({
 
 const fetchClientOptions = async (search?: string) => {
   clientLoading.value = true
+  const api = useApi()
   try {
-    const { data } = await $fetch<ClientsResponse>('/api/v1/clients', {
+    const { data } = await api<ClientsResponse>('/api/v1/clients', {
       query: {
         limit: 20,
         ...(search ? { name: search } : {})

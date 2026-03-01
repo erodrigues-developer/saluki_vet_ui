@@ -25,11 +25,51 @@ export const useAuthStore = defineStore('auth', {
     }
   },
   actions: {
+    cookieOptions() {
+      return {
+        sameSite: 'lax' as const,
+        path: '/',
+      };
+    },
+    setUserFromStorage(userStr: string | null) {
+      if (!userStr) {
+        this.user = null;
+        return;
+      }
+
+      try {
+        this.user = JSON.parse(userStr);
+      } catch (e) {
+        this.user = null;
+        if (process.client) {
+          localStorage.removeItem('auth_user');
+        }
+      }
+    },
+    clearPersistedAuth() {
+      const tokenCookie = useCookie<string | null>('auth_token', this.cookieOptions());
+      // Remove cookie legado que armazenava usuário completo.
+      const legacyUserCookie = useCookie<string | null>('auth_user', this.cookieOptions());
+      tokenCookie.value = null;
+      legacyUserCookie.value = null;
+
+      if (process.client) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+      }
+    },
     setAuth(token: string, user: User) {
       this.token = token;
       this.user = user;
 
-      // Armazena no localStorage para persistência client-side
+      // Cookie do token é a fonte de verdade para SSR.
+      const tokenCookie = useCookie<string | null>('auth_token', this.cookieOptions());
+      tokenCookie.value = token;
+
+      // Remove cookie legado para não depender de payload grande em cookie.
+      const legacyUserCookie = useCookie<string | null>('auth_user', this.cookieOptions());
+      legacyUserCookie.value = null;
+
       if (process.client) {
         localStorage.setItem('auth_token', token);
         localStorage.setItem('auth_user', JSON.stringify(user));
@@ -38,26 +78,33 @@ export const useAuthStore = defineStore('auth', {
     logout() {
       this.token = null;
       this.user = null;
-
-      if (process.client) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
-        navigateTo('/login');
-      }
+      this.clearPersistedAuth();
+      if (process.client) navigateTo('/login');
     },
     initAuth() {
-      // Recupera o estado do localStorage na inicialização client-side
+      const tokenCookie = useCookie<string | null>('auth_token', this.cookieOptions());
+
+      // Fluxo principal: token vem de cookie, compatível com SSR/CSR.
+      if (tokenCookie.value) {
+        this.token = tokenCookie.value;
+        if (process.client) {
+          this.setUserFromStorage(localStorage.getItem('auth_user'));
+        }
+        return;
+      }
+
+      this.token = null;
+      this.user = null;
+
+      // Migração legada: se só existir localStorage, sobe token para cookie.
       if (process.client) {
         const token = localStorage.getItem('auth_token');
         const userStr = localStorage.getItem('auth_user');
 
-        if (token && userStr) {
+        if (token) {
           this.token = token;
-          try {
-            this.user = JSON.parse(userStr);
-          } catch (e) {
-            this.logout();
-          }
+          tokenCookie.value = token;
+          this.setUserFromStorage(userStr);
         }
       }
     }

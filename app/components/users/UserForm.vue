@@ -119,10 +119,9 @@ const rules: FormRules = {
 
 const fetchRoles = async () => {
   rolesLoading.value = true
+  const api = useApi()
   try {
-    // Note: Assuming there is a roles endpoint. I should implement it or mock it.
-    // Based on the schema expansion, I should have implemented it.
-    const roles = await $fetch<Role[]>('/api/v1/roles')
+    const roles = await api<Role[]>('/api/v1/roles')
     roleOptions.value = roles.map(r => ({ label: r.name, value: Number(r.id) }))
   } catch (err) {
     message.error('Erro ao carregar papéis')

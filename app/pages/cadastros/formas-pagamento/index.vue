@@ -128,8 +128,9 @@ const columns = [
 
 const fetchPaymentMethods = async () => {
   loading.value = true;
+  const api = useApi();
   try {
-    const response = await $fetch('/api/v1/payment-methods', {
+    const response = await api('/api/v1/payment-methods', {
       params: {
         page: pagination.value.page,
         limit: pagination.value.pageSize,
@@ -168,8 +169,9 @@ const openEditModal = (paymentMethod: any) => {
 };
 
 const handleDelete = async (id: number) => {
+  const api = useApi();
   try {
-    await $fetch(`/api/v1/payment-methods/${id}`, {
+    await api(`/api/v1/payment-methods/${id}`, {
       method: 'DELETE',
     });
     message.success('Forma de Pagamento excluída com sucesso');

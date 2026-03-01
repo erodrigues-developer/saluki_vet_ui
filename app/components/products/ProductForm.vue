@@ -165,8 +165,9 @@ watch(
 )
 
 const loadCategories = async () => {
+  const api = useApi()
   try {
-    const res = await $fetch<any>('/api/v1/product-categories?limit=100')
+    const res = await api<any>('/api/v1/product-categories?limit=100')
     categoryOptions.value = (res.data || []).map((c: any) => ({
       label: c.name,
       value: Number(c.id)

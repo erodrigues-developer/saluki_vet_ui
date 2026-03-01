@@ -46,7 +46,6 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
 import { useAuthStore } from '~/stores/auth';
 import type { FormInst } from 'naive-ui';
 import { useMessage } from 'naive-ui';
@@ -58,6 +57,7 @@ definePageMeta({
 const formRef = ref<FormInst | null>(null);
 const message = useMessage();
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 const config = useRuntimeConfig();
 
@@ -103,6 +103,18 @@ async function handleLogin(e: Event) {
         // Logado com sucesso
         authStore.setAuth(response.data.access_token, response.data.user);
         message.success('Bem vindo ao Saluki ERP!');
+
+        const redirectQuery = route.query.redirect;
+        const redirect = Array.isArray(redirectQuery) ? redirectQuery[0] : redirectQuery;
+        if (
+          typeof redirect === 'string'
+          && redirect.startsWith('/')
+          && !redirect.startsWith('//')
+          && redirect !== '/login'
+        ) {
+          router.push(redirect);
+          return;
+        }
 
         if (authStore.isAdmin) {
           router.push('/admin');

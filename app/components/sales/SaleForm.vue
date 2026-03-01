@@ -149,11 +149,12 @@ const formatCurrency = (val: number) => {
 };
 
 const loadLookups = async () => {
+  const api = useApi();
   try {
     const [clientsRes, usersRes, productsRes] = await Promise.all([
-      $fetch<any>('/api/v1/clients?limit=500'),
-      $fetch<any>('/api/v1/users?limit=100'),
-      $fetch<any>('/api/v1/products?limit=500')
+      api<any>('/api/v1/clients?limit=500'),
+      api<any>('/api/v1/users?limit=100'),
+      api<any>('/api/v1/products?limit=500')
     ]);
 
     clientOptions.value = clientsRes.data.map((i: any) => ({ label: i.name, value: Number(i.id) }));
@@ -356,7 +357,9 @@ const handleSubmit = async () => {
     const url = model.id ? `/api/v1/sales/${model.id}` : '/api/v1/sales';
     const method = model.id ? 'PATCH' : 'POST';
 
-    const response = await $fetch(url, {
+    const api = useApi();
+
+    const response = await api(url, {
       method,
       body: payload
     });
@@ -366,7 +369,7 @@ const handleSubmit = async () => {
     // we must manually loop and create sale_items.
     if (!model.id && response.id) {
        for (const item of model.items) {
-          await $fetch('/api/v1/sale-items', {
+          await api('/api/v1/sale-items', {
              method: 'POST',
              body: {
                saleId: response.id,

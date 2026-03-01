@@ -118,6 +118,63 @@
     </section>
 
     <section class="chart-grid">
+      <div class="card wide finance-panel">
+        <div class="card-head finance-head">
+          <div>
+            <p class="label">Financeiro - Contas a pagar</p>
+            <h3>Resumo e Filtros</h3>
+            <p class="subhead">Aplique filtros para atualizar KPIs e gráficos financeiros.</p>
+          </div>
+          <span class="pill neutral">Atualização em tempo real</span>
+        </div>
+
+        <div class="finance-filters">
+          <label class="finance-filter">
+            Mês
+            <select v-model.number="financeFilters.month">
+              <option v-for="option in monthOptions" :key="`m-${option.value}`" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="finance-filter">
+            Ano
+            <select v-model.number="financeFilters.year">
+              <option v-for="option in yearOptions" :key="`y-${option.value}`" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="finance-filter">
+            Status
+            <select v-model="financeFilters.status">
+              <option v-for="option in statusOptions" :key="`s-${option.value}`" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+        </div>
+
+        <div class="finance-kpis">
+          <div class="finance-kpi">
+            <span>Total Pendente</span>
+            <strong>{{ formatCurrency(financeKpis.totalPending) }}</strong>
+          </div>
+          <div class="finance-kpi">
+            <span>Total Pago</span>
+            <strong>{{ formatCurrency(financeKpis.totalPaid) }}</strong>
+          </div>
+          <div class="finance-kpi">
+            <span>Previsão do Mês</span>
+            <strong>{{ formatCurrency(financeKpis.expectedTotal) }}</strong>
+          </div>
+          <div class="finance-kpi">
+            <span>Contas Atrasadas</span>
+            <strong>{{ formatCurrency(financeKpis.totalOverdue) }}</strong>
+          </div>
+        </div>
+      </div>
+
       <div class="card wide">
         <div class="card-head">
           <div>
@@ -143,6 +200,30 @@
         </div>
         <div class="bar-chart">
           <EChartBase :option="revenueOption" height="220px" class="tall-chart" />
+        </div>
+      </div>
+
+      <div class="card wide">
+        <div class="card-head">
+          <div>
+            <p class="label">Despesas por Categoria</p>
+            <h3>Distribuição de Custos</h3>
+          </div>
+        </div>
+        <div>
+          <EChartBase :option="pieChartOptions" height="220px" class="tall-chart" />
+        </div>
+      </div>
+
+      <div class="card wide">
+        <div class="card-head">
+          <div>
+            <p class="label">Fluxo de Vencimentos</p>
+            <h3>Previsão de Pagamentos</h3>
+          </div>
+        </div>
+        <div>
+          <EChartBase :option="barChartOptions" height="220px" class="tall-chart" />
         </div>
       </div>
 
@@ -222,7 +303,105 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, reactive, onMounted, watch } from 'vue'
+
+const dashboardData = ref(null)
+const currentMonth = new Date().getMonth() + 1
+const currentYear = new Date().getFullYear()
+
+const monthOptions = [
+  { label: 'Jan', value: 1 },
+  { label: 'Fev', value: 2 },
+  { label: 'Mar', value: 3 },
+  { label: 'Abr', value: 4 },
+  { label: 'Mai', value: 5 },
+  { label: 'Jun', value: 6 },
+  { label: 'Jul', value: 7 },
+  { label: 'Ago', value: 8 },
+  { label: 'Set', value: 9 },
+  { label: 'Out', value: 10 },
+  { label: 'Nov', value: 11 },
+  { label: 'Dez', value: 12 }
+]
+
+const yearOptions = [currentYear - 1, currentYear, currentYear + 1].map((year) => ({
+  label: year.toString(),
+  value: year
+}))
+
+const statusOptions = [
+  { label: 'Todos', value: 'ALL' },
+  { label: 'Pendentes', value: 'PENDING' },
+  { label: 'Pagos', value: 'PAID' },
+  { label: 'Atrasados', value: 'OVERDUE' }
+]
+
+const financeFilters = reactive({
+  month: currentMonth,
+  year: currentYear,
+  status: 'ALL'
+})
+
+const fetchPayablesDash = async () => {
+  try {
+    const query = new URLSearchParams({
+      month: financeFilters.month.toString(),
+      year: financeFilters.year.toString(),
+    });
+    if (financeFilters.status !== 'ALL') {
+      query.set('status', financeFilters.status)
+    }
+
+    const api = useApi()
+    const dashRes = await api(`/api/v1/accounts-payable/dashboard?${query.toString()}`)
+    dashboardData.value = dashRes?.data || dashRes || null
+  } catch (err) {
+    console.error('Failed to fetch dashboard data', err)
+  }
+}
+
+onMounted(fetchPayablesDash)
+watch(
+  () => [financeFilters.month, financeFilters.year, financeFilters.status],
+  fetchPayablesDash
+)
+
+const financeKpis = computed(() => ({
+  totalPending: dashboardData.value?.kpis?.totalPending || 0,
+  totalPaid: dashboardData.value?.kpis?.totalPaid || 0,
+  expectedTotal: dashboardData.value?.kpis?.expectedTotal || 0,
+  totalOverdue: dashboardData.value?.kpis?.totalOverdue || 0
+}))
+
+const pieChartOptions = computed(() => ({
+  tooltip: { trigger: 'item', formatter: '{a} <br/>{b} : R$ {c} ({d}%)' },
+  series: [
+    {
+      name: 'Categoria',
+      type: 'pie',
+      radius: '50%',
+      data: dashboardData.value?.charts?.categoryPie || [],
+      emphasis: {
+        itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' }
+      }
+    }
+  ]
+}))
+
+const barChartOptions = computed(() => {
+  const data = dashboardData.value?.charts?.flowBar || []
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: { data: ['Pago', 'Pendente', 'Atrasado'] },
+    xAxis: { type: 'category', data: data.map(d => `Dia ${d.day}`) },
+    yAxis: { type: 'value' },
+    series: [
+      { name: 'Pago', type: 'bar', stack: 'total', itemStyle: { color: '#18a058' }, data: data.map(d => d.paid) },
+      { name: 'Pendente', type: 'bar', stack: 'total', itemStyle: { color: '#f0a020' }, data: data.map(d => d.pending) },
+      { name: 'Atrasado', type: 'bar', stack: 'total', itemStyle: { color: '#d03050' }, data: data.map(d => d.overdue) }
+    ]
+  }
+})
 
 const palette = {
   primary: '#0E3A56',
@@ -606,6 +785,68 @@ h3 {
   padding: 18px;
   min-height: 240px;
   color: var(--color-neutral-900);
+}
+
+.finance-panel {
+  min-height: auto;
+}
+
+.finance-head {
+  margin-bottom: 10px;
+}
+
+.finance-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.finance-filter {
+  display: grid;
+  gap: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  color: var(--color-neutral-500);
+}
+
+.finance-filter select {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--color-neutral-300);
+  background: #fff;
+  color: var(--color-neutral-900);
+  font-family: inherit;
+  font-size: 13px;
+  min-width: 120px;
+}
+
+.finance-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.finance-kpi {
+  border: 1px solid var(--color-neutral-100);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.finance-kpi span {
+  display: block;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 11px;
+  color: var(--color-neutral-500);
+}
+
+.finance-kpi strong {
+  font-size: 20px;
+  color: var(--color-primary-700);
 }
 
 .kpi-card h2 {

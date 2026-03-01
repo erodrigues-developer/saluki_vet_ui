@@ -173,13 +173,14 @@ const columns = [
 ]
 
 const loadLookups = async () => {
+  const api = useApi()
   try {
     const [statusesRes, typesRes, usersRes, clientsRes, petsRes] = await Promise.all([
-      $fetch<any>('/api/v1/appointment-statuses?limit=100'),
-      $fetch<any>('/api/v1/appointment-types?limit=100'),
-      $fetch<any>('/api/v1/users?limit=100'),
-      $fetch<any>('/api/v1/clients?limit=500'),
-      $fetch<any>('/api/v1/pets?limit=1000')
+      api<any>('/api/v1/appointment-statuses?limit=100'),
+      api<any>('/api/v1/appointment-types?limit=100'),
+      api<any>('/api/v1/users?limit=100'),
+      api<any>('/api/v1/clients?limit=500'),
+      api<any>('/api/v1/pets?limit=1000')
     ])
 
     statusesRes.data.forEach((s: any) => { statusesMap.value[s.id] = s })
@@ -207,7 +208,8 @@ const fetchAppointments = async () => {
     // If we have date filter, we might need a backend date range query.
     // Skipping exact date filter implementation for basic layout unless API supports `startsAt` filtering specifically.
 
-    const res = await $fetch<any>('/api/v1/appointments', {
+    const api = useApi()
+    const res = await api<any>('/api/v1/appointments', {
       query: queryParams
     })
     appointments.value = res.data
@@ -237,15 +239,16 @@ const handlePageSizeChange = (s: number) => {
 
 const handleSubmit = async (payload: AppointmentPayload) => {
   saving.value = true
+  const api = useApi()
   try {
     if (payload.id) {
-      await $fetch(`/api/v1/appointments/${payload.id}`, {
+      await api(`/api/v1/appointments/${payload.id}`, {
         method: 'PATCH',
         body: payload
       })
       message.success('Agendamento atualizado')
     } else {
-      await $fetch('/api/v1/appointments', {
+      await api('/api/v1/appointments', {
         method: 'POST',
         body: payload
       })
@@ -267,8 +270,9 @@ const confirmDelete = (appointment: any) => {
     positiveText: 'Excluir',
     negativeText: 'Cancelar',
     onPositiveClick: async () => {
+      const api = useApi()
       try {
-        await $fetch(`/api/v1/appointments/${appointment.id}`, { method: 'DELETE' })
+        await api(`/api/v1/appointments/${appointment.id}`, { method: 'DELETE' })
         message.success('Agendamento excluído')
         fetchAppointments()
       } catch (err: any) {

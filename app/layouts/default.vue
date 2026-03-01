@@ -166,9 +166,10 @@ const menuItems = [
   },
   { label: 'Clientes', icon: '👥', to: '/clientes' },
   {
-    label: 'Vendas',
+    label: 'Financeiro',
     icon: '💰',
     children: [
+      { label: 'Contas a Pagar', icon: '🧾', to: '/financeiro/contas-a-pagar' },
       { label: 'Caixa / PDV', icon: '💳', to: '/financeiro/vendas' }
     ]
   },

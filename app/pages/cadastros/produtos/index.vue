@@ -147,7 +147,8 @@ const fetchProducts = async () => {
     if (filters.sku) queryParams.sku = filters.sku
     if (filters.isService !== null) queryParams.isService = filters.isService
 
-    const res = await $fetch<any>('/api/v1/products', {
+    const api = useApi()
+    const res = await api<any>('/api/v1/products', {
       query: queryParams
     })
     products.value = res.data
@@ -177,15 +178,16 @@ const handlePageSizeChange = (s: number) => {
 
 const handleSubmit = async (payload: Product) => {
   saving.value = true
+  const api = useApi()
   try {
     if (payload.id) {
-      await $fetch(`/api/v1/products/${payload.id}`, {
+      await api(`/api/v1/products/${payload.id}`, {
         method: 'PATCH',
         body: payload
       })
       message.success('Item atualizado')
     } else {
-      await $fetch('/api/v1/products', {
+      await api('/api/v1/products', {
         method: 'POST',
         body: payload
       })
@@ -207,8 +209,9 @@ const confirmDelete = (product: Product) => {
     positiveText: 'Excluir',
     negativeText: 'Cancelar',
     onPositiveClick: async () => {
+      const api = useApi()
       try {
-        await $fetch(`/api/v1/products/${product.id}`, { method: 'DELETE' })
+        await api(`/api/v1/products/${product.id}`, { method: 'DELETE' })
         message.success('Item excluído')
         fetchProducts()
       } catch (err: any) {

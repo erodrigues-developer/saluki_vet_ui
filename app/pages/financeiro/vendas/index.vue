@@ -177,7 +177,8 @@ const fetchSales = async () => {
       params.endDate = new Date(dateRange.value[1]).toISOString();
     }
 
-    const response = await $fetch('/api/v1/sales', { params });
+    const api = useApi();
+    const response = await api('/api/v1/sales', { params });
     data.value = response.data;
     pagination.value.itemCount = response.total;
   } catch (error: any) {
@@ -205,9 +206,9 @@ const openCreateModal = () => {
 };
 
 const openViewModal = async (sale: any) => {
-  // need to fetch complete sale with items
   try {
-    const fullSale = await $fetch(`/api/v1/sales/${sale.id}`);
+    const api = useApi();
+    const fullSale = await api(`/api/v1/sales/${sale.id}`);
     selectedSale.value = fullSale;
     isReadonly.value = fullSale.status !== 'OPEN'; // If it's paid or canceled, only view
     modalTitle.value = isReadonly.value ? `Detalhes da Venda #${fullSale.id}` : `Editar Venda #${fullSale.id}`;

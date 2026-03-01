@@ -75,8 +75,8 @@ const handleValidateClick = (e: MouseEvent) => {
           ? `/api/v1/payment-methods/${props.initialData.id}`
           : '/api/v1/payment-methods';
         const method = props.initialData?.id ? 'PATCH' : 'POST';
-
-        const response = await $fetch(url, {
+        const api = useApi();
+        const response = await api(url, {
           method,
           body: model.value,
         });

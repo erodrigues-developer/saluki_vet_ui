@@ -31,6 +31,7 @@
 .n-modal-body-wrapper {
   padding: var(--modal-margin-block) var(--modal-margin-inline);
   box-sizing: border-box;
+  overflow: auto;
 }
 
 .n-modal-scroll-content {
@@ -41,7 +42,7 @@
 .n-modal {
   max-width: calc(100vw - (2 * var(--modal-margin-inline)));
   max-height: calc(100vh - (2 * var(--modal-margin-block)));
-  overflow: auto;
+  overflow: visible;
   box-sizing: border-box;
 }
 </style>

@@ -83,7 +83,8 @@ const columns = [
 const fetchStatuses = async () => {
   loading.value = true
   try {
-    const res = await $fetch<AppointmentStatus[]>('/api/v1/appointment-statuses')
+    const api = useApi()
+    const res = await api<AppointmentStatus[]>('/api/v1/appointment-statuses')
     statuses.value = res
   } catch (err) {
     message.error('Erro ao buscar status de agendamento')
@@ -96,8 +97,9 @@ const handleSubmit = async (payload: AppointmentStatus) => {
   saving.value = true
   try {
     // Note: Edit is not supported by API yet, only create/delete
+    const api = useApi()
     if (!payload.id) {
-      await $fetch('/api/v1/appointment-statuses', {
+      await api('/api/v1/appointment-statuses', {
         method: 'POST',
         body: payload
       })
@@ -123,8 +125,9 @@ const confirmDelete = (status: AppointmentStatus) => {
     positiveText: 'Excluir',
     negativeText: 'Cancelar',
     onPositiveClick: async () => {
+      const api = useApi()
       try {
-        await $fetch(`/api/v1/appointment-statuses/${status.id}`, { method: 'DELETE' })
+        await api(`/api/v1/appointment-statuses/${status.id}`, { method: 'DELETE' })
         message.success('Status excluído')
         fetchStatuses()
       } catch (err: any) {

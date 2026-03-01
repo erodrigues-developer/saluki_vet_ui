@@ -117,8 +117,9 @@ const rules: FormRules = {
 
 const fetchSettings = async () => {
   loading.value = true
+  const api = useApi()
   try {
-    const data = await $fetch<ClinicSettings>('/api/v1/clinic-settings')
+    const data = await api<ClinicSettings>('/api/v1/clinic-settings')
     Object.assign(model, {
       id: data.id,
       appointmentSlotDurationMinutes: data.appointmentSlotDurationMinutes,
@@ -141,7 +142,8 @@ const handleSave = async () => {
 
     // Convert empty strings to null/undefined before sending if needed,
     // or backend handles partial updates.
-    await $fetch('/api/v1/clinic-settings', {
+    const api = useApi()
+    await api('/api/v1/clinic-settings', {
       method: 'PATCH',
       body: {
         appointmentSlotDurationMinutes: model.appointmentSlotDurationMinutes,
