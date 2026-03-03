@@ -180,9 +180,13 @@ const menuItems = [
       { label: 'Usuários e permissões', icon: '🛡️', to: '/usuarios' },
       { label: 'Tipos de agendamento', icon: '🗓️', to: '/cadastros/tipos-agendamento' },
       { label: 'Categorias de produto', icon: '🏷️', to: '/cadastros/categorias-produto' },
+      { label: 'Fornecedores', icon: '🏭', to: '/cadastros/fornecedores' },
       { label: 'Produtos e Serviços', icon: '📦', to: '/cadastros/produtos' },
       { label: 'Procedimentos médicos', icon: '🩺', to: '/cadastros/procedimentos' },
       { label: 'Formas de Pagamento', icon: '💲', to: '/cadastros/formas-pagamento' },
+      { label: 'Espécies', icon: '🧬', to: '/tabelas/especies' },
+      { label: 'Raças', icon: '🐕', to: '/tabelas/racas' },
+      { label: 'Status', icon: '✅', to: '/tabelas/status' },
     ]
   },
   {
@@ -190,15 +194,6 @@ const menuItems = [
     icon: '⚙️',
     children: [
       { label: 'Clínica', icon: '🏥', to: '/configuracoes/clinica' }
-    ]
-  },
-  {
-    label: 'Tabelas',
-    icon: '📚',
-    children: [
-      { label: 'Espécies', icon: '🧬', to: '/tabelas/especies' },
-      { label: 'Raças', icon: '🐕', to: '/tabelas/racas' },
-      { label: 'Status', icon: '✅', to: '/tabelas/status' }
     ]
   }
 ]
