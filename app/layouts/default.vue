@@ -154,7 +154,8 @@ const menuItems = [
     icon: '🩺',
     children: [
       { label: 'Agendamentos', icon: '📅', to: '/atendimento/agendamentos' },
-      { label: 'Consultas', icon: '📋', to: '/atendimento/consultas' }
+      { label: 'Consultas', icon: '📋', to: '/atendimento/consultas' },
+      { label: 'Internação', icon: '🏥', to: '/atendimento/internacao' }
     ]
   },
   {

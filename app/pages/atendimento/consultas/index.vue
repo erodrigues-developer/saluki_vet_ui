@@ -58,7 +58,7 @@
 
 <script setup lang="ts">
 import { h, onMounted, reactive, ref } from 'vue'
-import { NButton, useMessage, useDialog } from 'naive-ui'
+import { NButton, NSpace, useMessage, useDialog } from 'naive-ui'
 import ConsultationForm, { type ConsultationPayload } from '~/components/consultations/ConsultationForm.vue'
 import { format } from 'date-fns'
 
@@ -117,6 +117,55 @@ const columns = [
     title: 'Diagnóstico',
     key: 'diagnosis',
     render: (row: any) => h('span', { style: 'font-style: italic' }, row.diagnosis ? (row.diagnosis.length > 50 ? row.diagnosis.substring(0, 50) + '...' : row.diagnosis) : 'Pendente')
+  },
+  {
+    title: 'Ações',
+    key: 'actions',
+    width: 260,
+    render: (row: any) =>
+      h(NSpace, {}, {
+        default: () => [
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'primary',
+              secondary: true,
+              onClick: (event: MouseEvent) => {
+                event.stopPropagation()
+                navigateTo({
+                  path: '/atendimento/internacao',
+                  query: {
+                    action: 'admit',
+                    consultationId: String(row.id),
+                    petId: String(row.petId),
+                  },
+                })
+              },
+            },
+            { default: () => 'Internar' },
+          ),
+          h(
+            NButton,
+            {
+              size: 'small',
+              tertiary: true,
+              onClick: (event: MouseEvent) => {
+                event.stopPropagation()
+                navigateTo({
+                  path: '/atendimento/internacao',
+                  query: {
+                    action: 'prescription',
+                    consultationId: String(row.id),
+                    petId: String(row.petId),
+                  },
+                })
+              },
+            },
+            { default: () => 'Prescrição' },
+          ),
+        ],
+      }),
   }
 ]
 
