@@ -35,6 +35,17 @@
           style="width: 100%"
         />
       </n-form-item>
+
+      <n-form-item label="% Comissão" path="commissionPercent">
+        <n-input-number
+          v-model:value="model.commissionPercent"
+          :min="0"
+          :max="100"
+          :precision="2"
+          placeholder="Ex: 15.00"
+          style="width: 100%"
+        />
+      </n-form-item>
     </div>
 
     <div class="actions">
@@ -55,6 +66,7 @@ export interface Procedure {
   name: string
   description?: string | null
   defaultPrice: number | null
+  commissionPercent: number | null
   isActive: boolean
 }
 
@@ -74,11 +86,20 @@ const model = reactive<Procedure>({
   name: '',
   description: '',
   defaultPrice: null,
+  commissionPercent: 0,
   isActive: true
 })
 
 const rules: FormRules = {
   name: { required: true, message: 'Nome é obrigatório', trigger: 'blur' },
+  commissionPercent: {
+    validator: (_rule, value) => {
+      if (value === null || value === undefined) return true
+      return Number(value) >= 0 && Number(value) <= 100
+    },
+    message: 'A comissão deve estar entre 0% e 100%',
+    trigger: ['blur', 'change']
+  }
 }
 
 watch(
@@ -89,6 +110,10 @@ watch(
       name: val?.name ?? '',
       description: val?.description ?? '',
       defaultPrice: val?.defaultPrice !== undefined && val?.defaultPrice !== null ? Number(val.defaultPrice) : null,
+      commissionPercent:
+        val?.commissionPercent !== undefined && val?.commissionPercent !== null
+          ? Number(val.commissionPercent)
+          : 0,
       isActive: val?.isActive ?? true
     })
   },

@@ -72,6 +72,11 @@ const columns = [
     render: (row: Procedure) => row.defaultPrice ? `R$ ${Number(row.defaultPrice).toFixed(2)}` : '-'
   },
   {
+    title: 'Comissão',
+    key: 'commissionPercent',
+    render: (row: Procedure) => `${Number(row.commissionPercent || 0).toFixed(2)}%`
+  },
+  {
     title: 'Status',
     key: 'isActive',
     render: (row: Procedure) =>

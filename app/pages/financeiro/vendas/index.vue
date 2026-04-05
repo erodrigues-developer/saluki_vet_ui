@@ -49,7 +49,7 @@
     <n-modal
       v-model:show="showCheckoutModal"
       preset="card"
-      title="Checkout da Venda"
+      title="Receber Venda"
       class="w-full max-w-lg"
     >
       <n-form :model="checkoutForm" label-placement="top">
@@ -84,6 +84,15 @@
             style="width: 100%"
           />
         </n-form-item>
+
+        <n-form-item label="Observações">
+          <n-input
+            v-model:value="checkoutForm.notes"
+            type="textarea"
+            :rows="3"
+            placeholder="Opcional. Ex: pago no balcão via PIX."
+          />
+        </n-form-item>
       </n-form>
 
       <template #footer>
@@ -92,7 +101,7 @@
             Cancelar
           </n-button>
           <n-button type="primary" :loading="checkoutLoading" @click="handleCheckout">
-            Confirmar Checkout
+            Confirmar Recebimento
           </n-button>
         </div>
       </template>
@@ -137,6 +146,7 @@ const checkoutForm = reactive({
   paymentMethodId: null as number | null,
   amount: 0,
   paidAt: Date.now(),
+  notes: '',
 });
 
 const statusOptions = [
@@ -240,7 +250,7 @@ const columns = [
               'data-testid': `checkout-button-${row.id}`,
               onClick: () => openCheckoutModal(row),
             },
-            { default: () => 'Checkout' }
+            { default: () => 'Receber' }
           )
         );
       }
@@ -347,6 +357,7 @@ const openCheckoutModal = async (sale: SaleRow) => {
   checkoutForm.paymentMethodId = null;
   checkoutForm.amount = Number(sale.totalAmount);
   checkoutForm.paidAt = Date.now();
+  checkoutForm.notes = '';
 
   checkoutLoading.value = true;
   try {
@@ -410,15 +421,16 @@ const handleCheckout = async () => {
           paymentMethodId: checkoutForm.paymentMethodId,
           amount: Number(checkoutForm.amount),
           paidAt: new Date(checkoutForm.paidAt).toISOString(),
+          notes: checkoutForm.notes || undefined,
         },
       },
     );
 
     updateSaleStatusLocally(Number((response as any).saleId), 'PAID');
     showCheckoutModal.value = false;
-    message.success('Checkout realizado com sucesso.');
+    message.success('Recebimento realizado com sucesso.');
   } catch (error: any) {
-    message.error(extractApiErrorMessage(error, 'Erro ao realizar checkout.'));
+    message.error(extractApiErrorMessage(error, 'Erro ao realizar recebimento.'));
   } finally {
     checkoutLoading.value = false;
   }

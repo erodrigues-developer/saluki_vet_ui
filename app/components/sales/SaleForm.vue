@@ -113,6 +113,7 @@ const formRef = ref<FormInst | null>(null);
 const clientOptions = ref<{label: string, value: number}[]>([]);
 const veterinarianOptions = ref<{label: string, value: number}[]>([]);
 const productOptions = ref<{label: string, value: number, salePrice: number}[]>([]);
+const procedureOptions = ref<{label: string, value: number, defaultPrice: number}[]>([]);
 
 const statusOptions = [
   { label: 'Aberta', value: 'OPEN' },
@@ -130,7 +131,9 @@ const model = reactive({
   discountAmount: 0,
   items: [] as Array<{
     id?: number,
+    itemType: 'PRODUCT' | 'PROCEDURE',
     productId: number | null,
+    procedureId: number | null,
     quantity: number,
     unitPrice: number,
     discountAmount: number,
@@ -151,10 +154,11 @@ const formatCurrency = (val: number) => {
 const loadLookups = async () => {
   const api = useApi();
   try {
-    const [clientsRes, usersRes, productsRes] = await Promise.all([
+    const [clientsRes, usersRes, productsRes, proceduresRes] = await Promise.all([
       api<any>('/api/v1/clients?limit=500'),
       api<any>('/api/v1/users?limit=100'),
-      api<any>('/api/v1/products?limit=500')
+      api<any>('/api/v1/products?limit=500'),
+      api<any>('/api/v1/procedures?limit=500')
     ]);
 
     clientOptions.value = clientsRes.data.map((i: any) => ({ label: i.name, value: Number(i.id) }));
@@ -164,6 +168,11 @@ const loadLookups = async () => {
       value: Number(i.id),
       salePrice: Number(i.salePrice)
     }));
+    procedureOptions.value = proceduresRes.data.map((i: any) => ({
+      label: `${i.name} (${formatCurrency(Number(i.defaultPrice || 0))})`,
+      value: Number(i.id),
+      defaultPrice: Number(i.defaultPrice || 0)
+    }));
   } catch (err) {
     message.error('Erro ao carregar dados auxiliares');
   }
@@ -171,7 +180,9 @@ const loadLookups = async () => {
 
 const addItem = () => {
   model.items.push({
+    itemType: 'PRODUCT',
     productId: null,
+    procedureId: null,
     quantity: 1,
     unitPrice: 0,
     discountAmount: 0,
@@ -185,12 +196,43 @@ const removeItem = (key: string) => {
   model.items = model.items.filter(i => i._key !== key);
 };
 
+const handleItemTypeChange = (type: 'PRODUCT' | 'PROCEDURE', row: any) => {
+  row.itemType = type;
+  row.productId = null;
+  row.procedureId = null;
+  row.unitPrice = 0;
+  row.discountAmount = 0;
+  row.totalPrice = 0;
+};
+
 const handleProductSelect = (val: number, row: any) => {
   const prod = productOptions.value.find(p => p.value === val);
   if (prod) {
+    row.productId = val;
+    row.procedureId = null;
     row.unitPrice = prod.salePrice;
     recalculateRow(row);
   }
+};
+
+const handleProcedureSelect = (val: number, row: any) => {
+  const procedure = procedureOptions.value.find(p => p.value === val);
+  if (procedure) {
+    row.procedureId = val;
+    row.productId = null;
+    row.unitPrice = procedure.defaultPrice;
+    recalculateRow(row);
+  }
+};
+
+const resolveItemLabel = (row: any) => {
+  if (row.itemType === 'PROCEDURE') {
+    const procedure = procedureOptions.value.find((option) => option.value === row.procedureId);
+    return procedure ? procedure.label.split(' (')[0] : 'Procedimento desconhecido';
+  }
+
+  const product = productOptions.value.find((option) => option.value === row.productId);
+  return product ? product.label.split(' (')[0] : 'Produto desconhecido';
 };
 
 const recalculateRow = (row: any) => {
@@ -213,20 +255,46 @@ const calculatedTotal = computed(() => {
 const itemColumns = computed(() => {
   return [
     {
-      title: 'Produto/Serviço',
-      key: 'productId',
+      title: 'Tipo',
+      key: 'itemType',
+      width: 150,
       render(row: any) {
         if (props.readonly) {
-          const p = productOptions.value.find(o => o.value === row.productId);
-          return p ? p.label.split('(')[0] : 'Desconhecido';
+          return row.itemType === 'PROCEDURE' ? 'Procedimento' : 'Produto';
         }
+
         return h(NSelect, {
-          value: row.productId,
-          options: productOptions.value,
+          value: row.itemType,
+          options: [
+            { label: 'Produto', value: 'PRODUCT' },
+            { label: 'Procedimento', value: 'PROCEDURE' }
+          ],
+          onUpdateValue: (val: 'PRODUCT' | 'PROCEDURE') => handleItemTypeChange(val, row)
+        });
+      }
+    },
+    {
+      title: 'Item',
+      key: 'itemId',
+      render(row: any) {
+        if (props.readonly) {
+          return resolveItemLabel(row);
+        }
+
+        const options = row.itemType === 'PROCEDURE' ? procedureOptions.value : productOptions.value;
+        const value = row.itemType === 'PROCEDURE' ? row.procedureId : row.productId;
+
+        return h(NSelect, {
+          value,
+          options,
           filterable: true,
-          placeholder: 'Selecione',
+          placeholder: row.itemType === 'PROCEDURE' ? 'Selecione o procedimento' : 'Selecione o produto',
           onUpdateValue: (val) => {
-            row.productId = val;
+            if (row.itemType === 'PROCEDURE') {
+              handleProcedureSelect(val, row);
+              return;
+            }
+
             handleProductSelect(val, row);
           }
         });
@@ -319,7 +387,9 @@ onMounted(async () => {
       saleDate: new Date(props.initialData.saleDate).getTime(),
       items: props.initialData.items ? props.initialData.items.map((i:any) => ({
         ...i,
-        productId: Number(i.productId),
+        itemType: i.procedureId ? 'PROCEDURE' : 'PRODUCT',
+        productId: i.productId ? Number(i.productId) : null,
+        procedureId: i.procedureId ? Number(i.procedureId) : null,
         quantity: Number(i.quantity),
         unitPrice: Number(i.unitPrice),
         discountAmount: Number(i.discountAmount),
@@ -339,9 +409,11 @@ const handleSubmit = async () => {
       return;
     }
 
-    const hasEmptyProduct = model.items.some(i => !i.productId);
-    if (hasEmptyProduct) {
-      message.warning('Todos os itens devem ter um produto selecionado.');
+    const hasEmptyItem = model.items.some((item) =>
+      item.itemType === 'PROCEDURE' ? !item.procedureId : !item.productId
+    );
+    if (hasEmptyItem) {
+      message.warning('Todos os itens devem ter um produto ou procedimento selecionado.');
       return;
     }
 
@@ -374,6 +446,7 @@ const handleSubmit = async () => {
              body: {
                saleId: response.id,
                productId: item.productId,
+               procedureId: item.procedureId,
                quantity: item.quantity,
                unitPrice: item.unitPrice,
                discountAmount: item.discountAmount,

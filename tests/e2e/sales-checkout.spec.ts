@@ -98,10 +98,10 @@ test.describe('Vendas checkout flow', () => {
     await expect(page.locator('[data-testid="checkout-button-2"]')).toHaveCount(0);
 
     await page.locator('[data-testid="checkout-button-1"]').click();
-    await page.getByRole('button', { name: 'Confirmar Checkout' }).click();
+    await page.getByRole('button', { name: 'Confirmar Recebimento' }).click();
 
     await expect(page.locator('.n-message')).toContainText(
-      'Checkout realizado com sucesso.',
+      'Recebimento realizado com sucesso.',
     );
     await expect(
       page.locator('tr', { hasText: 'Tutor 1' }).getByText('Paga'),
@@ -171,7 +171,7 @@ test.describe('Vendas checkout flow', () => {
 
     await page.goto('/financeiro/vendas');
     await page.locator('[data-testid="checkout-button-1"]').click();
-    await page.getByRole('button', { name: 'Confirmar Checkout' }).click();
+    await page.getByRole('button', { name: 'Confirmar Recebimento' }).click();
 
     await expect(page.locator('.n-message')).toContainText(
       'Venda #1 ja foi liquidada.',
