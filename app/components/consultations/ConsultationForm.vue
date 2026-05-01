@@ -11,12 +11,12 @@
     <section class="form-block">
       <div class="block-heading">
         <div>
-          <p class="block-eyebrow">Contexto</p>
-          <h3>Quem está sendo atendido</h3>
+          <p class="block-eyebrow">1. Contexto do atendimento</p>
+          <h3>Contexto do atendimento</h3>
+          <p class="block-subtitle">
+            Identifique o paciente, responsável e profissional da consulta.
+          </p>
         </div>
-        <n-tag :type="model.id ? 'success' : 'warning'" size="small">
-          {{ model.id ? "IA ativa" : "Salve para ativar IA" }}
-        </n-tag>
       </div>
 
       <div class="grid compact-grid">
@@ -29,7 +29,7 @@
           <n-select
             v-model:value="model.appointmentId"
             :options="appointmentsOptions"
-            placeholder="Selecione o agendamento prévio (opcional)"
+            placeholder="Selecione um agendamento anterior, se houver"
             clearable
             @update:value="handleAppointmentChange"
           />
@@ -82,12 +82,12 @@
     <section class="form-block">
       <div class="block-heading">
         <div>
-          <p class="block-eyebrow">Triagem rápida</p>
+          <p class="block-eyebrow">2. Triagem rápida</p>
           <h3>Sinais iniciais da consulta</h3>
+          <p class="block-subtitle block-subtitle-discreet">
+            Campos rápidos para ganhar velocidade.
+          </p>
         </div>
-        <span class="block-caption"
-          >Campos rápidos para ganhar velocidade.</span
-        >
       </div>
 
       <div class="grid compact-grid triage-grid">
@@ -111,17 +111,23 @@
           />
         </n-form-item>
       </div>
+      <div class="section-footnote">
+        <n-button tertiary size="small" type="info">+ Adicionar sinais vitais</n-button>
+      </div>
     </section>
 
-    <section class="form-block anamnesis-block">
+    <section class="form-block ai-assist-block">
       <div class="block-heading">
         <div>
-          <p class="block-eyebrow">Anamnese</p>
-          <h3>Queixa principal assistida</h3>
+          <p class="block-eyebrow">3. Queixa assistida por IA</p>
+          <h3>Queixa assistida por IA</h3>
+          <p class="block-subtitle">
+            Dite ou escreva a queixa. A IA irá organizar o relato e sugerir campos da anamnese.
+          </p>
         </div>
-        <span class="block-caption">
-          A IA sugere os próximos campos a partir do que você escreve ou dita.
-        </span>
+        <n-tag :type="aiStatusTagType" size="small" round>
+          {{ aiStatusLabel }}
+        </n-tag>
       </div>
 
       <div
@@ -134,9 +140,9 @@
         <div class="chief-complaint-head">
           <div>
             <p class="field-label">Queixa Principal</p>
-            <strong>Descreva ou dite a queixa do paciente</strong>
+            <strong>Descreva a queixa do paciente</strong>
           </div>
-          <span class="recording-state">{{ recordingStateLabel }}</span>
+          <span class="recording-state">{{ aiStatusLabel }}</span>
         </div>
 
         <div class="chief-input-shell">
@@ -145,37 +151,39 @@
             type="textarea"
             class="chief-complaint-input"
             :autosize="{ minRows: 3, maxRows: 6 }"
-            placeholder="Descreva ou dite a queixa do paciente (ex: vômito há 2 dias...)"
+            placeholder="Ex.: tutor relata vômitos há dois dias, apatia e redução do apetite..."
             @update:value="handleChiefComplaintInput"
           />
-          <div class="chief-actions inside-field">
-            <button
-              type="button"
-              class="icon-action"
-              :disabled="!model.id || !canUseAudioCapture"
-              :title="microphoneActionLabel"
-              @click="handleMicrophoneAction"
-            >
-              {{ microphoneIndicator }}
-            </button>
-            <button
-              v-if="isRecording"
-              type="button"
-              class="icon-action secondary"
-              :title="
-                isRecordingPaused ? 'Retomar gravação' : 'Pausar gravação'
-              "
-              @click="toggleRecordingPause"
-            >
-              {{ isRecordingPaused ? "▶" : "⏸" }}
-            </button>
-          </div>
+        </div>
+        <div class="ia-actions-row">
+          <n-button
+            type="info"
+            secondary
+            :disabled="!model.id || !canUseAudioCapture"
+            @click="handleMicrophoneAction"
+          >
+            {{ isRecording ? "Parar gravação" : "Iniciar ditado" }}
+          </n-button>
+          <n-button
+            tertiary
+            type="info"
+            :disabled="!model.id || !canAutoGenerate || hasPendingSuggestion"
+            @click="triggerTextImprove"
+          >
+            Melhorar texto com IA
+          </n-button>
+          <n-button
+            v-if="isRecording"
+            tertiary
+            :title="isRecordingPaused ? 'Retomar gravação' : 'Pausar gravação'"
+            @click="toggleRecordingPause"
+          >
+            {{ isRecordingPaused ? "Retomar" : "Pausar" }}
+          </n-button>
         </div>
 
         <div class="chief-complaint-footer">
-          <span class="ai-inline-status" :class="{ live: aiStatusIsLive }">
-            {{ aiInlineStatus }}
-          </span>
+          <span class="ai-inline-status" :class="{ live: aiStatusIsLive }">{{ aiHelperText }}</span>
           <div class="chief-meta">
             <span v-if="latestAudioBlob" class="meta-chip">
               {{ audioDurationLabel }}
@@ -192,43 +200,34 @@
         </div>
       </div>
 
-      <div v-if="model.id && hasPendingSuggestion" class="suggestion-pending">
-        <strong>✨ Gerando sugestões...</strong>
-        <p>
-          Achados clínicos, diagnóstico provável e plano de tratamento serão
-          sugeridos automaticamente.
-        </p>
-      </div>
-
-      <div
-        v-else-if="visibleSuggestion?.structuredPayload"
-        class="suggestion-panel"
-      >
+      <div class="suggestion-panel">
         <div class="suggestion-head">
           <div>
-            <p class="block-eyebrow">Sugestões automáticas</p>
-            <strong>{{
-              visibleSuggestion.structuredPayload.summary ||
-              "A IA preparou uma sugestão clínica para revisão"
-            }}</strong>
+            <p class="block-eyebrow">4. Sugestões da IA para anamnese</p>
+            <strong>Sugestões da IA para anamnese</strong>
+            <p class="block-subtitle">
+              Revise as sugestões antes de salvar no prontuário.
+            </p>
           </div>
           <div class="suggestion-actions">
-            <n-button tertiary @click="ignoreLatestSuggestion"
-              >Ignorar</n-button
-            >
-            <n-button
-              type="primary"
-              secondary
-              @click="
-                applyStructuredPayload(visibleSuggestion.structuredPayload)
-              "
-            >
+            <n-button tertiary :disabled="!visibleSuggestion?.structuredPayload" @click="reviewSuggestionsOneByOne">
+              Revisar uma a uma
+            </n-button>
+            <n-button tertiary :disabled="!visibleSuggestion?.structuredPayload" @click="ignoreLatestSuggestion">
+              Descartar
+            </n-button>
+            <n-button type="primary" secondary :disabled="!visibleSuggestion?.structuredPayload" @click="applyVisibleSuggestions">
               Aplicar sugestões
             </n-button>
           </div>
         </div>
 
-        <div class="suggestion-grid">
+        <div v-if="model.id && hasPendingSuggestion" class="suggestion-pending">
+          <strong>Organizando relato clínico...</strong>
+          <p>A IA está estruturando o conteúdo para facilitar sua revisão clínica.</p>
+        </div>
+
+        <div v-else-if="visibleSuggestion?.structuredPayload" class="suggestion-grid">
           <article
             v-for="card in suggestionCards"
             :key="card.field"
@@ -248,8 +247,12 @@
             <p>{{ card.value || card.emptyText }}</p>
           </article>
         </div>
+        <div v-else class="suggestion-empty">
+          <strong>Ainda sem sugestões.</strong>
+          <p>Salve os dados básicos para liberar ditado, melhoria da queixa e sugestões automáticas.</p>
+        </div>
 
-        <div v-if="hasSuggestedMetrics" class="metric-row">
+        <div v-if="visibleSuggestion?.structuredPayload && hasSuggestedMetrics" class="metric-row">
           <button
             v-if="visibleSuggestion.structuredPayload.weightKg != null"
             type="button"
@@ -282,15 +285,14 @@
           </button>
         </div>
       </div>
+      <p class="responsibility-note">Revise as sugestões antes de salvar no prontuário.</p>
 
-      <div v-else class="suggestion-empty">
-        <strong>Comece pela queixa principal.</strong>
-        <p>
-          Assim que houver contexto suficiente, a IA sugere os próximos campos
-          sem exigir um fluxo separado.
-        </p>
+      <div class="block-heading body-divider">
+        <div>
+          <p class="block-eyebrow">5. Anamnese / detalhes clínicos</p>
+          <h3>Anamnese e evolução clínica</h3>
+        </div>
       </div>
-
       <div class="grid compact-grid">
         <n-form-item
           label="Achados Clínicos"
@@ -363,8 +365,14 @@
       <n-button tertiary :disabled="loading" @click="$emit('cancel')">
         Cancelar
       </n-button>
-      <n-button type="primary" :loading="loading" @click="handleSubmit">
-        {{ submitLabel }}
+      <n-button tertiary :disabled="loading" @click="handleSubmit">
+        Salvar rascunho
+      </n-button>
+      <n-button v-if="!model.id" type="primary" :loading="loading" @click="handleSubmit">
+        Salvar e ativar IA
+      </n-button>
+      <n-button v-else type="primary" :loading="loading" @click="handleSubmit">
+        Salvar atendimento
       </n-button>
     </div>
   </n-form>
@@ -531,10 +539,6 @@ const rules: FormRules = {
   },
 };
 
-const submitLabel = computed(() =>
-  model.id ? "Salvar Registro Clínico" : "Iniciar Atendimento Clínico",
-);
-
 const latestCompletedDictation = computed(
   () => dictations.value.find((item) => item.status === "COMPLETED") || null,
 );
@@ -586,21 +590,18 @@ const aiStatusIsLive = computed(
   () => isRecording.value || hasPendingSuggestion.value,
 );
 
-const microphoneIndicator = computed(() => {
-  if (isRecordingPaused.value) return "⏸";
-  if (isRecording.value) return "🔴";
-  return "🎤";
+const aiStatusLabel = computed(() => {
+  if (!model.id) return "IA disponível após salvar";
+  if (isRecording.value) return "Ouvindo...";
+  if (hasPendingSuggestion.value) return "Organizando relato clínico...";
+  if (visibleSuggestion.value?.structuredPayload) return "Sugestão pronta";
+  return "IA pronta";
 });
 
-const recordingStateLabel = computed(() => {
-  if (isRecording.value && isRecordingPaused.value) return "⏸ Pausado";
-  if (isRecording.value) return "🔴 Gravando";
-  return "🎤 Pronto para ouvir";
-});
-
-const microphoneActionLabel = computed(() => {
-  if (isRecording.value) return "Encerrar gravação";
-  return "Iniciar gravação";
+const aiStatusTagType = computed<"success" | "warning" | "info">(() => {
+  if (!model.id) return "warning";
+  if (isRecording.value || hasPendingSuggestion.value) return "info";
+  return "success";
 });
 
 const audioDurationLabel = computed(() => {
@@ -616,26 +617,26 @@ const audioDurationLabel = computed(() => {
   return `Áudio capturado · ${audioDurationSeconds.value}s`;
 });
 
-const aiInlineStatus = computed(() => {
+const aiHelperText = computed(() => {
   if (!model.id) {
-    return "Salve o atendimento para liberar as sugestões automáticas.";
+    return "Salve os dados básicos para liberar ditado, melhoria da queixa e sugestões automáticas.";
   }
   if (isRecording.value && isRecordingPaused.value) {
-    return "⏸ Gravação pausada. Retome ou finalize para gerar sugestões.";
+    return "Gravação pausada. Retome ou finalize para gerar sugestões.";
   }
   if (isRecording.value) {
-    return "🔴 Gravando. A IA vai sugerir os próximos campos quando você finalizar.";
+    return "Clique em parar gravação ao concluir o relato clínico.";
   }
   if (hasPendingSuggestion.value) {
-    return "✨ Gerando sugestões...";
+    return "Organizando relato clínico...";
   }
   if (visibleSuggestion.value?.structuredPayload) {
-    return "✨ Sugestões prontas para revisar, aplicar por campo ou ignorar.";
+    return "Revise as sugestões antes de salvar no prontuário.";
   }
   if (canUseSpeechRecognition.value) {
-    return "Digite ou fale a queixa principal. A IA acompanha o fluxo sem botão extra.";
+    return "Clique em iniciar ditado e descreva a queixa do paciente.";
   }
-  return "Digite ou grave a queixa principal. O backend usa o áudio para transcrever quando disponível.";
+  return "Digite a queixa principal e use Melhorar texto com IA quando quiser estruturar.";
 });
 
 const suggestionCards = computed(() => {
@@ -646,8 +647,22 @@ const suggestionCards = computed(() => {
 
   return [
     {
+      field: "mainComplaint" as SuggestionField,
+      label: "Queixa organizada",
+      value: payload.mainComplaint || payload.summary,
+      kind: "string" as SuggestionFieldKind,
+      emptyText: "Sem organização automática da queixa ainda.",
+    },
+    {
+      field: "notes" as SuggestionField,
+      label: "Duração dos sintomas",
+      value: payload.notes,
+      kind: "string" as SuggestionFieldKind,
+      emptyText: "Sem duração sugerida.",
+    },
+    {
       field: "clinicalFindings" as SuggestionField,
-      label: "Achados clínicos",
+      label: "Sinais associados",
       value: payload.clinicalFindings,
       kind: "string" as SuggestionFieldKind,
       emptyText: "Sem sugestão automática para este campo.",
@@ -661,17 +676,17 @@ const suggestionCards = computed(() => {
     },
     {
       field: "treatmentPlan" as SuggestionField,
-      label: "Plano de tratamento",
+      label: "Perguntas recomendadas",
       value: payload.treatmentPlan,
       kind: "string" as SuggestionFieldKind,
       emptyText: "Sem plano de tratamento sugerido.",
     },
     {
       field: "notes" as SuggestionField,
-      label: "Anotações privadas",
+      label: "Alimentação / eliminação / medicamentos",
       value: payload.notes,
       kind: "string" as SuggestionFieldKind,
-      emptyText: "Sem observações adicionais.",
+      emptyText: "Sem dados adicionais sugeridos.",
     },
   ];
 });
@@ -970,6 +985,14 @@ const handleMicrophoneAction = async () => {
   await startRecording();
 };
 
+const triggerTextImprove = async () => {
+  if (!model.id) {
+    message.warning("Salve e ative a IA para melhorar o texto.");
+    return;
+  }
+  await submitDictation({ silent: false });
+};
+
 const discardAudioCapture = () => {
   audioDurationSeconds.value = null;
   revokeAudioPreview();
@@ -1139,6 +1162,18 @@ const applyStructuredPayload = (payload: DictationStructuredPayload) => {
   );
 };
 
+const applyVisibleSuggestions = () => {
+  if (!visibleSuggestion.value?.structuredPayload) {
+    message.warning("Nenhuma sugestão disponível para aplicar.");
+    return;
+  }
+  applyStructuredPayload(visibleSuggestion.value.structuredPayload);
+};
+
+const reviewSuggestionsOneByOne = () => {
+  message.info("Use o botão \"Aplicar campo\" em cada bloco para revisar uma a uma.");
+};
+
 const ignoreLatestSuggestion = () => {
   if (!latestCompletedDictation.value) {
     return;
@@ -1246,6 +1281,7 @@ function normalizeFreeText(value: string) {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  padding-bottom: 88px;
 }
 
 .form-block {
@@ -1261,14 +1297,14 @@ function normalizeFreeText(value: string) {
     linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
-.anamnesis-block {
+.ai-assist-block {
   background:
     radial-gradient(
-      circle at top left,
-      rgba(16, 185, 129, 0.08),
-      transparent 30%
+      circle at top right,
+      rgba(99, 102, 241, 0.12),
+      transparent 34%
     ),
-    linear-gradient(180deg, #ffffff 0%, #f7faf8 100%);
+    linear-gradient(180deg, #ffffff 0%, #f7f8ff 100%);
 }
 
 .block-heading {
@@ -1284,6 +1320,18 @@ function normalizeFreeText(value: string) {
   font-size: 18px;
   line-height: 1.2;
   color: #0f172a;
+}
+
+.block-subtitle {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.block-subtitle-discreet {
+  font-size: 12px;
+  color: #64748b;
 }
 
 .block-eyebrow,
@@ -1307,6 +1355,10 @@ function normalizeFreeText(value: string) {
   font-size: 12px;
   font-weight: 600;
   color: #475569;
+}
+
+.section-footnote {
+  margin-top: 10px;
 }
 
 .grid {
@@ -1369,16 +1421,16 @@ function normalizeFreeText(value: string) {
   gap: 8px;
 }
 
-.chief-actions.inside-field {
-  position: absolute;
-  top: 10px;
-  right: 10px;
+.ia-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .chief-complaint-input :deep(textarea) {
   font-size: 15px;
   line-height: 1.55;
-  padding-right: 108px;
   min-height: 126px;
 }
 
@@ -1546,7 +1598,24 @@ function normalizeFreeText(value: string) {
 
 .actions {
   justify-content: flex-end;
-  margin-top: 6px;
+  margin-top: 10px;
+  position: sticky;
+  bottom: 0;
+  z-index: 15;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, #ffffff 45%);
+  border-top: 1px solid rgba(148, 163, 184, 0.24);
+  padding-top: 12px;
+  padding-bottom: 2px;
+}
+
+.responsibility-note {
+  margin: 2px 0 4px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.body-divider {
+  margin-top: 10px;
 }
 
 @media (max-width: 960px) {
@@ -1576,13 +1645,6 @@ function normalizeFreeText(value: string) {
     flex-wrap: wrap;
   }
 
-  .chief-actions.inside-field {
-    top: 8px;
-    right: 8px;
-  }
-
-  .chief-complaint-input :deep(textarea) {
-    padding-right: 96px;
-  }
+  .ia-actions-row { width: 100%; }
 }
 </style>
