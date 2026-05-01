@@ -80,12 +80,30 @@
     </n-grid>
 
     <n-card title="Lançamentos" style="margin-bottom: 24px;">
-      <n-data-table
-        :columns="columns"
-        :data="payables"
-        :loading="loading"
-        :row-class-name="rowClassName"
-      />
+      <div v-if="isMobile" class="card-list">
+        <div v-for="row in payables" :key="row.id" class="entity-card">
+          <p class="card-title">{{ row.description }}</p>
+          <p class="card-subtitle">{{ row.supplier?.name || '-' }} • {{ row.category || '-' }}</p>
+          <p class="card-subtitle">Vencimento {{ formatDateDisplay(row.dueDate) }}</p>
+          <div class="card-actions">
+            <n-tag :type="row.status === 'PAID' ? 'success' : 'warning'" :bordered="false" size="small">{{ row.status === 'PAID' ? 'Pago' : 'Pendente' }}</n-tag>
+            <n-space>
+              <n-button size="small" secondary @click.stop="openEditModal(row)">Editar</n-button>
+              <n-button v-if="row.status === 'PENDING'" size="small" type="primary" secondary @click.stop="openPayModal(row)">Pagar</n-button>
+              <n-button v-if="row.status === 'PAID'" size="small" type="warning" secondary @click.stop="handleUndo(row)">Desfazer</n-button>
+            </n-space>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="table-mobile-wrapper">
+        <n-data-table
+          :columns="columns"
+          :data="payables"
+          :loading="loading"
+          :row-class-name="rowClassName"
+        />
+      </div>
     </n-card>
 
     <n-modal
@@ -187,7 +205,7 @@
 </template>
 
 <script setup lang="ts">
-import { h, onMounted, reactive, ref, watch } from 'vue';
+import { h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { NButton, NSpace, NTag, useMessage } from 'naive-ui';
 
 definePageMeta({ layout: 'default' });
@@ -222,6 +240,9 @@ const editingOriginalNotes = ref<string | null>(null);
 const payables = ref<AccountPayableItem[]>([]);
 const dashboardData = ref<any>(null);
 const selectedAccount = ref<AccountPayableItem | null>(null);
+const isMobile = ref(false);
+let mediaQuery: MediaQueryList | null = null;
+const updateIsMobile = () => { isMobile.value = mediaQuery?.matches ?? false; };
 
 const supplierOptions = ref<{ label: string; value: number }[]>([]);
 const supplierLoading = ref(false);
@@ -322,6 +343,11 @@ const rowClassName = (row: AccountPayableItem) => {
   }
 
   return '';
+};
+
+const formatDateDisplay = (value?: string | null) => {
+  if (!value) return '-';
+  return new Date(value).toLocaleDateString('pt-BR');
 };
 
 const columns = [
@@ -661,8 +687,14 @@ const handleUndo = async (row: AccountPayableItem) => {
 watch(filters, fetchPayables, { deep: true });
 
 onMounted(() => {
+  mediaQuery = window.matchMedia('(max-width: 768px)');
+  updateIsMobile();
+  mediaQuery.addEventListener('change', updateIsMobile);
   fetchSuppliers();
   fetchPayables();
+});
+onBeforeUnmount(() => {
+  mediaQuery?.removeEventListener('change', updateIsMobile);
 });
 </script>
 
@@ -670,5 +702,13 @@ onMounted(() => {
 :deep(.overdue-row td) {
   color: #d03050 !important;
   font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .card-list { display: flex; flex-direction: column; gap: 12px; }
+  .entity-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fff; }
+  .card-title { margin: 0; font-size: 16px; font-weight: 700; }
+  .card-subtitle { margin: 4px 0 0; font-size: 12px; color: #64748b; }
+  .card-actions { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 }
 </style>

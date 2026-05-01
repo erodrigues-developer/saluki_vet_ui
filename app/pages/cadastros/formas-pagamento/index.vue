@@ -19,14 +19,39 @@
       </n-space>
     </n-card>
 
-    <n-data-table
-      remote
-      :columns="columns"
-      :data="data"
-      :loading="loading"
-      :pagination="pagination"
-      @update:page="handlePageChange"
-    />
+    <div v-if="isMobile" class="card-list">
+      <div
+        v-for="item in data"
+        :key="item.id"
+        class="entity-card"
+        @click="openEditModal(item)"
+      >
+        <div class="card-head">
+          <div>
+            <p class="card-title">{{ item.name }}</p>
+            <p class="card-subtitle">Código {{ item.code }}</p>
+          </div>
+          <n-tag :type="item.isActive ? 'success' : 'error'" :bordered="false" size="small">
+            {{ item.isActive ? 'Ativo' : 'Inativo' }}
+          </n-tag>
+        </div>
+        <div class="card-actions">
+          <n-button size="small" secondary @click.stop="openEditModal(item)">Editar</n-button>
+          <n-button size="small" type="error" tertiary @click.stop="handleDelete(item.id)">Excluir</n-button>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="table-mobile-wrapper">
+      <n-data-table
+        remote
+        :columns="columns"
+        :data="data"
+        :loading="loading"
+        :pagination="pagination"
+        @update:page="handlePageChange"
+      />
+    </div>
 
     <n-modal v-model:show="showModal" preset="card" :title="modalTitle" class="w-full max-w-md">
       <PaymentMethodForm
@@ -40,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, h, resolveComponent } from 'vue';
+import { ref, onBeforeUnmount, onMounted, h, resolveComponent } from 'vue';
 import { NButton, NSpace, NTag, NPopconfirm, useMessage } from 'naive-ui';
 import PaymentMethodForm from '~/components/payment-methods/PaymentMethodForm.vue';
 import { format } from 'date-fns';
@@ -52,6 +77,11 @@ const searchQuery = ref('');
 const showModal = ref(false);
 const selectedPaymentMethod = ref(null);
 const modalTitle = ref('Nova Forma de Pagamento');
+const isMobile = ref(false);
+let mediaQuery: MediaQueryList | null = null;
+const updateIsMobile = () => {
+  isMobile.value = mediaQuery?.matches ?? false;
+};
 
 const pagination = ref({
   page: 1,
@@ -187,6 +217,60 @@ const handleSaved = () => {
 };
 
 onMounted(() => {
+  mediaQuery = window.matchMedia('(max-width: 768px)');
+  updateIsMobile();
+  mediaQuery.addEventListener('change', updateIsMobile);
   fetchPaymentMethods();
 });
+
+onBeforeUnmount(() => {
+  mediaQuery?.removeEventListener('change', updateIsMobile);
+});
 </script>
+
+<style scoped>
+.table-mobile-wrapper {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .entity-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px;
+    background: #fff;
+  }
+
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .card-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .card-subtitle {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .card-actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+}
+</style>

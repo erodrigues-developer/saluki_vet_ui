@@ -46,6 +46,26 @@
           style="width: 100%"
         />
       </n-form-item>
+
+      <n-form-item label="Produto consumido no estoque" path="consumedProductId">
+        <n-select
+          v-model:value="model.consumedProductId"
+          :options="productOptions"
+          placeholder="Opcional"
+          clearable
+          filterable
+        />
+      </n-form-item>
+
+      <n-form-item label="Qtd. consumida" path="consumptionQuantity">
+        <n-input-number
+          v-model:value="model.consumptionQuantity"
+          :min="0"
+          :precision="3"
+          :disabled="!model.consumedProductId"
+          style="width: 100%"
+        />
+      </n-form-item>
     </div>
 
     <div class="actions">
@@ -58,8 +78,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInst, FormRules } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 
 export interface Procedure {
   id?: number
@@ -67,6 +88,8 @@ export interface Procedure {
   description?: string | null
   defaultPrice: number | null
   commissionPercent: number | null
+  consumedProductId?: number | null
+  consumptionQuantity?: number | null
   isActive: boolean
 }
 
@@ -81,12 +104,16 @@ const emit = defineEmits<{
 }>()
 
 const formRef = ref<FormInst | null>(null)
+const message = useMessage()
+const productOptions = ref<{ label: string, value: number }[]>([])
 const model = reactive<Procedure>({
   id: undefined,
   name: '',
   description: '',
   defaultPrice: null,
   commissionPercent: 0,
+  consumedProductId: null,
+  consumptionQuantity: null,
   isActive: true
 })
 
@@ -114,18 +141,46 @@ watch(
         val?.commissionPercent !== undefined && val?.commissionPercent !== null
           ? Number(val.commissionPercent)
           : 0,
+      consumedProductId: val?.consumedProductId ? Number(val.consumedProductId) : null,
+      consumptionQuantity:
+        val?.consumptionQuantity !== undefined && val?.consumptionQuantity !== null
+          ? Number(val.consumptionQuantity)
+          : null,
       isActive: val?.isActive ?? true
     })
   },
   { immediate: true }
 )
 
+const loadProducts = async () => {
+  try {
+    const api = useApi()
+    const res = await api<any>('/api/v1/products?limit=500&isService=false&isActive=true')
+    productOptions.value = (res.data || [])
+      .filter((product: any) => product.trackStock)
+      .map((product: any) => ({
+        label: product.sku ? `${product.name} (${product.sku})` : product.name,
+        value: Number(product.id)
+      }))
+  } catch (_err) {
+    message.error('Erro ao carregar produtos de estoque')
+  }
+}
+
+onMounted(() => {
+  loadProducts()
+})
+
 const submitLabel = computed(() => (model.id ? 'Salvar alterações' : 'Criar procedimento'))
 
 const handleSubmit = async () => {
   try {
     await formRef.value?.validate()
-    emit('submit', { ...model })
+    const payload = { ...model }
+    if (!payload.consumedProductId) {
+      payload.consumptionQuantity = null
+    }
+    emit('submit', payload)
   } catch (err) {
     // Validation failed
   }

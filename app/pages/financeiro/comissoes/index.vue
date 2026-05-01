@@ -55,20 +55,36 @@
       </n-space>
     </n-card>
 
-    <n-data-table
-      remote
-      :columns="columns"
-      :data="rows"
-      :loading="loading"
-      :pagination="pagination"
-      :bordered="false"
-      @update:page="handlePageChange"
-    />
+    <div v-if="isMobile" class="card-list">
+      <div v-for="row in rows" :key="row.id" class="entity-card">
+        <p class="card-title">Comissão #{{ row.id }}</p>
+        <p class="card-subtitle">{{ row.user?.name || '-' }} • {{ row.procedure?.name || 'Origem não identificada' }}</p>
+        <p class="card-subtitle">Valor {{ formatCurrency(row.amount) }}</p>
+        <div class="card-actions">
+          <n-tag :type="row.status === 'PAID' ? 'success' : 'warning'" :bordered="false" size="small">
+            {{ row.status === 'PAID' ? 'Paga' : 'Pendente' }}
+          </n-tag>
+          <span class="card-subtitle">{{ format(new Date(row.calculatedAt), 'dd/MM/yyyy HH:mm') }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="table-mobile-wrapper">
+      <n-data-table
+        remote
+        :columns="columns"
+        :data="rows"
+        :loading="loading"
+        :pagination="pagination"
+        :bordered="false"
+        @update:page="handlePageChange"
+      />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { h, onMounted, reactive, ref, resolveComponent } from 'vue'
+import { h, onBeforeUnmount, onMounted, reactive, ref, resolveComponent } from 'vue'
 import { NTag, useMessage } from 'naive-ui'
 import { format } from 'date-fns'
 
@@ -89,6 +105,9 @@ const loading = ref(false)
 const rows = ref<CommissionRow[]>([])
 const userOptions = ref<Array<{ label: string; value: number }>>([])
 const dateRange = ref<[number, number] | null>(null)
+const isMobile = ref(false)
+let mediaQuery: MediaQueryList | null = null
+const updateIsMobile = () => { isMobile.value = mediaQuery?.matches ?? false }
 
 const filters = reactive({
   status: null as string | null,
@@ -248,8 +267,14 @@ const handlePageChange = (page: number) => {
 }
 
 onMounted(async () => {
+  mediaQuery = window.matchMedia('(max-width: 768px)')
+  updateIsMobile()
+  mediaQuery.addEventListener('change', updateIsMobile)
   await fetchUsers()
   await fetchCommissions()
+})
+onBeforeUnmount(() => {
+  mediaQuery?.removeEventListener('change', updateIsMobile)
 })
 </script>
 
@@ -299,5 +324,13 @@ h1 {
   .summary-grid {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+@media (max-width: 768px) {
+  .card-list { display: flex; flex-direction: column; gap: 12px; }
+  .entity-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fff; }
+  .card-title { margin: 0; font-size: 16px; font-weight: 700; }
+  .card-subtitle { margin: 4px 0 0; font-size: 12px; color: #64748b; }
+  .card-actions { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 }
 </style>

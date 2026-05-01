@@ -27,14 +27,33 @@
       </n-space>
     </n-card>
 
-    <n-data-table
-      remote
-      :columns="columns"
-      :data="data"
-      :loading="loading"
-      :pagination="pagination"
-      @update:page="handlePageChange"
-    />
+    <div v-if="isMobile" class="card-list">
+      <div v-for="row in data" :key="row.id" class="entity-card" @click="openViewModal(row)">
+        <p class="card-title">Venda #{{ row.id }}</p>
+        <p class="card-subtitle">{{ row.client?.name || 'Venda Balcão (Avulsa)' }}</p>
+        <p class="card-subtitle">{{ format(new Date(row.saleDate), 'dd/MM/yyyy HH:mm') }}</p>
+        <div class="card-actions">
+          <n-tag :type="row.status === 'PAID' ? 'success' : row.status === 'OPEN' ? 'warning' : 'error'" :bordered="false" size="small">
+            {{ row.status === 'OPEN' ? 'Aberta' : row.status === 'PAID' ? 'Paga' : 'Cancelada' }}
+          </n-tag>
+          <n-space>
+            <n-button size="small" secondary @click.stop="openViewModal(row)">Ver</n-button>
+            <n-button v-if="row.status === 'OPEN'" size="small" type="primary" secondary @click.stop="openCheckoutModal(row)">Receber</n-button>
+          </n-space>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="table-mobile-wrapper">
+      <n-data-table
+        remote
+        :columns="columns"
+        :data="data"
+        :loading="loading"
+        :pagination="pagination"
+        @update:page="handlePageChange"
+      />
+    </div>
 
     <n-modal v-model:show="showModal" preset="card" :title="modalTitle" class="w-full max-w-4xl">
       <SaleForm
@@ -110,7 +129,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, onMounted, reactive, ref, resolveComponent } from 'vue';
+import { computed, h, onBeforeUnmount, onMounted, reactive, ref, resolveComponent } from 'vue';
 import { NButton, NSpace, NTag, useMessage } from 'naive-ui';
 import SaleForm from '~/components/sales/SaleForm.vue';
 import { format } from 'date-fns';
@@ -135,6 +154,11 @@ const showCheckoutModal = ref(false);
 const checkoutLoading = ref(false);
 const checkoutTargetSale = ref<SaleRow | null>(null);
 const paymentMethodOptions = ref<Array<{ label: string; value: number }>>([]);
+const isMobile = ref(false);
+let mediaQuery: MediaQueryList | null = null;
+const updateIsMobile = () => {
+  isMobile.value = mediaQuery?.matches ?? false;
+};
 
 const dateRange = ref<[number, number] | null>(null);
 
@@ -442,6 +466,22 @@ const handleSaved = () => {
 };
 
 onMounted(() => {
+  mediaQuery = window.matchMedia('(max-width: 768px)');
+  updateIsMobile();
+  mediaQuery.addEventListener('change', updateIsMobile);
   fetchSales();
 });
+onBeforeUnmount(() => {
+  mediaQuery?.removeEventListener('change', updateIsMobile);
+});
 </script>
+
+<style scoped>
+@media (max-width: 768px) {
+  .card-list { display: flex; flex-direction: column; gap: 12px; }
+  .entity-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fff; }
+  .card-title { margin: 0; font-size: 16px; font-weight: 700; }
+  .card-subtitle { margin: 4px 0 0; font-size: 12px; color: #64748b; }
+  .card-actions { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+}
+</style>

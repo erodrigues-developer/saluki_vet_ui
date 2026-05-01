@@ -6,7 +6,7 @@ import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
-  devtools: { enabled: true },
+  devtools: { enabled: false },
   devServer: {
     port: 3001
   },
@@ -31,6 +31,11 @@ export default defineNuxtConfig({
     '/api/**': { proxy: `${process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/api/**` }
   },
   vite: {
+    server: {
+      hmr: {
+        port: Number(process.env.NUXT_HMR_PORT || 24679),
+      },
+    },
     plugins: [
       AutoImport({
         imports: [

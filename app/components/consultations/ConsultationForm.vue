@@ -6,90 +6,363 @@
     label-placement="top"
     :show-require-mark="false"
     :disabled="loading"
+    class="consultation-form"
   >
-    <div class="grid">
-      <!-- Readonly Information from Appointment if applicable -->
-      <n-form-item label="Atendimento Relacionado" path="appointmentId" class="full-row" v-if="appointmentsOptions.length > 0">
-        <n-select
-          v-model:value="model.appointmentId"
-          :options="appointmentsOptions"
-          placeholder="Selecione o agendamento prévio (opcional)"
-          clearable
-          @update:value="handleAppointmentChange"
-        />
-      </n-form-item>
+    <section class="form-block">
+      <div class="block-heading">
+        <div>
+          <p class="block-eyebrow">Contexto</p>
+          <h3>Quem está sendo atendido</h3>
+        </div>
+        <n-tag :type="model.id ? 'success' : 'warning'" size="small">
+          {{ model.id ? "IA ativa" : "Salve para ativar IA" }}
+        </n-tag>
+      </div>
 
-      <n-form-item label="Cliente" path="clientId" required>
-        <n-select
-          v-model:value="model.clientId"
-          :options="clientOptions"
-          placeholder="Selecione"
-          filterable
-          @update:value="handleClientChange"
-        />
-      </n-form-item>
+      <div class="grid compact-grid">
+        <n-form-item
+          v-if="appointmentsOptions.length > 0"
+          label="Atendimento Relacionado"
+          path="appointmentId"
+          class="full-row"
+        >
+          <n-select
+            v-model:value="model.appointmentId"
+            :options="appointmentsOptions"
+            placeholder="Selecione o agendamento prévio (opcional)"
+            clearable
+            @update:value="handleAppointmentChange"
+          />
+        </n-form-item>
 
-      <n-form-item label="Paciente" path="petId" required>
-        <n-select
-          v-model:value="model.petId"
-          :options="petOptions"
-          placeholder="Selecione"
-          :disabled="!model.clientId"
-          filterable
-        />
-      </n-form-item>
+        <n-form-item label="Cliente" path="clientId" required>
+          <n-select
+            v-model:value="model.clientId"
+            :options="clientOptions"
+            placeholder="Selecione"
+            filterable
+            @update:value="handleClientChange"
+          />
+        </n-form-item>
 
-      <n-form-item label="Veterinário Responsável" path="veterinarianId" required>
-        <n-select
-          v-model:value="model.veterinarianId"
-          :options="veterinarianOptions"
-          placeholder="Selecione"
-          filterable
-        />
-      </n-form-item>
+        <n-form-item label="Paciente" path="petId" required>
+          <n-select
+            v-model:value="model.petId"
+            :options="petOptions"
+            placeholder="Selecione"
+            :disabled="!model.clientId"
+            filterable
+          />
+        </n-form-item>
 
-      <n-form-item label="Data e Hora" path="visitDate" required>
-        <n-date-picker
-          v-model:value="model.visitDate"
-          type="datetime"
-          format="dd/MM/yyyy HH:mm"
-          style="width: 100%"
-        />
-      </n-form-item>
+        <n-form-item
+          label="Veterinário Responsável"
+          path="veterinarianId"
+          required
+        >
+          <n-select
+            v-model:value="model.veterinarianId"
+            :options="veterinarianOptions"
+            placeholder="Selecione"
+            filterable
+          />
+        </n-form-item>
 
-      <n-form-item label="Peso (kg)" path="weightKg">
-        <n-input-number v-model:value="model.weightKg" :min="0" :precision="2" placeholder="Ex: 5.5" style="width: 100%" />
-      </n-form-item>
+        <n-form-item label="Data e Hora" path="visitDate" required>
+          <n-date-picker
+            v-model:value="model.visitDate"
+            type="datetime"
+            format="dd/MM/yyyy HH:mm"
+            style="width: 100%"
+          />
+        </n-form-item>
+      </div>
+    </section>
 
-      <n-form-item label="Temperatura (°C)" path="temperatureC">
-        <n-input-number v-model:value="model.temperatureC" :min="0" :precision="1" placeholder="Ex: 38.5" style="width: 100%" />
-      </n-form-item>
+    <section class="form-block">
+      <div class="block-heading">
+        <div>
+          <p class="block-eyebrow">Triagem rápida</p>
+          <h3>Sinais iniciais da consulta</h3>
+        </div>
+        <span class="block-caption"
+          >Campos rápidos para ganhar velocidade.</span
+        >
+      </div>
 
-      <n-form-item label="Queixa Principal" path="mainComplaint" class="full-row">
-        <n-input v-model:value="model.mainComplaint" type="textarea" :rows="2" placeholder="Relato do tutor" />
-      </n-form-item>
+      <div class="grid compact-grid triage-grid">
+        <n-form-item label="Peso (kg)" path="weightKg">
+          <n-input-number
+            v-model:value="model.weightKg"
+            :min="0"
+            :precision="2"
+            placeholder="Ex: 5.5"
+            style="width: 100%"
+          />
+        </n-form-item>
 
-      <n-form-item label="Achados Clínicos" path="clinicalFindings" class="full-row">
-        <n-input v-model:value="model.clinicalFindings" type="textarea" :rows="3" placeholder="Exame físico, sintomas avaliados, etc." />
-      </n-form-item>
+        <n-form-item label="Temperatura (°C)" path="temperatureC">
+          <n-input-number
+            v-model:value="model.temperatureC"
+            :min="0"
+            :precision="1"
+            placeholder="Ex: 38.5"
+            style="width: 100%"
+          />
+        </n-form-item>
+      </div>
+    </section>
 
-      <n-form-item label="Diagnóstico (Presuntivo / Definitivo)" path="diagnosis" class="full-row">
-        <n-input v-model:value="model.diagnosis" type="textarea" :rows="2" placeholder="Diagnóstico" />
-      </n-form-item>
+    <section class="form-block anamnesis-block">
+      <div class="block-heading">
+        <div>
+          <p class="block-eyebrow">Anamnese</p>
+          <h3>Queixa principal assistida</h3>
+        </div>
+        <span class="block-caption">
+          A IA sugere os próximos campos a partir do que você escreve ou dita.
+        </span>
+      </div>
 
-      <n-form-item label="Plano de Tratamento / Prescrição" path="treatmentPlan" class="full-row">
-        <n-input v-model:value="model.treatmentPlan" type="textarea" :rows="3" placeholder="Medicamentos, orientações..." />
-      </n-form-item>
+      <div
+        class="chief-complaint-panel"
+        :class="{
+          recording: isRecording && !isRecordingPaused,
+          paused: isRecordingPaused,
+        }"
+      >
+        <div class="chief-complaint-head">
+          <div>
+            <p class="field-label">Queixa Principal</p>
+            <strong>Descreva ou dite a queixa do paciente</strong>
+          </div>
+          <span class="recording-state">{{ recordingStateLabel }}</span>
+        </div>
 
-      <n-form-item label="Anotações Privadas" path="notes" class="full-row">
-        <n-input v-model:value="model.notes" type="textarea" :rows="2" placeholder="Observações não visíveis na via do tutor" />
-      </n-form-item>
-    </div>
+        <div class="chief-input-shell">
+          <n-input
+            :value="model.mainComplaint"
+            type="textarea"
+            class="chief-complaint-input"
+            :autosize="{ minRows: 3, maxRows: 6 }"
+            placeholder="Descreva ou dite a queixa do paciente (ex: vômito há 2 dias...)"
+            @update:value="handleChiefComplaintInput"
+          />
+          <div class="chief-actions inside-field">
+            <button
+              type="button"
+              class="icon-action"
+              :disabled="!model.id || !canUseAudioCapture"
+              :title="microphoneActionLabel"
+              @click="handleMicrophoneAction"
+            >
+              {{ microphoneIndicator }}
+            </button>
+            <button
+              v-if="isRecording"
+              type="button"
+              class="icon-action secondary"
+              :title="
+                isRecordingPaused ? 'Retomar gravação' : 'Pausar gravação'
+              "
+              @click="toggleRecordingPause"
+            >
+              {{ isRecordingPaused ? "▶" : "⏸" }}
+            </button>
+          </div>
+        </div>
 
-    <!-- Procedimentos Realizados (Sub-formulário, se fôssemos implementar completo aqui). Mantendo simples no momento e gerenciando na página mãe. -->
+        <div class="chief-complaint-footer">
+          <span class="ai-inline-status" :class="{ live: aiStatusIsLive }">
+            {{ aiInlineStatus }}
+          </span>
+          <div class="chief-meta">
+            <span v-if="latestAudioBlob" class="meta-chip">
+              {{ audioDurationLabel }}
+            </span>
+            <button
+              v-if="latestAudioBlob"
+              type="button"
+              class="text-action"
+              @click="discardAudioCapture"
+            >
+              Descartar áudio
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="model.id && hasPendingSuggestion" class="suggestion-pending">
+        <strong>✨ Gerando sugestões...</strong>
+        <p>
+          Achados clínicos, diagnóstico provável e plano de tratamento serão
+          sugeridos automaticamente.
+        </p>
+      </div>
+
+      <div
+        v-else-if="visibleSuggestion?.structuredPayload"
+        class="suggestion-panel"
+      >
+        <div class="suggestion-head">
+          <div>
+            <p class="block-eyebrow">Sugestões automáticas</p>
+            <strong>{{
+              visibleSuggestion.structuredPayload.summary ||
+              "A IA preparou uma sugestão clínica para revisão"
+            }}</strong>
+          </div>
+          <div class="suggestion-actions">
+            <n-button tertiary @click="ignoreLatestSuggestion"
+              >Ignorar</n-button
+            >
+            <n-button
+              type="primary"
+              secondary
+              @click="
+                applyStructuredPayload(visibleSuggestion.structuredPayload)
+              "
+            >
+              Aplicar sugestões
+            </n-button>
+          </div>
+        </div>
+
+        <div class="suggestion-grid">
+          <article
+            v-for="card in suggestionCards"
+            :key="card.field"
+            class="suggestion-item"
+          >
+            <div class="suggestion-item-head">
+              <span>{{ card.label }}</span>
+              <button
+                type="button"
+                class="text-action"
+                :disabled="!card.value"
+                @click="applySuggestionField(card.field, card.value, card.kind)"
+              >
+                Aplicar campo
+              </button>
+            </div>
+            <p>{{ card.value || card.emptyText }}</p>
+          </article>
+        </div>
+
+        <div v-if="hasSuggestedMetrics" class="metric-row">
+          <button
+            v-if="visibleSuggestion.structuredPayload.weightKg != null"
+            type="button"
+            class="metric-pill"
+            @click="
+              applySuggestionField(
+                'weightKg',
+                visibleSuggestion.structuredPayload.weightKg,
+                'number',
+              )
+            "
+          >
+            Peso sugerido:
+            {{ visibleSuggestion.structuredPayload.weightKg }}
+          </button>
+          <button
+            v-if="visibleSuggestion.structuredPayload.temperatureC != null"
+            type="button"
+            class="metric-pill"
+            @click="
+              applySuggestionField(
+                'temperatureC',
+                visibleSuggestion.structuredPayload.temperatureC,
+                'number',
+              )
+            "
+          >
+            Temperatura sugerida:
+            {{ visibleSuggestion.structuredPayload.temperatureC }}
+          </button>
+        </div>
+      </div>
+
+      <div v-else class="suggestion-empty">
+        <strong>Comece pela queixa principal.</strong>
+        <p>
+          Assim que houver contexto suficiente, a IA sugere os próximos campos
+          sem exigir um fluxo separado.
+        </p>
+      </div>
+
+      <div class="grid compact-grid">
+        <n-form-item
+          label="Achados Clínicos"
+          path="clinicalFindings"
+          class="full-row"
+        >
+          <n-input
+            v-model:value="model.clinicalFindings"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 5 }"
+            placeholder="Exame físico, sintomas avaliados, resposta clínica..."
+          />
+        </n-form-item>
+
+        <n-form-item label="Diagnóstico" path="diagnosis">
+          <n-input
+            v-model:value="model.diagnosis"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+            placeholder="Hipótese diagnóstica ou diagnóstico confirmado"
+          />
+        </n-form-item>
+
+        <n-form-item label="Plano de Tratamento" path="treatmentPlan">
+          <n-input
+            v-model:value="model.treatmentPlan"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+            placeholder="Medicamentos, orientações, exames, retorno..."
+          />
+        </n-form-item>
+
+        <n-form-item label="Anotações Privadas" path="notes" class="full-row">
+          <n-input
+            v-model:value="model.notes"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+            placeholder="Observações internas da equipe"
+          />
+        </n-form-item>
+      </div>
+
+      <details v-if="dictations.length > 1" class="history-panel">
+        <summary>Histórico da IA</summary>
+        <div class="timeline">
+          <div
+            v-for="dictation in dictations"
+            :key="dictation.id"
+            class="timeline-item"
+            :data-testid="`dictation-row-${dictation.id}`"
+          >
+            <div class="timeline-top">
+              <strong>Execução #{{ dictation.id }}</strong>
+              <n-tag size="small" :type="statusTagType(dictation.status)">
+                {{ dictation.status }}
+              </n-tag>
+            </div>
+            <p>
+              {{
+                dictation.structuredPayload?.summary ||
+                dictation.transcriptDraft
+              }}
+            </p>
+          </div>
+        </div>
+      </details>
+    </section>
 
     <div class="actions">
-      <n-button tertiary @click="$emit('cancel')" :disabled="loading">Cancelar</n-button>
+      <n-button tertiary :disabled="loading" @click="$emit('cancel')">
+        Cancelar
+      </n-button>
       <n-button type="primary" :loading="loading" @click="handleSubmit">
         {{ submitLabel }}
       </n-button>
@@ -98,45 +371,123 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
-import type { FormInst, FormRules } from 'naive-ui'
-import { useMessage } from 'naive-ui'
-import { format } from 'date-fns'
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  watch,
+} from "vue";
+import type { FormInst, FormRules } from "naive-ui";
+import { useMessage } from "naive-ui";
+import { format } from "date-fns";
+
+interface DictationStructuredPayload {
+  summary?: string;
+  mainComplaint?: string | null;
+  clinicalFindings?: string | null;
+  diagnosis?: string | null;
+  treatmentPlan?: string | null;
+  notes?: string | null;
+  weightKg?: number | null;
+  temperatureC?: number | null;
+}
+
+interface BrowserSpeechRecognitionResult {
+  isFinal: boolean;
+  0: {
+    transcript: string;
+  };
+}
+
+interface BrowserSpeechRecognitionEvent {
+  resultIndex: number;
+  results: BrowserSpeechRecognitionResult[];
+}
+
+interface BrowserSpeechRecognition {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+type BrowserSpeechRecognitionCtor = new () => BrowserSpeechRecognition;
+
+type SuggestionField =
+  | "mainComplaint"
+  | "clinicalFindings"
+  | "diagnosis"
+  | "treatmentPlan"
+  | "notes"
+  | "weightKg"
+  | "temperatureC";
+
+type SuggestionFieldKind = "string" | "number";
 
 export interface ConsultationPayload {
-  id?: number
-  appointmentId?: number | null
-  petId: number | null
-  clientId: number | null
-  veterinarianId: number | null
-  visitDate: number | null
-  weightKg?: number | null
-  temperatureC?: number | null
-  mainComplaint?: string
-  clinicalFindings?: string
-  diagnosis?: string
-  treatmentPlan?: string
-  notes?: string
+  id?: number;
+  appointmentId?: number | null;
+  petId: number | null;
+  clientId: number | null;
+  veterinarianId: number | null;
+  visitDate: number | null;
+  weightKg?: number | null;
+  temperatureC?: number | null;
+  mainComplaint?: string;
+  clinicalFindings?: string;
+  diagnosis?: string;
+  treatmentPlan?: string;
+  notes?: string;
 }
 
 const props = defineProps<{
-  value?: ConsultationPayload | null
-  loading?: boolean
-}>()
+  value?: ConsultationPayload | null;
+  loading?: boolean;
+}>();
 
 const emit = defineEmits<{
-  (e: 'submit', payload: ConsultationPayload): void
-  (e: 'cancel'): void
-}>()
+  (e: "submit", payload: ConsultationPayload): void;
+  (e: "cancel"): void;
+}>();
 
-const formRef = ref<FormInst | null>(null)
-const message = useMessage()
+const MIN_AUTOMATION_LENGTH = 18;
 
-const clientOptions = ref<{label: string, value: number}[]>([])
-const petOptions = ref<{label: string, value: number}[]>([])
-const allPets = ref<any[]>([])
-const veterinarianOptions = ref<{label: string, value: number}[]>([])
-const appointmentsOptions = ref<{label: string, value: number, data: any}[]>([])
+const formRef = ref<FormInst | null>(null);
+const message = useMessage();
+
+const clientOptions = ref<{ label: string; value: number }[]>([]);
+const petOptions = ref<{ label: string; value: number }[]>([]);
+const allPets = ref<any[]>([]);
+const veterinarianOptions = ref<{ label: string; value: number }[]>([]);
+const appointmentsOptions = ref<{ label: string; value: number; data: any }[]>(
+  [],
+);
+
+const dictations = ref<any[]>([]);
+const dictationsLoading = ref(false);
+const sendingDictation = ref(false);
+const latestAudioUrl = ref<string | null>(null);
+const latestAudioBlob = ref<Blob | null>(null);
+const latestAudioFileName = ref<string | null>(null);
+const isRecording = ref(false);
+const isRecordingPaused = ref(false);
+const audioDurationSeconds = ref<number | null>(null);
+const recordingStartedAt = ref<number | null>(null);
+const dismissedSuggestionId = ref<number | null>(null);
+const aiInputDirty = ref(false);
+
+let mediaRecorder: MediaRecorder | null = null;
+let mediaStream: MediaStream | null = null;
+let speechRecognition: BrowserSpeechRecognition | null = null;
+let dictationPoller: ReturnType<typeof setInterval> | null = null;
+let autoSuggestionTimer: ReturnType<typeof setTimeout> | null = null;
+let audioChunks: Blob[] = [];
 
 const model = reactive<ConsultationPayload>({
   appointmentId: null,
@@ -146,133 +497,1092 @@ const model = reactive<ConsultationPayload>({
   visitDate: Date.now(),
   weightKg: null,
   temperatureC: null,
-  mainComplaint: '',
-  clinicalFindings: '',
-  diagnosis: '',
-  treatmentPlan: '',
-  notes: ''
-})
+  mainComplaint: "",
+  clinicalFindings: "",
+  diagnosis: "",
+  treatmentPlan: "",
+  notes: "",
+});
 
 const rules: FormRules = {
-  clientId: { type: 'number', required: true, message: 'Selecione o cliente', trigger: 'change' },
-  petId: { type: 'number', required: true, message: 'Selecione o pet', trigger: 'change' },
-  veterinarianId: { type: 'number', required: true, message: 'Selecione o veterinário', trigger: 'change' },
-  visitDate: { type: 'number', required: true, message: 'Selecione a data/hora', trigger: 'change' }
-}
+  clientId: {
+    type: "number",
+    required: true,
+    message: "Selecione o cliente",
+    trigger: "change",
+  },
+  petId: {
+    type: "number",
+    required: true,
+    message: "Selecione o pet",
+    trigger: "change",
+  },
+  veterinarianId: {
+    type: "number",
+    required: true,
+    message: "Selecione o veterinário",
+    trigger: "change",
+  },
+  visitDate: {
+    type: "number",
+    required: true,
+    message: "Selecione a data/hora",
+    trigger: "change",
+  },
+};
+
+const submitLabel = computed(() =>
+  model.id ? "Salvar Registro Clínico" : "Iniciar Atendimento Clínico",
+);
+
+const latestCompletedDictation = computed(
+  () => dictations.value.find((item) => item.status === "COMPLETED") || null,
+);
+
+const visibleSuggestion = computed(() => {
+  if (!latestCompletedDictation.value) {
+    return null;
+  }
+
+  if (latestCompletedDictation.value.id === dismissedSuggestionId.value) {
+    return null;
+  }
+
+  return latestCompletedDictation.value;
+});
+
+const canUseAudioCapture = computed(
+  () =>
+    process.client &&
+    typeof MediaRecorder !== "undefined" &&
+    typeof navigator !== "undefined" &&
+    !!navigator.mediaDevices?.getUserMedia,
+);
+
+const canUseSpeechRecognition = computed(
+  () => process.client && !!getSpeechRecognitionCtor(),
+);
+
+const hasPendingSuggestion = computed(
+  () =>
+    sendingDictation.value ||
+    dictations.value.some((item) =>
+      ["PENDING", "PROCESSING"].includes(item.status),
+    ),
+);
+
+const cleanedMainComplaint = computed(() =>
+  normalizeFreeText(model.mainComplaint || ""),
+);
+
+const canAutoGenerate = computed(
+  () =>
+    Boolean(model.id) &&
+    (cleanedMainComplaint.value.length >= MIN_AUTOMATION_LENGTH ||
+      !!latestAudioBlob.value),
+);
+
+const aiStatusIsLive = computed(
+  () => isRecording.value || hasPendingSuggestion.value,
+);
+
+const microphoneIndicator = computed(() => {
+  if (isRecordingPaused.value) return "⏸";
+  if (isRecording.value) return "🔴";
+  return "🎤";
+});
+
+const recordingStateLabel = computed(() => {
+  if (isRecording.value && isRecordingPaused.value) return "⏸ Pausado";
+  if (isRecording.value) return "🔴 Gravando";
+  return "🎤 Pronto para ouvir";
+});
+
+const microphoneActionLabel = computed(() => {
+  if (isRecording.value) return "Encerrar gravação";
+  return "Iniciar gravação";
+});
+
+const audioDurationLabel = computed(() => {
+  if (isRecording.value && isRecordingPaused.value) {
+    return "Gravação pausada";
+  }
+  if (isRecording.value) {
+    return "Gravando áudio";
+  }
+  if (!audioDurationSeconds.value) {
+    return "Áudio capturado";
+  }
+  return `Áudio capturado · ${audioDurationSeconds.value}s`;
+});
+
+const aiInlineStatus = computed(() => {
+  if (!model.id) {
+    return "Salve o atendimento para liberar as sugestões automáticas.";
+  }
+  if (isRecording.value && isRecordingPaused.value) {
+    return "⏸ Gravação pausada. Retome ou finalize para gerar sugestões.";
+  }
+  if (isRecording.value) {
+    return "🔴 Gravando. A IA vai sugerir os próximos campos quando você finalizar.";
+  }
+  if (hasPendingSuggestion.value) {
+    return "✨ Gerando sugestões...";
+  }
+  if (visibleSuggestion.value?.structuredPayload) {
+    return "✨ Sugestões prontas para revisar, aplicar por campo ou ignorar.";
+  }
+  if (canUseSpeechRecognition.value) {
+    return "Digite ou fale a queixa principal. A IA acompanha o fluxo sem botão extra.";
+  }
+  return "Digite ou grave a queixa principal. O backend usa o áudio para transcrever quando disponível.";
+});
+
+const suggestionCards = computed(() => {
+  const payload = visibleSuggestion.value?.structuredPayload;
+  if (!payload) {
+    return [];
+  }
+
+  return [
+    {
+      field: "clinicalFindings" as SuggestionField,
+      label: "Achados clínicos",
+      value: payload.clinicalFindings,
+      kind: "string" as SuggestionFieldKind,
+      emptyText: "Sem sugestão automática para este campo.",
+    },
+    {
+      field: "diagnosis" as SuggestionField,
+      label: "Diagnóstico provável",
+      value: payload.diagnosis,
+      kind: "string" as SuggestionFieldKind,
+      emptyText: "Sem hipótese diagnóstica sugerida.",
+    },
+    {
+      field: "treatmentPlan" as SuggestionField,
+      label: "Plano de tratamento",
+      value: payload.treatmentPlan,
+      kind: "string" as SuggestionFieldKind,
+      emptyText: "Sem plano de tratamento sugerido.",
+    },
+    {
+      field: "notes" as SuggestionField,
+      label: "Anotações privadas",
+      value: payload.notes,
+      kind: "string" as SuggestionFieldKind,
+      emptyText: "Sem observações adicionais.",
+    },
+  ];
+});
+
+const hasSuggestedMetrics = computed(() => {
+  const payload = visibleSuggestion.value?.structuredPayload;
+  return Boolean(
+    payload &&
+      (payload.weightKg != null || payload.temperatureC != null),
+  );
+});
 
 const loadLookups = async () => {
-  const api = useApi()
+  const api = useApi();
   try {
     const [clientsRes, petsRes, usersRes, apptsRes] = await Promise.all([
-      api<any>('/api/v1/clients?limit=500'),
-      api<any>('/api/v1/pets?limit=1000'),
-      api<any>('/api/v1/users?limit=100'),
-      api<any>('/api/v1/appointments?sortBy=startsAt&sortDirection=desc&limit=50')
-    ])
+      api<any>("/api/v1/clients?limit=500"),
+      api<any>("/api/v1/pets?limit=1000"),
+      api<any>("/api/v1/users?limit=100"),
+      api<any>(
+        "/api/v1/appointments?sortBy=startsAt&sortDirection=desc&limit=50",
+      ),
+    ]);
 
-    clientOptions.value = clientsRes.data.map((i: any) => ({ label: i.name, value: Number(i.id) }))
-    allPets.value = petsRes.data
-    veterinarianOptions.value = usersRes.data.map((i: any) => ({ label: i.name, value: Number(i.id) }))
+    clientOptions.value = clientsRes.data.map((item: any) => ({
+      label: item.name,
+      value: Number(item.id),
+    }));
+    allPets.value = petsRes.data;
+    veterinarianOptions.value = usersRes.data.map((item: any) => ({
+      label: item.name,
+      value: Number(item.id),
+    }));
 
-    appointmentsOptions.value = apptsRes.data.map((a: any) => ({
-      label: `Agendamento - ${format(new Date(a.startsAt), 'dd/MM/yyyy HH:mm')} - ${a.reason || 'Sem motivo'}`,
-      value: Number(a.id),
-      data: a
-    }))
+    appointmentsOptions.value = apptsRes.data.map((item: any) => ({
+      label: `Agendamento - ${format(new Date(item.startsAt), "dd/MM/yyyy HH:mm")} - ${item.reason || "Sem motivo"}`,
+      value: Number(item.id),
+      data: item,
+    }));
 
-    updatePetOptions()
-  } catch (err) {
-    message.error('Erro ao carregar dados auxiliares')
+    updatePetOptions();
+  } catch (error) {
+    message.error("Erro ao carregar dados auxiliares");
   }
-}
+};
+
+const loadDictations = async () => {
+  if (!model.id) {
+    dictations.value = [];
+    stopDictationPolling();
+    return;
+  }
+
+  dictationsLoading.value = true;
+  try {
+    const api = useApi();
+    const response = await api<any>(
+      `/api/v1/consultations/${model.id}/dictations`,
+    );
+    dictations.value = response.data || [];
+    syncPollingState();
+  } catch (error) {
+    message.error("Erro ao carregar sugestões automáticas");
+  } finally {
+    dictationsLoading.value = false;
+  }
+};
 
 const handleClientChange = () => {
-  model.petId = null
-  updatePetOptions()
-}
+  model.petId = null;
+  updatePetOptions();
+};
 
 const updatePetOptions = () => {
   if (!model.clientId) {
-    petOptions.value = []
-    return
+    petOptions.value = [];
+    return;
   }
-  const filtered = allPets.value.filter(p => Number(p.clientId) === model.clientId)
-  petOptions.value = filtered.map(p => ({ label: p.name, value: Number(p.id) }))
-}
+  const filtered = allPets.value.filter(
+    (pet) => Number(pet.clientId) === model.clientId,
+  );
+  petOptions.value = filtered.map((pet) => ({
+    label: pet.name,
+    value: Number(pet.id),
+  }));
+};
 
-const handleAppointmentChange = (val: number | null) => {
-  if (val) {
-    const appt = appointmentsOptions.value.find(o => o.value === val)?.data
-    if (appt) {
-      model.clientId = Number(appt.clientId)
-      updatePetOptions()
-      model.petId = Number(appt.petId)
-      if (appt.veterinarianId) model.veterinarianId = Number(appt.veterinarianId)
-      model.visitDate = new Date(appt.startsAt).getTime()
-      if (appt.reason && !model.mainComplaint) model.mainComplaint = appt.reason
+const handleAppointmentChange = (value: number | null) => {
+  if (!value) {
+    return;
+  }
+
+  const appointment = appointmentsOptions.value.find(
+    (item) => item.value === value,
+  )?.data;
+
+  if (!appointment) {
+    return;
+  }
+
+  model.clientId = Number(appointment.clientId);
+  updatePetOptions();
+  model.petId = Number(appointment.petId);
+  if (appointment.veterinarianId) {
+    model.veterinarianId = Number(appointment.veterinarianId);
+  }
+  model.visitDate = new Date(appointment.startsAt).getTime();
+  if (appointment.reason && !model.mainComplaint) {
+    model.mainComplaint = appointment.reason;
+  }
+};
+
+const getSpeechRecognitionCtor = (): BrowserSpeechRecognitionCtor | null => {
+  if (!process.client) return null;
+  const browserWindow = window as Window & {
+    SpeechRecognition?: BrowserSpeechRecognitionCtor;
+    webkitSpeechRecognition?: BrowserSpeechRecognitionCtor;
+  };
+  return (
+    browserWindow.SpeechRecognition ||
+    browserWindow.webkitSpeechRecognition ||
+    null
+  );
+};
+
+const clearAutoSuggestionTimer = () => {
+  if (autoSuggestionTimer) {
+    clearTimeout(autoSuggestionTimer);
+    autoSuggestionTimer = null;
+  }
+};
+
+const revokeAudioPreview = () => {
+  if (latestAudioUrl.value) {
+    URL.revokeObjectURL(latestAudioUrl.value);
+    latestAudioUrl.value = null;
+  }
+  latestAudioBlob.value = null;
+  latestAudioFileName.value = null;
+};
+
+const cleanupRecordingResources = () => {
+  if (speechRecognition) {
+    speechRecognition.onresult = null;
+    speechRecognition.onerror = null;
+    speechRecognition.onend = null;
+    speechRecognition = null;
+  }
+
+  if (mediaStream) {
+    mediaStream.getTracks().forEach((track) => track.stop());
+    mediaStream = null;
+  }
+
+  mediaRecorder = null;
+  isRecording.value = false;
+  isRecordingPaused.value = false;
+};
+
+const startSpeechRecognitionSession = () => {
+  const recognitionCtor = getSpeechRecognitionCtor();
+  if (!recognitionCtor) {
+    return;
+  }
+
+  speechRecognition = new recognitionCtor();
+  speechRecognition.continuous = true;
+  speechRecognition.interimResults = true;
+  speechRecognition.lang = "pt-BR";
+  speechRecognition.onresult = (event) => {
+    let chunk = "";
+    for (
+      let index = event.resultIndex;
+      index < event.results.length;
+      index += 1
+    ) {
+      const result = event.results[index];
+      if (result?.isFinal) {
+        chunk += `${result[0]?.transcript || ""} `;
+      }
+    }
+
+    if (chunk.trim()) {
+      handleChiefComplaintInput(
+        `${model.mainComplaint || ""} ${chunk}`.replace(/\s+/g, " ").trim(),
+      );
+    }
+  };
+  speechRecognition.onerror = () => {
+    message.warning(
+      "Reconhecimento de fala indisponível. Continue digitando ou finalize o áudio para transcrição no backend.",
+    );
+  };
+  speechRecognition.onend = () => {
+    speechRecognition = null;
+  };
+  speechRecognition.start();
+};
+
+const startRecording = async () => {
+  if (!canUseAudioCapture.value) {
+    message.warning("O navegador atual não suporta captura de áudio");
+    return;
+  }
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks = [];
+    revokeAudioPreview();
+    audioDurationSeconds.value = null;
+    recordingStartedAt.value = Date.now();
+
+    mediaRecorder = new MediaRecorder(mediaStream);
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunks.push(event.data);
+      }
+    };
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(audioChunks, {
+        type: mediaRecorder?.mimeType || "audio/webm",
+      });
+      latestAudioBlob.value = blob;
+      latestAudioFileName.value = `consultation-dictation-${Date.now()}.webm`;
+      latestAudioUrl.value = URL.createObjectURL(blob);
+      if (recordingStartedAt.value) {
+        audioDurationSeconds.value = Math.max(
+          1,
+          Math.round((Date.now() - recordingStartedAt.value) / 1000),
+        );
+      }
+      aiInputDirty.value = true;
+      cleanupRecordingResources();
+      scheduleAutoSuggestion(250);
+    };
+    mediaRecorder.start();
+
+    if (canUseSpeechRecognition.value) {
+      startSpeechRecognitionSession();
+    }
+
+    isRecording.value = true;
+    isRecordingPaused.value = false;
+  } catch (error) {
+    cleanupRecordingResources();
+    message.error("Não foi possível acessar o microfone");
+  }
+};
+
+const stopRecording = () => {
+  if (speechRecognition) {
+    speechRecognition.stop();
+  }
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+  } else {
+    cleanupRecordingResources();
+  }
+};
+
+const toggleRecordingPause = () => {
+  if (!mediaRecorder) {
+    return;
+  }
+
+  if (
+    mediaRecorder.state === "recording" &&
+    typeof mediaRecorder.pause === "function"
+  ) {
+    mediaRecorder.pause();
+    if (speechRecognition) {
+      speechRecognition.stop();
+    }
+    isRecordingPaused.value = true;
+    return;
+  }
+
+  if (
+    mediaRecorder.state === "paused" &&
+    typeof mediaRecorder.resume === "function"
+  ) {
+    mediaRecorder.resume();
+    if (!speechRecognition && canUseSpeechRecognition.value) {
+      startSpeechRecognitionSession();
+    }
+    isRecordingPaused.value = false;
+  }
+};
+
+const handleMicrophoneAction = async () => {
+  if (isRecording.value) {
+    stopRecording();
+    return;
+  }
+
+  await startRecording();
+};
+
+const discardAudioCapture = () => {
+  audioDurationSeconds.value = null;
+  revokeAudioPreview();
+};
+
+const handleChiefComplaintInput = (value: string) => {
+  model.mainComplaint = value;
+  aiInputDirty.value = true;
+  dismissedSuggestionId.value = null;
+
+  if (!isRecording.value) {
+    scheduleAutoSuggestion();
+  }
+};
+
+const submitDictation = async ({
+  silent = true,
+}: { silent?: boolean } = {}) => {
+  if (!model.id || !canAutoGenerate.value || hasPendingSuggestion.value) {
+    return;
+  }
+
+  clearAutoSuggestionTimer();
+  sendingDictation.value = true;
+  try {
+    const api = useApi();
+    const formData = new FormData();
+    if (cleanedMainComplaint.value) {
+      formData.append("transcriptDraft", cleanedMainComplaint.value);
+    }
+    formData.append(
+      "captureSource",
+      latestAudioBlob.value ? "BROWSER_AUDIO" : "MANUAL_TEXT",
+    );
+    formData.append("language", "pt-BR");
+    if (audioDurationSeconds.value) {
+      formData.append(
+        "audioDurationSeconds",
+        String(audioDurationSeconds.value),
+      );
+    }
+    if (latestAudioBlob.value) {
+      formData.append(
+        "audioFile",
+        latestAudioBlob.value,
+        latestAudioFileName.value || "consultation-dictation.webm",
+      );
+    }
+
+    await api(`/api/v1/consultations/${model.id}/dictations`, {
+      method: "POST",
+      body: formData,
+    });
+    aiInputDirty.value = false;
+    discardAudioCapture();
+    if (!silent) {
+      message.success("Sugestão automática atualizada");
+    }
+    await loadDictations();
+  } catch (error: any) {
+    message.error(
+      error?.data?.message || "Erro ao gerar sugestões automáticas",
+    );
+  } finally {
+    sendingDictation.value = false;
+  }
+};
+
+const scheduleAutoSuggestion = (delay = 1100) => {
+  clearAutoSuggestionTimer();
+  if (
+    !canAutoGenerate.value ||
+    hasPendingSuggestion.value ||
+    !aiInputDirty.value
+  ) {
+    return;
+  }
+
+  autoSuggestionTimer = setTimeout(() => {
+    void submitDictation();
+  }, delay);
+};
+
+const syncPollingState = () => {
+  const shouldPoll = dictations.value.some((item) =>
+    ["PENDING", "PROCESSING"].includes(item.status),
+  );
+
+  if (shouldPoll && !dictationPoller) {
+    dictationPoller = setInterval(() => {
+      void loadDictations();
+    }, 4000);
+  }
+
+  if (!shouldPoll) {
+    stopDictationPolling();
+    if (aiInputDirty.value) {
+      scheduleAutoSuggestion(250);
     }
   }
-}
+};
+
+const stopDictationPolling = () => {
+  if (dictationPoller) {
+    clearInterval(dictationPoller);
+    dictationPoller = null;
+  }
+};
+
+const applySuggestionField = (
+  field: SuggestionField,
+  value: string | number | null | undefined,
+  kind: SuggestionFieldKind,
+) => {
+  if (kind === "number") {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) {
+      return;
+    }
+    (model[field] as number | null | undefined) = Number(value);
+    message.success("Campo atualizado com a sugestão da IA");
+    return;
+  }
+
+  const normalizedValue = String(value || "").trim();
+  if (!normalizedValue) {
+    return;
+  }
+  (model[field] as string | undefined) = normalizedValue;
+  message.success("Campo atualizado com a sugestão da IA");
+};
+
+const applyStructuredPayload = (payload: DictationStructuredPayload) => {
+  const appliedFields: string[] = [];
+
+  const applyStringField = (field: SuggestionField, value?: string | null) => {
+    const normalizedValue = String(value || "").trim();
+    if (!normalizedValue) {
+      return;
+    }
+    (model[field] as string | undefined) = normalizedValue;
+    appliedFields.push(field);
+  };
+
+  const applyNumberField = (field: SuggestionField, value?: number | null) => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) {
+      return;
+    }
+    (model[field] as number | null | undefined) = Number(value);
+    appliedFields.push(field);
+  };
+
+  applyStringField("mainComplaint", payload.mainComplaint);
+  applyStringField("clinicalFindings", payload.clinicalFindings);
+  applyStringField("diagnosis", payload.diagnosis);
+  applyStringField("treatmentPlan", payload.treatmentPlan);
+  applyStringField("notes", payload.notes);
+  applyNumberField("weightKg", payload.weightKg);
+  applyNumberField("temperatureC", payload.temperatureC);
+
+  if (!appliedFields.length) {
+    message.warning("Nenhum campo disponível para aplicar automaticamente");
+    return;
+  }
+
+  message.success(
+    `Sugestões aplicadas em ${appliedFields.length} campo(s). Revise antes de salvar.`,
+  );
+};
+
+const ignoreLatestSuggestion = () => {
+  if (!latestCompletedDictation.value) {
+    return;
+  }
+
+  dismissedSuggestionId.value = latestCompletedDictation.value.id;
+};
+
+const statusTagType = (status: string) => {
+  if (status === "COMPLETED") return "success";
+  if (status === "FAILED") return "error";
+  if (status === "PROCESSING") return "warning";
+  return "default";
+};
 
 watch(
   () => props.value,
-  (val) => {
+  async (value) => {
     Object.assign(model, {
-      id: val?.id,
-      appointmentId: val?.appointmentId ? Number(val.appointmentId) : null,
-      clientId: val?.clientId ? Number(val.clientId) : null,
-      petId: val?.petId ? Number(val.petId) : null,
-      veterinarianId: val?.veterinarianId ? Number(val.veterinarianId) : null,
-      visitDate: val?.visitDate ? new Date(val.visitDate).getTime() : Date.now(),
-      weightKg: val?.weightKg ? Number(val.weightKg) : null,
-      temperatureC: val?.temperatureC ? Number(val.temperatureC) : null,
-      mainComplaint: val?.mainComplaint ?? '',
-      clinicalFindings: val?.clinicalFindings ?? '',
-      diagnosis: val?.diagnosis ?? '',
-      treatmentPlan: val?.treatmentPlan ?? '',
-      notes: val?.notes ?? ''
-    })
-    updatePetOptions()
+      id: value?.id,
+      appointmentId: value?.appointmentId ? Number(value.appointmentId) : null,
+      clientId: value?.clientId ? Number(value.clientId) : null,
+      petId: value?.petId ? Number(value.petId) : null,
+      veterinarianId: value?.veterinarianId
+        ? Number(value.veterinarianId)
+        : null,
+      visitDate: value?.visitDate
+        ? new Date(value.visitDate).getTime()
+        : Date.now(),
+      weightKg: value?.weightKg ? Number(value.weightKg) : null,
+      temperatureC: value?.temperatureC ? Number(value.temperatureC) : null,
+      mainComplaint: value?.mainComplaint ?? "",
+      clinicalFindings: value?.clinicalFindings ?? "",
+      diagnosis: value?.diagnosis ?? "",
+      treatmentPlan: value?.treatmentPlan ?? "",
+      notes: value?.notes ?? "",
+    });
+    dismissedSuggestionId.value = null;
+    updatePetOptions();
+    await loadDictations();
+
+    const hasAutomationInput =
+      normalizeFreeText(value?.mainComplaint ?? "").length >=
+        MIN_AUTOMATION_LENGTH || !!latestAudioBlob.value;
+    const hasProcessedSuggestion = dictations.value.some((item) =>
+      ["PENDING", "PROCESSING", "COMPLETED"].includes(item.status),
+    );
+
+    aiInputDirty.value = Boolean(value?.id) && hasAutomationInput;
+
+    if (aiInputDirty.value && !hasProcessedSuggestion) {
+      scheduleAutoSuggestion(250);
+      return;
+    }
+
+    if (!value?.id || hasProcessedSuggestion) {
+      aiInputDirty.value = false;
+    }
   },
-  { immediate: true }
-)
+  { immediate: true },
+);
+
+watch(
+  () => model.id,
+  (currentId, previousId) => {
+    if (currentId && !previousId && aiInputDirty.value) {
+      scheduleAutoSuggestion(250);
+    }
+  },
+);
 
 onMounted(() => {
-  loadLookups()
-})
+  void loadLookups();
+});
 
-const submitLabel = computed(() => (model.id ? 'Salvar Registro Clínico' : 'Iniciar Atendimento Clínico'))
+onBeforeUnmount(() => {
+  stopRecording();
+  cleanupRecordingResources();
+  revokeAudioPreview();
+  stopDictationPolling();
+  clearAutoSuggestionTimer();
+});
 
 const handleSubmit = async () => {
   try {
-    await formRef.value?.validate()
-    const payload = {
+    await formRef.value?.validate();
+    emit("submit", {
       ...model,
-      visitDate: model.visitDate ? new Date(model.visitDate).toISOString() : null
-    }
-    emit('submit', payload)
-  } catch (err) {
-    // Validation failed
+      visitDate: model.visitDate
+        ? new Date(model.visitDate).toISOString()
+        : null,
+    });
+  } catch (error) {
+    // validation handled by form
   }
+};
+
+function normalizeFreeText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
 }
 </script>
 
 <style scoped>
+.consultation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-block {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 18px;
+  padding: 16px 18px;
+  background:
+    radial-gradient(
+      circle at top right,
+      rgba(14, 165, 233, 0.08),
+      transparent 34%
+    ),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.anamnesis-block {
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(16, 185, 129, 0.08),
+      transparent 30%
+    ),
+    linear-gradient(180deg, #ffffff 0%, #f7faf8 100%);
+}
+
+.block-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.block-heading h3 {
+  margin: 4px 0 0;
+  font-size: 18px;
+  line-height: 1.2;
+  color: #0f172a;
+}
+
+.block-eyebrow,
+.field-label {
+  margin: 0;
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.block-caption {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.4;
+  max-width: 240px;
+  text-align: right;
+}
+
+.recording-state {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
 .grid {
   display: grid;
   gap: 12px;
   grid-template-columns: 1fr 1fr;
-  margin-top: 6px;
+}
+
+.compact-grid :deep(.n-form-item) {
+  margin-bottom: 0;
 }
 
 .full-row {
   grid-column: 1 / -1;
 }
 
+.chief-complaint-panel {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 18px;
+  padding: 16px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 18px 40px -32px rgba(15, 23, 42, 0.5);
+}
+
+.chief-complaint-panel.recording {
+  border-color: rgba(220, 38, 38, 0.38);
+  box-shadow: 0 18px 40px -28px rgba(220, 38, 38, 0.2);
+}
+
+.chief-complaint-panel.paused {
+  border-color: rgba(245, 158, 11, 0.38);
+  box-shadow: 0 18px 40px -28px rgba(245, 158, 11, 0.18);
+}
+
+.chief-input-shell {
+  position: relative;
+}
+
+.chief-complaint-head,
+.chief-complaint-footer,
+.suggestion-head,
+.suggestion-item-head,
+.timeline-top,
+.metric-row,
 .actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.chief-actions,
+.suggestion-actions,
+.chief-meta {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  margin-top: 24px;
+}
+
+.chief-actions.inside-field {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.chief-complaint-input :deep(textarea) {
+  font-size: 15px;
+  line-height: 1.55;
+  padding-right: 108px;
+  min-height: 126px;
+}
+
+.icon-action,
+.metric-pill,
+.text-action {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.icon-action {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: #0f172a;
+  color: white;
+  font-size: 19px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    opacity 160ms ease;
+}
+
+.icon-action.secondary {
+  background: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+}
+
+.icon-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.icon-action:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.ai-inline-status,
+.meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.ai-inline-status.live {
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.meta-chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.text-action {
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0;
+}
+
+.text-action:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.suggestion-pending,
+.suggestion-empty,
+.suggestion-panel {
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.suggestion-pending strong,
+.suggestion-empty strong {
+  display: block;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.suggestion-pending p,
+.suggestion-empty p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.suggestion-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.suggestion-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.suggestion-item,
+.timeline-item {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  padding: 12px;
+  background: white;
+}
+
+.suggestion-item span {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.suggestion-item p,
+.timeline-item p {
+  margin: 8px 0 0;
+  line-height: 1.5;
+  color: #0f172a;
+  white-space: pre-wrap;
+}
+
+.metric-row {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.metric-pill {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.1);
+  color: #115e59;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.history-panel {
+  border-top: 1px dashed rgba(148, 163, 184, 0.4);
+  padding-top: 12px;
+}
+
+.history-panel summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #334155;
+}
+
+.timeline {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.actions {
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+@media (max-width: 960px) {
+  .grid,
+  .suggestion-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .block-heading,
+  .chief-complaint-head,
+  .chief-complaint-footer,
+  .suggestion-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .block-caption {
+    max-width: none;
+    text-align: left;
+  }
+
+  .suggestion-actions,
+  .chief-meta,
+  .actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .chief-actions.inside-field {
+    top: 8px;
+    right: 8px;
+  }
+
+  .chief-complaint-input :deep(textarea) {
+    padding-right: 96px;
+  }
 }
 </style>

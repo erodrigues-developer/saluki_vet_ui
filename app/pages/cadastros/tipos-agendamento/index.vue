@@ -10,14 +10,28 @@
       </n-button>
     </div>
 
-    <n-data-table
-      :loading="loading"
-      :columns="columns"
-      :data="types"
-      :pagination="false"
-      :bordered="false"
-      :row-props="rowProps"
-    />
+    <div v-if="isMobile" class="card-list">
+      <div v-for="item in types" :key="item.id" class="entity-card" @click="openEdit(item)">
+        <p class="card-title">{{ item.name }}</p>
+        <p class="card-subtitle">{{ item.description || '-' }}</p>
+        <p class="card-subtitle">Duração {{ item.defaultDurationMinutes }} min</p>
+        <div class="card-actions">
+          <n-tag :type="item.isActive ? 'success' : 'error'" :bordered="false" size="small">{{ item.isActive ? 'Ativo' : 'Inativo' }}</n-tag>
+          <n-button size="small" tertiary type="error" @click.stop="confirmDelete(item)">Excluir</n-button>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="table-mobile-wrapper">
+      <n-data-table
+        :loading="loading"
+        :columns="columns"
+        :data="types"
+        :pagination="false"
+        :bordered="false"
+        :row-props="rowProps"
+      />
+    </div>
 
     <n-modal
       v-model:show="showModal"
@@ -39,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { h, onMounted, ref } from 'vue'
+import { h, onBeforeUnmount, onMounted, ref } from 'vue'
 import { NButton, NTag, useMessage, useDialog } from 'naive-ui'
 import AppointmentTypeForm, { type AppointmentType } from '~/components/appointment-types/AppointmentTypeForm.vue'
 
@@ -51,6 +65,9 @@ const loading = ref(false)
 const saving = ref(false)
 const showModal = ref(false)
 const editingType = ref<AppointmentType | null>(null)
+const isMobile = ref(false)
+let mediaQuery: MediaQueryList | null = null
+const updateIsMobile = () => { isMobile.value = mediaQuery?.matches ?? false }
 
 const columns = [
   { title: 'Nome', key: 'name' },
@@ -158,7 +175,13 @@ const rowProps = (row: AppointmentType) => ({
 })
 
 onMounted(() => {
+  mediaQuery = window.matchMedia('(max-width: 768px)')
+  updateIsMobile()
+  mediaQuery.addEventListener('change', updateIsMobile)
   fetchTypes()
+})
+onBeforeUnmount(() => {
+  mediaQuery?.removeEventListener('change', updateIsMobile)
 })
 </script>
 
@@ -168,4 +191,11 @@ onMounted(() => {
 .eyebrow { font-size: 12px; color: #6b7280; text-transform: uppercase; margin: 0; }
 h1 { margin: 4px 0 0; font-size: 24px; }
 .actions { display: flex; gap: 8px; }
+@media (max-width: 768px) {
+  .card-list { display: flex; flex-direction: column; gap: 12px; }
+  .entity-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fff; }
+  .card-title { margin: 0; font-size: 16px; font-weight: 700; }
+  .card-subtitle { margin: 4px 0 0; font-size: 12px; color: #64748b; }
+  .card-actions { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+}
 </style>
