@@ -184,24 +184,86 @@
       </template>
     </n-modal>
 
-    <n-modal v-model:show="showQuickModal" :mask-closable="false" preset="card" style="width: 760px">
+    <n-modal
+      v-model:show="showQuickModal"
+      :mask-closable="false"
+      preset="card"
+      class="appointment-modal quick-create-modal"
+      style="width: 760px;"
+    >
       <template #header>
-        <p class="eyebrow" style="margin: 0">Cadastro rápido</p>
+        <div class="modal-head">
+          <h3 class="modal-title">Cadastro rápido</h3>
+          <p class="modal-subtitle">Crie tutor, pet e agendamento em um único fluxo.</p>
+        </div>
       </template>
       <n-form :model="quickForm" label-placement="top" :disabled="quickSaving">
-        <div class="quick-grid">
-          <n-form-item label="Tutor" required><n-input v-model:value="quickForm.client.name" placeholder="Nome do tutor" /></n-form-item>
-          <n-form-item label="CPF"><n-input v-model:value="quickForm.client.document" placeholder="Opcional" /></n-form-item>
-          <n-form-item label="Celular"><n-input v-model:value="quickForm.client.mobilePhone" placeholder="WhatsApp" /></n-form-item>
-          <n-form-item label="E-mail"><n-input v-model:value="quickForm.client.email" placeholder="Opcional" /></n-form-item>
-          <n-form-item label="Pet" required><n-input v-model:value="quickForm.pet.name" placeholder="Nome do pet" /></n-form-item>
-          <n-form-item label="Espécie" required><n-select v-model:value="quickForm.pet.speciesId" :options="speciesOptions" filterable /></n-form-item>
-          <n-form-item label="Raça"><n-select v-model:value="quickForm.pet.breedId" :options="breedOptions" clearable filterable /></n-form-item>
-          <n-form-item label="Sexo"><n-select v-model:value="quickForm.pet.sex" :options="sexOptions" clearable /></n-form-item>
-          <n-form-item label="Tipo" required><n-select v-model:value="quickForm.appointment.appointmentTypeId" :options="appointmentTypeOptions" /></n-form-item>
-          <n-form-item label="Data e hora"><n-date-picker v-model:value="quickForm.appointment.startsAt" type="datetime" format="dd/MM/yyyy HH:mm" style="width: 100%" /></n-form-item>
-          <n-form-item label="Veterinário(a)"><n-select v-model:value="quickForm.appointment.veterinarianId" :options="veterinarianOptions" clearable filterable /></n-form-item>
-          <n-form-item label="Motivo" class="full-row"><n-input v-model:value="quickForm.appointment.reason" placeholder="Queixa inicial" /></n-form-item>
+        <div class="quick-sections">
+          <section class="quick-section">
+            <h4 class="quick-section-title">Tutor</h4>
+            <div class="quick-grid">
+              <n-form-item label="Nome do tutor" required>
+                <n-input v-model:value="quickForm.client.name" placeholder="Ex.: Ana Lima" />
+              </n-form-item>
+              <n-form-item label="Celular" required>
+                <n-input v-model:value="quickForm.client.mobilePhone" placeholder="WhatsApp" />
+              </n-form-item>
+              <n-form-item label="CPF">
+                <n-input v-model:value="quickForm.client.document" placeholder="Opcional" />
+              </n-form-item>
+              <n-form-item label="E-mail">
+                <n-input v-model:value="quickForm.client.email" placeholder="Opcional" />
+              </n-form-item>
+            </div>
+          </section>
+
+          <section class="quick-section">
+            <h4 class="quick-section-title">Pet</h4>
+            <div class="quick-grid">
+              <n-form-item label="Nome do pet" required>
+                <n-input v-model:value="quickForm.pet.name" placeholder="Ex.: Odin" />
+              </n-form-item>
+              <n-form-item label="Espécie" required>
+                <n-select v-model:value="quickForm.pet.speciesId" :options="speciesOptions" placeholder="Selecione a espécie" filterable />
+              </n-form-item>
+              <n-form-item label="Raça">
+                <n-select v-model:value="quickForm.pet.breedId" :options="breedOptions" placeholder="Selecione a raça" clearable filterable />
+              </n-form-item>
+              <n-form-item label="Sexo">
+                <n-select v-model:value="quickForm.pet.sex" :options="sexOptions" placeholder="Selecione o sexo" clearable />
+              </n-form-item>
+            </div>
+          </section>
+
+          <section class="quick-section">
+            <h4 class="quick-section-title">Agendamento</h4>
+            <div class="quick-grid">
+              <n-form-item label="Tipo de atendimento" required>
+                <n-select v-model:value="quickForm.appointment.appointmentTypeId" :options="appointmentTypeOptions" placeholder="Selecione o atendimento" />
+              </n-form-item>
+              <n-form-item label="Data e hora" required>
+                <n-date-picker
+                  v-model:value="quickForm.appointment.startsAt"
+                  type="datetime"
+                  format="dd/MM/yyyy HH:mm"
+                  placeholder="Selecione data e hora"
+                  style="width: 100%"
+                />
+              </n-form-item>
+              <n-form-item label="Veterinário(a)" class="full-row">
+                <n-select
+                  v-model:value="quickForm.appointment.veterinarianId"
+                  :options="veterinarianOptions"
+                  placeholder="Selecione o veterinário"
+                  clearable
+                  filterable
+                />
+              </n-form-item>
+              <n-form-item label="Motivo / Queixa" class="full-row">
+                <n-input v-model:value="quickForm.appointment.reason" placeholder="Ex.: vômito, apatia, vacina anual..." />
+              </n-form-item>
+            </div>
+          </section>
         </div>
       </n-form>
       <template #footer>
@@ -716,8 +778,8 @@ const openQuickCreate = () => {
 }
 
 const handleQuickSubmit = async () => {
-  if (!quickForm.client.name || !quickForm.pet.name || !quickForm.pet.speciesId || !quickForm.appointment.appointmentTypeId) {
-    message.warning('Preencha tutor, pet, espécie e tipo de agendamento.')
+  if (!quickForm.client.name || !quickForm.client.mobilePhone || !quickForm.pet.name || !quickForm.pet.speciesId || !quickForm.appointment.appointmentTypeId || !quickForm.appointment.startsAt) {
+    message.warning('Preencha os campos obrigatórios: tutor, celular, pet, espécie, tipo e data/hora.')
     return
   }
 
@@ -895,6 +957,20 @@ h1 { margin: 0; font-size: 34px; line-height: 1.1; }
 
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .menu-button { min-width: 34px; height: 32px; padding-inline: 10px; }
+.quick-sections { display: flex; flex-direction: column; gap: 10px; }
+.quick-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+}
+.quick-section-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #334155;
+}
 .quick-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .full-row { grid-column: 1 / -1; }
 .modal-head { display: flex; flex-direction: column; gap: 4px; }
@@ -927,6 +1003,8 @@ h1 { margin: 0; font-size: 34px; line-height: 1.1; }
   .head-actions { width: 100%; display: grid; grid-template-columns: 1fr; gap: 8px; }
   .head-actions :deep(.n-button) { width: 100%; min-height: 44px; }
   .quick-grid { grid-template-columns: 1fr; }
+  .quick-section { padding: 10px; }
+  .quick-section-title { font-size: 15px; margin-bottom: 6px; }
   .card-list { display: flex; flex-direction: column; gap: 12px; }
   .entity-card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 12px; background: #fff; display: flex; flex-direction: column; gap: 10px; }
   .card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; }
