@@ -230,7 +230,7 @@
         <div v-else-if="visibleSuggestion?.structuredPayload" class="suggestion-grid">
           <article
             v-for="card in suggestionCards"
-            :key="card.field"
+            :key="card.key"
             class="suggestion-item"
           >
             <div class="suggestion-item-head">
@@ -393,6 +393,10 @@ import { format } from "date-fns";
 
 interface DictationStructuredPayload {
   summary?: string;
+  subjective?: string | null;
+  objective?: string | null;
+  assessment?: string | null;
+  plan?: string | null;
   mainComplaint?: string | null;
   clinicalFindings?: string | null;
   diagnosis?: string | null;
@@ -645,48 +649,84 @@ const suggestionCards = computed(() => {
     return [];
   }
 
+  const normalizeSuggestionText = (value: string | null | undefined) =>
+    String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const sameContent = (
+    current: string | null | undefined,
+    previous: string[],
+  ) => {
+    const normalizedCurrent = normalizeSuggestionText(current);
+    return (
+      normalizedCurrent.length > 0 &&
+      previous.some((value) => value === normalizedCurrent)
+    );
+  };
+
+  const acceptedValues: string[] = [];
+  const useDistinctValue = (value: string | null | undefined) => {
+    if (sameContent(value, acceptedValues)) {
+      return null;
+    }
+    const normalized = normalizeSuggestionText(value);
+    if (normalized) {
+      acceptedValues.push(normalized);
+    }
+    return value || null;
+  };
+
+  const mainComplaintValue =
+    payload.mainComplaint || payload.subjective || payload.summary || null;
+  const clinicalFindingsValue = payload.clinicalFindings || payload.objective;
+  const diagnosisValue = payload.diagnosis || payload.assessment;
+  const followUpQuestionsValue = payload.plan;
+  const historyValue = payload.notes;
+
   return [
     {
+      key: "mainComplaint",
       field: "mainComplaint" as SuggestionField,
       label: "Queixa organizada",
-      value: payload.mainComplaint || payload.summary,
+      value: useDistinctValue(mainComplaintValue),
       kind: "string" as SuggestionFieldKind,
       emptyText: "Sem organização automática da queixa ainda.",
     },
     {
-      field: "notes" as SuggestionField,
-      label: "Duração dos sintomas",
-      value: payload.notes,
-      kind: "string" as SuggestionFieldKind,
-      emptyText: "Sem duração sugerida.",
-    },
-    {
+      key: "clinicalFindings",
       field: "clinicalFindings" as SuggestionField,
       label: "Sinais associados",
-      value: payload.clinicalFindings,
+      value: useDistinctValue(clinicalFindingsValue),
       kind: "string" as SuggestionFieldKind,
-      emptyText: "Sem sugestão automática para este campo.",
+      emptyText: "Sem sinais associados sugeridos.",
     },
     {
+      key: "diagnosis",
       field: "diagnosis" as SuggestionField,
-      label: "Diagnóstico provável",
-      value: payload.diagnosis,
+      label: "Hipótese diagnóstica",
+      value: useDistinctValue(diagnosisValue),
       kind: "string" as SuggestionFieldKind,
       emptyText: "Sem hipótese diagnóstica sugerida.",
     },
     {
+      key: "questions",
       field: "treatmentPlan" as SuggestionField,
       label: "Perguntas recomendadas",
-      value: payload.treatmentPlan,
+      value: useDistinctValue(followUpQuestionsValue),
       kind: "string" as SuggestionFieldKind,
-      emptyText: "Sem plano de tratamento sugerido.",
+      emptyText: "Sem perguntas recomendadas.",
     },
     {
+      key: "history",
       field: "notes" as SuggestionField,
-      label: "Alimentação / eliminação / medicamentos",
-      value: payload.notes,
+      label: "Histórico complementar",
+      value: useDistinctValue(historyValue),
       kind: "string" as SuggestionFieldKind,
-      emptyText: "Sem dados adicionais sugeridos.",
+      emptyText: "Sem histórico complementar sugerido.",
     },
   ];
 });

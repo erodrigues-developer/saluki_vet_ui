@@ -465,18 +465,40 @@ const recordingElapsedLabel = computed(() => {
 const suggestionCards = computed(() => {
   const payload: DictationStructuredPayload | undefined = visibleSuggestion.value?.structuredPayload
   if (!payload) return []
-  const contextText = payload.subjective || payload.notes
-  const conductText = payload.plan || payload.treatmentPlan
+
+  const normalizeSuggestionText = (value: string | null | undefined) =>
+    String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const acceptedValues: string[] = []
+  const useDistinctValue = (value: string | null | undefined) => {
+    const normalized = normalizeSuggestionText(value)
+    if (!normalized) return null
+    if (acceptedValues.includes(normalized)) return null
+    acceptedValues.push(normalized)
+    return String(value).trim()
+  }
+
+  const complaintText = payload.mainComplaint || payload.subjective || payload.summary
+  const durationText = payload.notes
+  const findingsText = payload.clinicalFindings || payload.objective
+  const historyText = payload.assessment || payload.notes
+  const questionsText = payload.plan || payload.treatmentPlan
+
   return [
-    { key: 'complaint', label: 'Queixa organizada', value: payload.mainComplaint || payload.summary, emptyText: 'Sem organização automática da queixa.' },
-    { key: 'duration', label: 'Duração dos sintomas', value: contextText, emptyText: 'Sem duração sugerida.' },
-    { key: 'findings', label: 'Sinais associados', value: payload.clinicalFindings, emptyText: 'Sem sinais sugeridos.' },
-    { key: 'feeding', label: 'Alimentação', value: contextText, emptyText: 'Sem dados sugeridos.' },
-    { key: 'hydration', label: 'Ingestão de água', value: contextText, emptyText: 'Sem dados sugeridos.' },
-    { key: 'elimination', label: 'Eliminação', value: contextText, emptyText: 'Sem dados sugeridos.' },
-    { key: 'meds', label: 'Medicamentos em uso', value: contextText, emptyText: 'Sem dados sugeridos.' },
-    { key: 'history', label: 'Histórico prévio', value: payload.assessment || contextText, emptyText: 'Sem histórico sugerido.' },
-    { key: 'questions', label: 'Perguntas recomendadas', value: conductText, emptyText: 'Sem perguntas sugeridas.' }
+    { key: 'complaint', label: 'Queixa organizada', value: useDistinctValue(complaintText), emptyText: 'Sem organização automática da queixa.' },
+    { key: 'duration', label: 'Duração dos sintomas', value: useDistinctValue(durationText), emptyText: 'Sem duração sugerida.' },
+    { key: 'findings', label: 'Sinais associados', value: useDistinctValue(findingsText), emptyText: 'Sem sinais sugeridos.' },
+    { key: 'feeding', label: 'Alimentação', value: null, emptyText: 'Sem dados sugeridos.' },
+    { key: 'hydration', label: 'Ingestão de água', value: null, emptyText: 'Sem dados sugeridos.' },
+    { key: 'elimination', label: 'Eliminação', value: null, emptyText: 'Sem dados sugeridos.' },
+    { key: 'meds', label: 'Medicamentos em uso', value: null, emptyText: 'Sem dados sugeridos.' },
+    { key: 'history', label: 'Histórico prévio', value: useDistinctValue(historyText), emptyText: 'Sem histórico sugerido.' },
+    { key: 'questions', label: 'Perguntas recomendadas', value: useDistinctValue(questionsText), emptyText: 'Sem perguntas sugeridas.' }
   ]
 })
 const appliedSuggestionsCount = computed(() => suggestionCards.value.filter((card) => suggestionStateMap[card.key] === 'Aplicado').length)
