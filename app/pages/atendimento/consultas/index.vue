@@ -633,8 +633,7 @@ const handleSubmit = async (payload: ConsultationPayload) => {
 }
 
 const openCreate = () => {
-  editingConsultation.value = null
-  showModal.value = true
+  navigateTo('/consultas/novo-atendimento')
 }
 
 const openEdit = (consultation: any) => {
