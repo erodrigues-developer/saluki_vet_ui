@@ -1073,6 +1073,20 @@ watch(activeDetailTab, async () => {
   color: #64748b;
 }
 
+.btn-filter {
+  width: 112px;
+}
+
+:deep(.btn-filter.n-button) {
+  border: 1px solid #334155;
+  color: #1e293b;
+}
+
+:deep(.btn-filter.n-button:hover) {
+  border-color: #0f172a;
+  color: #0f172a;
+}
+
 .view-chips {
   display: flex;
   gap: 8px;

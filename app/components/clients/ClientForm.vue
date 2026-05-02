@@ -1,76 +1,117 @@
 <template>
-<n-form
-  ref="formRef"
-  :model="model"
-  :rules="rules"
-  label-placement="top"
-  :show-require-mark="false"
-  :disabled="loading"
->
-  <div class="grid">
-    <n-form-item label="Ativo" path="isActive" class="full-row">
-      <n-switch v-model:value="model.isActive" />
-    </n-form-item>
-    <n-form-item label="Nome" path="name" required>
-      <n-input v-model:value="model.name" placeholder="Nome completo" />
-    </n-form-item>
-    <n-form-item label="E-mail" path="email" required>
-      <n-input v-model:value="model.email" placeholder="email@exemplo.com" />
-    </n-form-item>
-    <n-form-item label="Documento" path="document">
-      <n-input v-model:value="model.document" placeholder="CPF/CNPJ" @input="onDocumentInput" />
-    </n-form-item>
-    <n-form-item label="Telefone" path="phone">
-      <n-input
-        v-model:value="model.phone"
-        placeholder="(11) 4002-8922"
-        :input-props="{ maxlength: 15 }"
-        @update:value="onPhoneInput"
-      />
-    </n-form-item>
-    <n-form-item label="Celular" path="mobilePhone">
-      <n-input
-        v-model:value="model.mobilePhone"
-        placeholder="(11) 99999-9999"
-        :input-props="{ maxlength: 15 }"
-        @update:value="onMobileInput"
-      />
-    </n-form-item>
-    <n-form-item label="CEP" path="zipCode">
-      <n-input
-        v-model:value="model.zipCode"
-        placeholder="00000-000"
-        :input-props="{ maxlength: 9 }"
-        @update:value="onZipInput"
-      />
-    </n-form-item>
-    <n-form-item label="Rua" path="street">
-      <n-input v-model:value="model.street" placeholder="Rua / Avenida" />
-    </n-form-item>
-    <n-form-item label="Número" path="number">
-      <n-input v-model:value="model.number" placeholder="1000" />
-    </n-form-item>
-    <n-form-item label="Complemento" path="complement">
-      <n-input v-model:value="model.complement" placeholder="Apto, sala..." />
-    </n-form-item>
-    <n-form-item label="Bairro" path="district">
-      <n-input v-model:value="model.district" placeholder="Bairro" />
-    </n-form-item>
-    <n-form-item label="Cidade" path="city">
-      <n-input v-model:value="model.city" placeholder="Cidade" />
-    </n-form-item>
-    <n-form-item label="UF" path="state">
-      <n-input v-model:value="model.state" placeholder="SP" />
-    </n-form-item>
-    <n-form-item label="Observações" path="notes">
-      <n-input v-model:value="model.notes" type="textarea" :rows="3" placeholder="Preferências, recados..." />
-    </n-form-item>
-    </div>
-    <div class="actions">
-      <n-button tertiary @click="$emit('cancel')" :disabled="loading">Cancelar</n-button>
-      <n-button type="primary" :loading="loading" @click="handleSubmit">
-        {{ submitLabel }}
-      </n-button>
+  <n-form
+    ref="formRef"
+    :model="model"
+    :rules="rules"
+    label-placement="top"
+    :show-require-mark="false"
+    :disabled="loading"
+  >
+    <div class="sections">
+      <section class="form-section">
+        <div class="form-switch-row">
+          <h4 class="section-title">Identificação</h4>
+          <div class="active-wrap">
+            <span class="active-label">Ativo</span>
+            <n-switch v-model:value="model.isActive" />
+          </div>
+        </div>
+        <div class="form-grid form-grid-identification">
+          <n-form-item label="Nome *" path="name" required class="field-span-name">
+            <n-input v-model:value="model.name" placeholder="Nome completo" class="form-control" />
+          </n-form-item>
+          <n-form-item label="Documento *" path="document" required>
+            <n-input
+              v-model:value="model.document"
+              placeholder="CPF ou CNPJ"
+              class="form-control"
+              @update:value="onDocumentInput"
+            />
+          </n-form-item>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <h4 class="section-title">Contato</h4>
+        <div class="form-grid">
+          <n-form-item label="Celular" path="mobilePhone">
+            <n-input
+              v-model:value="model.mobilePhone"
+              placeholder="(11) 99999-9999"
+              class="form-control"
+              :input-props="{ maxlength: 15 }"
+              @update:value="onMobileInput"
+            />
+          </n-form-item>
+          <n-form-item label="Telefone" path="phone">
+            <n-input
+              v-model:value="model.phone"
+              placeholder="(11) 4002-8922"
+              class="form-control"
+              :input-props="{ maxlength: 15 }"
+              @update:value="onPhoneInput"
+            />
+          </n-form-item>
+          <n-form-item label="E-mail" path="email" class="field-span-2">
+            <n-input v-model:value="model.email" placeholder="email@exemplo.com" class="form-control" />
+          </n-form-item>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <h4 class="section-title">Endereço</h4>
+        <div class="form-grid form-grid-address">
+          <n-form-item label="CEP" path="zipCode">
+            <n-input
+              v-model:value="model.zipCode"
+              placeholder="00000-000"
+              class="form-control"
+              :input-props="{ maxlength: 9 }"
+              @update:value="onZipInput"
+            />
+          </n-form-item>
+          <n-form-item label="Rua" path="street" class="field-span-2">
+            <n-input v-model:value="model.street" placeholder="Rua / Avenida" class="form-control" />
+          </n-form-item>
+          <n-form-item label="Número" path="number">
+            <n-input v-model:value="model.number" placeholder="Número" class="form-control" />
+          </n-form-item>
+          <n-form-item label="Complemento" path="complement">
+            <n-input v-model:value="model.complement" placeholder="Apto, sala, casa..." class="form-control" />
+          </n-form-item>
+          <n-form-item label="Bairro" path="district">
+            <n-input v-model:value="model.district" placeholder="Bairro" class="form-control" />
+          </n-form-item>
+          <n-form-item label="Cidade" path="city">
+            <n-input v-model:value="model.city" placeholder="Cidade" class="form-control" />
+          </n-form-item>
+          <n-form-item label="UF" path="state">
+            <n-select
+              v-model:value="model.state"
+              :options="stateOptions"
+              placeholder="UF"
+              class="form-control"
+              filterable
+              clearable
+            />
+          </n-form-item>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <h4 class="section-title">Observações</h4>
+        <div class="form-grid">
+          <n-form-item label="Observações" path="notes" class="field-span-2">
+            <n-input
+              v-model:value="model.notes"
+              type="textarea"
+              :rows="3"
+              placeholder="Preferências, recados ou informações importantes"
+              class="form-textarea"
+            />
+          </n-form-item>
+        </div>
+      </section>
     </div>
   </n-form>
 </template>
@@ -79,7 +120,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import cepPromise from 'cep-promise'
 import { useMessage } from 'naive-ui'
-import type { FormInst, FormRules } from 'naive-ui'
+import type { FormInst, FormRules, SelectOption } from 'naive-ui'
 
 export interface Client {
   id?: number
@@ -106,13 +147,21 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'submit', payload: Client): void
-  (e: 'cancel'): void
 }>()
 
 const message = useMessage()
 const zipLoading = ref(false)
 
 const formRef = ref<FormInst | null>(null)
+const stateOptions: SelectOption[] = [
+  { label: 'AC', value: 'AC' }, { label: 'AL', value: 'AL' }, { label: 'AP', value: 'AP' }, { label: 'AM', value: 'AM' },
+  { label: 'BA', value: 'BA' }, { label: 'CE', value: 'CE' }, { label: 'DF', value: 'DF' }, { label: 'ES', value: 'ES' },
+  { label: 'GO', value: 'GO' }, { label: 'MA', value: 'MA' }, { label: 'MT', value: 'MT' }, { label: 'MS', value: 'MS' },
+  { label: 'MG', value: 'MG' }, { label: 'PA', value: 'PA' }, { label: 'PB', value: 'PB' }, { label: 'PR', value: 'PR' },
+  { label: 'PE', value: 'PE' }, { label: 'PI', value: 'PI' }, { label: 'RJ', value: 'RJ' }, { label: 'RN', value: 'RN' },
+  { label: 'RS', value: 'RS' }, { label: 'RO', value: 'RO' }, { label: 'RR', value: 'RR' }, { label: 'SC', value: 'SC' },
+  { label: 'SP', value: 'SP' }, { label: 'SE', value: 'SE' }, { label: 'TO', value: 'TO' }
+]
 const model = reactive<Client>({
   id: undefined,
   name: '',
@@ -133,10 +182,10 @@ const model = reactive<Client>({
 
 const rules: FormRules = {
   name: { required: true, message: 'Nome é obrigatório', trigger: 'blur' },
-  email: [
-    { required: true, message: 'E-mail é obrigatório', trigger: 'blur' },
-    { type: 'email', message: 'E-mail inválido', trigger: ['blur', 'input'] }
-  ],
+  email: {
+    validator: (_, value) => validateEmail(value),
+    trigger: ['blur', 'input']
+  },
   document: {
     validator: (_, value) => validateDocument(value),
     trigger: ['blur', 'input']
@@ -175,12 +224,11 @@ watch(
   { immediate: true }
 )
 
-const submitLabel = computed(() => (model.id ? 'Salvar alterações' : 'Criar cliente'))
-
 const handleSubmit = async () => {
   await formRef.value?.validate()
   emit('submit', { ...model })
 }
+defineExpose({ submit: handleSubmit })
 
 const digitsOnly = (val: string) => (val || '').replace(/\D+/g, '')
 
@@ -274,6 +322,14 @@ const validatePhone = (value: string, _isMobile: boolean) => {
   return (len === 10 || len === 11) || new Error('Telefone deve ter 10 ou 11 dígitos')
 }
 
+const validateEmail = (value: string) => {
+  if (!value) return true
+  const email = String(value).trim()
+  if (!email) return true
+  const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  return isValid || new Error('E-mail inválido')
+}
+
 const isValidCpf = (cpf: string) => {
   if (!cpf || cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false
   const calcCheck = (len: number) => {
@@ -307,21 +363,103 @@ const isValidCnpj = (cnpj: string) => {
 </script>
 
 <style scoped>
-.grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  margin-top: 6px;
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.full-row {
+.form-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.section-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: #334155;
+}
+
+.form-switch-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.active-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  margin-top: 1px;
+}
+
+.active-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.form-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-grid-identification {
+  grid-template-columns: 2fr 1fr;
+  margin-top: 2px;
+}
+
+.field-span-name {
+  grid-column: span 1;
+}
+
+.field-span-2 {
   grid-column: 1 / -1;
 }
 
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
+.form-grid-address :deep(.n-form-item:nth-child(2)) {
+  grid-column: 1 / -1;
+}
+
+.form-grid-address :deep(.n-form-item:nth-child(5)) {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 768px) {
+  .form-section {
+    padding: 10px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .field-span-2 {
+    grid-column: auto;
+  }
+
+  .field-span-name {
+    grid-column: auto;
+  }
+
+  .form-grid-address :deep(.n-form-item:nth-child(2)) {
+    grid-column: auto;
+  }
+
+  .form-grid-address :deep(.n-form-item:nth-child(5)) {
+    grid-column: auto;
+  }
+
+  .section-title {
+    font-size: 15px;
+  }
 }
 </style>
