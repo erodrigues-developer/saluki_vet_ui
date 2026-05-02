@@ -174,45 +174,20 @@
       </n-drawer-content>
     </n-drawer>
 
-    <n-modal
-      v-model:show="showModal"
-      :mask-closable="false"
-      preset="card"
-      class="consultation-modal"
-      style="width: min(1080px, 96vw); max-height: 94vh;"
-    >
-      <template #header>
-        <div class="modal-head">
-          <h3 class="modal-title">Novo atendimento clínico</h3>
-          <p class="modal-subtitle">Registre a consulta com apoio de IA para organizar a queixa e sugerir a anamnese.</p>
-        </div>
-      </template>
-      <ConsultationForm
-        :value="editingConsultation"
-        :loading="saving"
-        @submit="handleSubmit"
-        @cancel="closeModal"
-      />
-    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { NButton, NDropdown, NSpace, useDialog, useMessage } from 'naive-ui'
+import { NButton, NDropdown, NSpace, useMessage } from 'naive-ui'
 import { format } from 'date-fns'
-import ConsultationForm, { type ConsultationPayload } from '~/components/consultations/ConsultationForm.vue'
 
 const message = useMessage()
-const dialog = useDialog()
 
 const consultations = ref<any[]>([])
 const loading = ref(false)
 const loadError = ref(false)
-const saving = ref(false)
-const showModal = ref(false)
 const showMobileFilters = ref(false)
-const editingConsultation = ref<ConsultationPayload | null>(null)
 const isMobile = ref(false)
 let mediaQuery: MediaQueryList | null = null
 const updateIsMobile = () => { isMobile.value = mediaQuery?.matches ?? false }
@@ -603,46 +578,26 @@ const handlePageSizeChange = (s: number) => {
   fetchConsultations()
 }
 
-const handleSubmit = async (payload: ConsultationPayload) => {
-  saving.value = true
-  const api = useApi()
-  try {
-    if (payload.id) {
-      const updated = await api<any>(`/api/v1/consultations/${payload.id}`, {
-        method: 'PATCH',
-        body: payload
-      })
-      editingConsultation.value = updated
-      message.success('Consulta atualizada com sucesso')
-      closeModal()
-    } else {
-      const created = await api<any>('/api/v1/consultations', {
-        method: 'POST',
-        body: payload
-      })
-      editingConsultation.value = created
-      showModal.value = true
-      message.success('Consulta registrada com sucesso. A anamnese assistida foi habilitada.')
-    }
-    await fetchConsultations()
-  } catch (err: any) {
-    message.error(err?.data?.message || 'Erro ao salvar consulta')
-  } finally {
-    saving.value = false
-  }
-}
-
 const openCreate = () => {
   navigateTo('/consultas/novo-atendimento')
 }
 
-const openEdit = (consultation: any) => {
-  editingConsultation.value = consultation
-  showModal.value = true
+const resolveInitialStep = (consultation: any) => {
+  if (!hasText(consultation?.mainComplaint)) return 2
+  if (hasText(consultation?.mainComplaint) && !hasText(consultation?.clinicalFindings)) return 3
+  if (hasText(consultation?.clinicalFindings) && !hasText(consultation?.diagnosis) && !hasText(consultation?.treatmentPlan)) return 4
+  if (hasText(consultation?.diagnosis) || hasText(consultation?.treatmentPlan)) return 5
+  return 0
 }
 
-const closeModal = () => {
-  showModal.value = false
+const openEdit = (consultation: any) => {
+  navigateTo({
+    path: '/consultas/novo-atendimento',
+    query: {
+      id: String(consultation.id),
+      step: String(resolveInitialStep(consultation) + 1)
+    }
+  })
 }
 
 const rowProps = (row: any) => ({
@@ -764,22 +719,6 @@ h1 { margin: 0; font-size: 34px; line-height: 1.1; }
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.modal-head { display: flex; flex-direction: column; gap: 4px; }
-.modal-title { margin: 0; font-size: 24px; line-height: 1.2; color: #0f172a; font-weight: 700; }
-.modal-subtitle { margin: 0; font-size: 13px; color: #64748b; }
-:deep(.consultation-modal .n-card) { max-height: 94vh; display: flex; flex-direction: column; }
-:deep(.consultation-modal .n-card-header) {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
-}
-:deep(.consultation-modal .n-card__content) {
-  overflow-y: auto;
-  padding-bottom: 18px;
 }
 
 @media (max-width: 768px) {

@@ -48,7 +48,7 @@
 
     <div class="actions">
       <n-button type="primary" :loading="loading" @click="handleSubmit">
-        Registrar Aferição
+        Salvar aferição
       </n-button>
     </div>
   </n-form>
@@ -140,9 +140,13 @@ const handleSubmit = async () => {
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  .actions :deep(.n-button) {
+    width: 100%;
   }
 }
 </style>

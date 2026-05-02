@@ -1,111 +1,147 @@
 <template>
   <div class="hospital-page">
-    <section class="hero">
-      <div>
-        <p class="eyebrow">Operação Clínica</p>
+    <div class="page-head">
+      <div class="head-copy">
+        <p class="eyebrow">OPERAÇÃO CLÍNICA</p>
         <h1>Painel de Internação</h1>
-        <p class="hero-copy">
-          Visualize leitos, registre sinais vitais, organize o mapa terapêutico e emita
-          prescrições sem sair do fluxo hospitalar.
-        </p>
+        <p class="subhead">Acompanhe leitos, pacientes internados, prescrições e altas clínicas.</p>
       </div>
-
-      <div class="hero-actions">
-        <n-button tertiary size="large" @click="refreshBoard" :loading="loadingBoard">
-          Atualizar painel
-        </n-button>
-        <n-button type="primary" size="large" @click="openAdmissionModal()">
-          Nova internação
-        </n-button>
-      </div>
-    </section>
+      <n-space class="head-actions">
+        <n-button secondary size="large" class="refresh-action-btn" @click="refreshBoard" :loading="loadingBoard">Atualizar painel</n-button>
+        <n-button type="primary" size="large" class="btn-primary-green new-admission-btn" @click="openAdmissionModal()">Nova internação</n-button>
+      </n-space>
+    </div>
 
     <section class="stats-grid">
-      <article class="stat-card">
+      <n-card size="small" :bordered="false" class="summary-card">
         <span class="stat-label">Internações ativas</span>
         <strong class="stat-value">{{ occupiedBoxes }}</strong>
-        <span class="stat-hint">pacientes em acompanhamento agora</span>
-      </article>
-      <article class="stat-card">
-        <span class="stat-label">Boxes disponíveis</span>
+      </n-card>
+      <n-card size="small" :bordered="false" class="summary-card">
+        <span class="stat-label">Leitos disponíveis</span>
         <strong class="stat-value">{{ availableBoxes }}</strong>
-        <span class="stat-hint">leitos prontos para nova admissão</span>
-      </article>
-      <article class="stat-card accent">
+      </n-card>
+      <n-card size="small" :bordered="false" class="summary-card">
+        <span class="stat-label">Ocupação</span>
+        <strong class="stat-value">{{ occupancyRate }}</strong>
+      </n-card>
+      <n-card size="small" :bordered="false" class="summary-card">
         <span class="stat-label">Última atualização</span>
         <strong class="stat-value small">{{ lastRefreshLabel }}</strong>
-        <span class="stat-hint">sincronizado com a API clínica</span>
-      </article>
+      </n-card>
     </section>
 
-    <section class="board">
+    <n-card :bordered="false" size="small" class="filters-card">
+      <div class="filters-grid">
+        <n-input v-model:value="draftFilters.search" placeholder="Buscar tutor, pet ou leito" clearable />
+        <n-select v-model:value="draftFilters.status" :options="statusOptions" placeholder="Status" clearable />
+        <n-select v-model:value="draftFilters.sector" :options="sectorOptions" placeholder="Setor" clearable />
+        <n-select v-model:value="draftFilters.responsible" :options="responsibleOptions" placeholder="Responsável" clearable />
+        <div class="filter-actions">
+          <n-button text class="btn-clear" @click="clearFilters">Limpar filtros</n-button>
+          <n-button secondary strong class="btn-filter" @click="applyFilters">Filtrar</n-button>
+        </div>
+      </div>
+    </n-card>
+
+    <div class="view-chips" role="tablist" aria-label="Visões do painel de internação">
+      <button type="button" class="view-chip" :class="{ active: activeBoardView === 'beds' }" @click="activeBoardView = 'beds'">Leitos</button>
+      <button type="button" class="view-chip" :class="{ active: activeBoardView === 'inpatients' }" @click="activeBoardView = 'inpatients'">Pacientes internados</button>
+      <button type="button" class="view-chip" :class="{ active: activeBoardView === 'map' }" @click="activeBoardView = 'map'">Mapa terapêutico</button>
+    </div>
+
+    <section v-if="activeBoardView === 'beds'" class="status-legend">
+      <button type="button" class="legend-toggle" @click="legendOpen = !legendOpen">
+        Legenda de status <span>{{ legendOpen ? '▴' : '▾' }}</span>
+      </button>
+      <div v-show="legendOpen || !isMobileView" class="future-badges">
+        <span class="status-badge badge-free">Livre</span>
+        <span class="status-badge badge-occupied">Ocupado</span>
+        <span class="status-badge badge-discharge">Alta prevista</span>
+        <span class="status-badge badge-critical">Crítico</span>
+        <span class="status-badge badge-isolation">Isolamento</span>
+        <span class="status-badge badge-prescription">Prescrição ativa</span>
+        <span class="status-badge badge-pending-signals">Sinais pendentes</span>
+      </div>
+    </section>
+
+    <section v-if="activeBoardView === 'beds'" class="board">
       <article
-        v-for="box in boardBoxes"
+        v-for="box in filteredBoardBoxes"
         :key="box.id"
-        class="box-column"
-        :class="{ occupied: box.currentInpatient }"
+        class="box-card"
       >
         <header class="box-header">
           <div>
             <p class="box-label">{{ box.name }}</p>
             <small>{{ box.description || 'Leito operacional' }}</small>
           </div>
-          <n-tag :type="box.currentInpatient ? 'warning' : 'success'" size="small" :bordered="false">
-            {{ box.currentInpatient ? 'Ocupado' : 'Livre' }}
-          </n-tag>
+          <span class="status-badge" :class="statusClass(box)">{{ statusLabel(box) }}</span>
         </header>
 
-        <div v-if="box.currentInpatient" class="inpatient-card" @click="openRecord(box.currentInpatient.id)">
-          <div class="pet-avatar">
-            {{ initials(box.currentInpatient.pet?.name) }}
+        <div v-if="box.currentInpatient" class="inpatient-card">
+          <div class="pet-avatar" @click="openRecordWithTab(box.currentInpatient.id, 'vitals')">{{ initials(box.currentInpatient.pet?.name) }}</div>
+
+          <div class="card-content" @click="openRecordWithTab(box.currentInpatient.id, 'vitals')">
+            <div class="card-group">
+              <p class="card-group-title">Paciente</p>
+              <h3>{{ box.currentInpatient.pet?.name }}</h3>
+              <p><strong>Tutor:</strong> {{ box.currentInpatient.pet?.client?.name || 'Não informado' }}</p>
+              <p class="card-reason"><strong>Motivo:</strong> {{ box.currentInpatient.reason || 'Sem motivo clínico informado.' }}</p>
+            </div>
+            <div class="card-group">
+              <p class="card-group-title">Internação</p>
+              <div class="card-meta-grid">
+                <span><strong>Entrada:</strong> {{ formatDateTime(box.currentInpatient.admissionAt) }}</span>
+                <span><strong>Tempo internado:</strong> {{ stayDuration(box.currentInpatient.admissionAt) }}</span>
+                <span v-if="box.currentInpatient.consultationId"><strong>Consulta relacionada:</strong> #{{ box.currentInpatient.consultationId }}</span>
+                <span v-if="inpatientResponsibleLabel(box.currentInpatient)"><strong>Responsável:</strong> {{ inpatientResponsibleLabel(box.currentInpatient) }}</span>
+              </div>
+            </div>
           </div>
 
-          <div class="card-content">
-            <div class="card-head">
-              <div>
-                <h3>{{ box.currentInpatient.pet?.name }}</h3>
-                <p>
-                  {{ box.currentInpatient.pet?.client?.name || 'Tutor não identificado' }}
-                </p>
-              </div>
-              <n-tag type="info" size="small" :bordered="false">
-                {{ petDescriptor(box.currentInpatient.pet) }}
-              </n-tag>
-            </div>
-
-            <p class="card-reason">{{ box.currentInpatient.reason || 'Sem motivo clínico informado.' }}</p>
-
-            <div class="card-meta">
-              <span>Entrada {{ formatDateTime(box.currentInpatient.admissionAt) }}</span>
-              <span v-if="box.currentInpatient.consultationId">
-                Consulta #{{ box.currentInpatient.consultationId }}
-              </span>
-            </div>
-
-            <div class="card-actions" @click.stop>
-              <n-button size="small" type="primary" @click="openRecord(box.currentInpatient.id)">
-                Abrir ficha
-              </n-button>
-              <n-popconfirm @positive-click="dischargeRecord(box.currentInpatient)">
-                <template #trigger>
-                  <n-button size="small" tertiary type="error">
-                    Dar alta
-                  </n-button>
-                </template>
-                Encerrar internação deste paciente?
-              </n-popconfirm>
+          <div class="card-actions card-actions-row" @click.stop>
+            <n-button
+              size="medium"
+              type="primary"
+              class="open-record-btn"
+              :style="isMobileView ? { width: '100%', '--n-width': '100%', '--n-height': '40px', '--n-padding': '0 12px' } : null"
+              @click="openRecordWithTab(box.currentInpatient.id, 'vitals')"
+            >
+              Abrir internação
+            </n-button>
+            <div class="card-actions-secondary">
+              <n-button size="small" secondary class="secondary-action-btn" @click="openRecordWithTab(box.currentInpatient.id, 'vitals')">Registrar sinais</n-button>
+              <n-dropdown trigger="click" :options="rowMenuOptions(box.currentInpatient)" @select="(key) => handleRowMenuSelect(key, box.currentInpatient)">
+                <n-button size="small" secondary class="menu-button menu-button-square" aria-label="Mais opções">Mais opções</n-button>
+              </n-dropdown>
             </div>
           </div>
         </div>
 
         <div v-else class="empty-state">
-          <p>Leito livre para admissão.</p>
-          <n-button size="small" type="primary" secondary @click="openAdmissionModal({ boxId: box.id })">
-            Internar aqui
-          </n-button>
+          <div class="empty-state-copy">
+            <p class="empty-title">Leito disponível para admissão.</p>
+            <p><strong>Status:</strong> Disponível</p>
+            <p><strong>Admissão:</strong> Pronto</p>
+            <p><strong>Higienização:</strong> Sem registro</p>
+          </div>
+          <n-button size="small" type="primary" secondary class="admit-btn" @click="openAdmissionModal({ boxId: box.id })">Internar</n-button>
         </div>
       </article>
+
+      <n-card v-if="filteredBoardBoxes.length === 0" size="small" :bordered="false" class="empty-result-card">
+        <n-empty description="Nenhum leito encontrado para os filtros aplicados." />
+      </n-card>
     </section>
+
+    <n-card v-else-if="activeBoardView === 'inpatients'" size="small" :bordered="false" class="empty-result-card">
+      <n-empty description="Visão de pacientes internados em preparação. Use a visão de Leitos para operação clínica." />
+    </n-card>
+
+    <n-card v-else size="small" :bordered="false" class="empty-result-card">
+      <n-empty description="Visão de mapa terapêutico em preparação. Acompanhe itens no detalhe da internação por enquanto." />
+    </n-card>
 
     <n-modal
       v-model:show="showAdmissionModal"
@@ -166,21 +202,30 @@
           <p><strong>Tutor:</strong> {{ lastCreatedPrescription.pet?.client?.name }}</p>
           <p><strong>Veterinário:</strong> {{ lastCreatedPrescription.veterinarian?.name }}</p>
           <p><strong>Emitido em:</strong> {{ formatDateTime(lastCreatedPrescription.prescribedAt) }}</p>
-          <p v-if="lastCreatedPrescription.expirationDate">
-            <strong>Validade:</strong> {{ formatDate(lastCreatedPrescription.expirationDate) }}
-          </p>
+          <p v-if="lastCreatedPrescription.expirationDate"><strong>Validade:</strong> {{ formatDate(lastCreatedPrescription.expirationDate) }}</p>
         </div>
 
         <div class="print-content">{{ lastCreatedPrescription.content }}</div>
       </div>
     </n-modal>
 
-    <n-drawer v-model:show="showDetailDrawer" placement="right" :width="drawerWidth">
-      <n-drawer-content :title="selectedRecord?.pet?.name || 'Ficha de internação'">
+    <n-drawer
+      v-model:show="showDetailDrawer"
+      :placement="detailDrawerPlacement"
+      :width="isMobileView ? undefined : drawerWidth"
+      :height="detailDrawerHeight"
+      :trap-focus="false"
+      :class="{ 'inpatient-mobile-drawer': isMobileView }"
+    >
+      <n-drawer-content :title="drawerTitle" closable :native-scrollbar="false" @close="showDetailDrawer = false">
+        <template #header>
+          <div class="drawer-header">
+            <h2>{{ drawerTitle }}</h2>
+            <p>{{ drawerSubtitle }}</p>
+          </div>
+        </template>
         <template #header-extra>
-          <n-button tertiary size="small" @click="refreshSelectedRecord" :disabled="!selectedRecordId">
-            Atualizar ficha
-          </n-button>
+          <n-button tertiary size="small" @click="refreshSelectedRecord" :disabled="!selectedRecordId">Atualizar ficha</n-button>
         </template>
 
         <div v-if="detailLoading" class="detail-loading">
@@ -189,35 +234,53 @@
 
         <div v-else-if="selectedRecord" class="detail-stack">
           <section class="detail-summary">
-            <div>
-              <p class="eyebrow">Paciente</p>
-              <h2>{{ selectedRecord.pet?.name }}</h2>
-              <p>{{ selectedRecord.pet?.client?.name }} • {{ petDescriptor(selectedRecord.pet) }}</p>
+            <div class="summary-primary">
+              <h3>{{ selectedRecord.pet?.name || 'Paciente não identificado' }}</h3>
+              <p>
+                {{ selectedRecord.pet?.client?.name || 'Tutor não informado' }}
+                · {{ selectedRecord.pet?.species?.name || 'Espécie não informada' }}
+                · {{ selectedRecord.pet?.breed?.name || 'Raça não informada' }}
+              </p>
+              <p><strong>Motivo:</strong> {{ selectedRecord.reason || 'não informado' }}</p>
+              <p v-if="inpatientResponsibleLabel(selectedRecord)"><strong>Responsável:</strong> {{ inpatientResponsibleLabel(selectedRecord) }}</p>
             </div>
-            <div class="summary-chip">
-              <span>Box</span>
-              <strong>{{ selectedRecord.box?.name }}</strong>
-            </div>
-            <div class="summary-chip">
-              <span>Entrada</span>
-              <strong>{{ formatDateTime(selectedRecord.admissionAt) }}</strong>
+            <div class="summary-chips">
+              <span class="summary-chip"><strong>Box:</strong> {{ selectedRecord.box?.name || '-' }}</span>
+              <span class="summary-chip"><strong>Entrada:</strong> {{ formatDateTime(selectedRecord.admissionAt) }}</span>
+              <span class="summary-chip"><strong>Tempo:</strong> {{ stayDuration(selectedRecord.admissionAt) }}</span>
+              <span class="summary-chip status-chip badge-occupied"><strong>Status:</strong> Internado</span>
             </div>
           </section>
 
-          <n-tabs type="line" animated>
-            <n-tab-pane name="vitals" tab="Sinais Vitais">
-              <n-card size="small" title="Nova aferição" class="panel-card">
-                <ClinicalParametersForm
-                  :loading="savingVitals"
-                  @submit="createClinicalParameter"
-                />
+          <n-tabs v-model:value="activeDetailTab" type="line" animated class="detail-tabs">
+            <n-tab-pane name="vitals" :tab="vitalsTabLabel">
+              <n-card size="small" title="Última aferição" class="panel-card">
+                <div v-if="latestClinicalItem" class="latest-vitals">
+                  <div class="feed-head latest-vitals-head">
+                    <strong>{{ formatDateTime(latestClinicalItem.measuredAt) }}</strong>
+                    <span>Registrado por {{ latestClinicalItem.createdByUser?.name || 'Usuário não identificado' }}</span>
+                  </div>
+                  <div class="metric-grid">
+                    <span v-if="latestClinicalItem.temperatureC">Temp {{ Number(latestClinicalItem.temperatureC).toFixed(1) }} °C</span>
+                    <span v-if="latestClinicalItem.heartRateBpm">FC {{ latestClinicalItem.heartRateBpm }} bpm</span>
+                    <span v-if="latestClinicalItem.respiratoryRateMpm">FR {{ latestClinicalItem.respiratoryRateMpm }} mpm</span>
+                    <span v-if="latestClinicalItem.bloodPressure">PA {{ latestClinicalItem.bloodPressure }}</span>
+                    <span v-if="latestClinicalItem.weightKg">Peso {{ Number(latestClinicalItem.weightKg).toFixed(2) }} kg</span>
+                  </div>
+                </div>
+                <n-empty v-else description="Nenhuma aferição registrada." />
               </n-card>
 
+              <n-card size="small" title="Nova aferição" class="panel-card">
+                <ClinicalParametersForm :loading="savingVitals" @submit="createClinicalParameter" />
+              </n-card>
+
+              <h4 class="section-title">Histórico de aferições</h4>
               <div class="feed">
                 <article v-for="item in clinicalFeed" :key="item.id" class="feed-card">
-                  <div class="feed-head">
+                  <div class="feed-head feed-head-stacked">
                     <strong>{{ formatDateTime(item.measuredAt) }}</strong>
-                    <span>{{ item.createdByUser?.name || 'Usuário não identificado' }}</span>
+                    <span>Registrado por {{ item.createdByUser?.name || 'Usuário não identificado' }}</span>
                   </div>
                   <div class="metric-grid">
                     <span v-if="item.temperatureC">Temp {{ Number(item.temperatureC).toFixed(1) }} °C</span>
@@ -233,25 +296,16 @@
               </div>
             </n-tab-pane>
 
-            <n-tab-pane name="treatment" tab="Mapa Terapêutico">
-              <n-card size="small" title="Agendar item" class="panel-card">
-                <TreatmentItemForm
-                  :loading="savingTreatment"
-                  :product-options="productOptions"
-                  :procedure-options="procedureOptions"
-                  @submit="createTreatmentItem"
-                />
+            <n-tab-pane name="treatment" :tab="treatmentTabLabel">
+              <n-card v-if="showTreatmentForm || treatmentItems.length" size="small" title="Agendar item" class="panel-card">
+                <TreatmentItemForm :loading="savingTreatment" :product-options="productOptions" :procedure-options="procedureOptions" @submit="createTreatmentItem" />
               </n-card>
 
               <div class="feed">
                 <article v-for="item in treatmentItems" :key="item.id" class="treatment-card">
                   <div class="feed-head">
                     <strong>{{ item.procedure?.name || item.medicament?.name || 'Item de tratamento' }}</strong>
-                    <n-tag
-                      size="small"
-                      :type="item.status === 'EXECUTED' ? 'success' : treatmentState(item) === 'OVERDUE' ? 'error' : 'warning'"
-                      :bordered="false"
-                    >
+                    <n-tag size="small" :type="item.status === 'EXECUTED' ? 'success' : treatmentState(item) === 'OVERDUE' ? 'error' : 'warning'" :bordered="false">
                       {{ item.status === 'EXECUTED' ? 'Executado' : treatmentState(item) === 'OVERDUE' ? 'Atrasado' : 'Pendente' }}
                     </n-tag>
                   </div>
@@ -264,51 +318,46 @@
                   <p v-if="item.notes" class="feed-notes">{{ item.notes }}</p>
 
                   <div class="card-actions">
-                    <n-button
-                      v-if="item.status === 'PENDING'"
-                      size="small"
-                      type="primary"
-                      secondary
-                      @click="executeTreatment(item)"
-                    >
-                      Executar
-                    </n-button>
-                    <span v-else class="executed-by">
-                      Aplicado por {{ item.executedByUser?.name || 'usuário não identificado' }}
-                    </span>
+                    <n-button v-if="item.status === 'PENDING'" size="small" type="primary" secondary @click="executeTreatment(item)">Executar</n-button>
+                    <span v-else class="executed-by">Aplicado por {{ item.executedByUser?.name || 'usuário não identificado' }}</span>
                   </div>
                 </article>
 
-                <n-empty v-if="!treatmentItems.length" description="Nenhum item de tratamento programado." />
+                <div v-if="!treatmentItems.length && !showTreatmentForm" class="empty-tab-action">
+                  <n-empty description="Nenhum item terapêutico registrado." />
+                  <n-button type="primary" secondary @click="showTreatmentForm = true">Adicionar item</n-button>
+                </div>
               </div>
             </n-tab-pane>
 
-            <n-tab-pane name="prescriptions" tab="Prescrições">
+            <n-tab-pane name="prescriptions" :tab="prescriptionsTabLabel">
               <div class="prescription-head">
                 <div>
                   <p class="eyebrow">Histórico do paciente</p>
                   <h3>Receitas emitidas</h3>
                 </div>
-                <n-button type="primary" secondary @click="openPrescriptionModalForSelectedRecord">
-                  Nova prescrição
-                </n-button>
+                <n-button type="primary" secondary class="new-prescription-btn" @click="openPrescriptionModalForSelectedRecord">+ Nova prescrição digital</n-button>
               </div>
 
-              <div class="feed">
-                <article v-for="item in prescriptions" :key="item.id" class="feed-card">
-                  <div class="feed-head">
+              <div class="feed prescriptions-feed">
+                <article v-for="item in prescriptions" :key="item.id" class="feed-card prescription-card">
+                  <div class="prescription-card-head">
                     <strong>{{ formatDateTime(item.prescribedAt) }}</strong>
-                    <span>{{ item.veterinarian?.name || 'Veterinário não identificado' }}</span>
+                    <n-tag size="small" :bordered="false" class="prescription-status-tag" :type="prescriptionStatus(item) === 'Ativa' ? 'success' : prescriptionStatus(item) === 'Finalizada' ? 'default' : 'info'">
+                      {{ prescriptionStatus(item) }}
+                    </n-tag>
                   </div>
-                  <p class="feed-notes">{{ item.content }}</p>
+                  <p class="prescription-responsible">{{ item.veterinarian?.name || 'Veterinário não identificado' }}</p>
+                  <p class="feed-notes prescription-content">{{ item.content }}</p>
                   <div class="card-actions">
-                    <n-button size="small" tertiary @click="previewExistingPrescription(item)">
-                      Abrir receituário
-                    </n-button>
+                    <n-button size="small" tertiary @click="previewExistingPrescription(item)">Abrir receituário</n-button>
                   </div>
                 </article>
 
-                <n-empty v-if="!prescriptions.length" description="Nenhuma prescrição emitida para este paciente." />
+                <div v-if="!prescriptions.length" class="empty-tab-action">
+                  <n-empty description="Nenhuma prescrição ativa." />
+                  <n-button type="primary" secondary @click="openPrescriptionModalForSelectedRecord">Adicionar prescrição</n-button>
+                </div>
               </div>
             </n-tab-pane>
           </n-tabs>
@@ -319,11 +368,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { format } from 'date-fns'
-import InpatientAdmissionForm, {
-  type InpatientAdmissionPayload,
-} from '~/components/hospitalization/InpatientAdmissionForm.vue'
+import { useDialog, useMessage } from 'naive-ui'
+import InpatientAdmissionForm, { type InpatientAdmissionPayload } from '~/components/hospitalization/InpatientAdmissionForm.vue'
 import ClinicalParametersForm from '~/components/hospitalization/ClinicalParametersForm.vue'
 import TreatmentItemForm from '~/components/hospitalization/TreatmentItemForm.vue'
 import PrescriptionForm from '~/components/hospitalization/PrescriptionForm.vue'
@@ -331,6 +379,7 @@ import PrescriptionForm from '~/components/hospitalization/PrescriptionForm.vue'
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
+const dialog = useDialog()
 
 const loadingBoard = ref(false)
 const detailLoading = ref(false)
@@ -343,8 +392,16 @@ const showAdmissionModal = ref(false)
 const showDetailDrawer = ref(false)
 const showPrescriptionModal = ref(false)
 const showPrintModal = ref(false)
+const showTreatmentForm = ref(false)
+const activeDetailTab = ref('vitals')
+const activeBoardView = ref<'beds' | 'inpatients' | 'map'>('beds')
+const legendOpen = ref(false)
+const isMobileView = ref(false)
+let mobileQuery: MediaQueryList | null = null
+let handleMobileChange: ((event: MediaQueryListEvent) => void) | null = null
 
 const boardBoxes = ref<any[]>([])
+const filteredBoardBoxes = ref<any[]>([])
 const clinicalFeed = ref<any[]>([])
 const treatmentItems = ref<any[]>([])
 const prescriptions = ref<any[]>([])
@@ -367,15 +424,81 @@ const prescriptionContext = reactive({
   consultationLabel: '',
 })
 
+const draftFilters = reactive({
+  search: '',
+  status: null as string | null,
+  sector: null as string | null,
+  responsible: null as string | null,
+})
+
+const appliedFilters = reactive({
+  search: '',
+  status: null as string | null,
+  sector: null as string | null,
+  responsible: null as string | null,
+})
+
+const statusOptions = [
+  { label: 'Livre', value: 'FREE' },
+  { label: 'Ocupado', value: 'OCCUPIED' },
+  { label: 'Alta prevista', value: 'DISCHARGE_PLANNED' },
+  { label: 'Isolamento', value: 'ISOLATION' },
+  { label: 'Crítico', value: 'CRITICAL' },
+]
+
+const sectorOptions = [
+  { label: 'Canil', value: 'CANIL' },
+  { label: 'Gatil', value: 'GATIL' },
+  { label: 'Isolamento', value: 'ISOLAMENTO' },
+]
+
 const api = useApi()
 
 const occupiedBoxes = computed(() => boardBoxes.value.filter((box) => box.currentInpatient).length)
 const availableBoxes = computed(() => boardBoxes.value.filter((box) => !box.currentInpatient).length)
+const occupancyRate = computed(() => {
+  const total = boardBoxes.value.length
+  if (!total) return '0%'
+  return `${Math.round((occupiedBoxes.value / total) * 100)}%`
+})
+
 const lastRefreshLabel = computed(() =>
   lastRefreshAt.value ? format(lastRefreshAt.value, 'dd/MM/yyyy HH:mm') : 'Aguardando sincronização',
 )
+
 const clinicTitle = computed(() => clinicSettings.value?.notes || 'Saluki Vet')
 const drawerWidth = computed(() => (process.client && window.innerWidth < 900 ? '100%' : 720))
+const detailDrawerPlacement = computed(() => (isMobileView.value ? 'bottom' : 'right'))
+const detailDrawerHeight = computed(() => (isMobileView.value ? '100%' : undefined))
+const drawerTitle = computed(() => selectedRecord.value?.pet?.name ? `Internação de ${selectedRecord.value.pet.name}` : 'Ficha de internação')
+const drawerSubtitle = computed(() => {
+  if (!selectedRecord.value) return 'Acompanhe dados clínicos, sinais vitais e evolução da internação.'
+  const boxName = selectedRecord.value.box?.name || 'Box não informado'
+  const entry = formatDateTime(selectedRecord.value.admissionAt)
+  const duration = stayDuration(selectedRecord.value.admissionAt)
+  return `${boxName} · Entrada ${entry} · ${duration} internado`
+})
+const latestClinicalItem = computed(() => (clinicalFeed.value?.length ? clinicalFeed.value[0] : null))
+const pendingTreatmentCount = computed(() => treatmentItems.value.filter((item) => item.status === 'PENDING').length)
+const vitalsTabLabel = computed(() => (isMobileView.value ? 'Sinais' : 'Sinais Vitais'))
+const treatmentTabLabel = computed(() => {
+  if (isMobileView.value) return 'Mapa'
+  return pendingTreatmentCount.value > 0 ? `Mapa Terapêutico · ${pendingTreatmentCount.value} pendentes` : 'Mapa Terapêutico'
+})
+const activePrescriptionCount = computed(() => prescriptions.value.length)
+const prescriptionsTabLabel = computed(() => {
+  if (isMobileView.value) return activePrescriptionCount.value > 0 ? `Prescrições (${activePrescriptionCount.value})` : 'Prescrições'
+  return activePrescriptionCount.value > 0 ? `Prescrições · ${activePrescriptionCount.value} ativa${activePrescriptionCount.value > 1 ? 's' : ''}` : 'Prescrições'
+})
+
+const responsibleOptions = computed(() => {
+  const map = new Map<string, string>()
+  boardBoxes.value.forEach((box) => {
+    const label = inpatientResponsibleLabel(box.currentInpatient)
+    if (label) map.set(label, label)
+  })
+  return Array.from(map.entries()).map(([label, value]) => ({ label, value }))
+})
 
 const petOptions = computed(() =>
   pets.value.map((pet) => ({
@@ -401,33 +524,23 @@ const availableBoxOptions = computed(() =>
     })),
 )
 
-const productOptions = computed(() =>
-  products.value.map((item) => ({
-    label: item.name,
-    value: Number(item.id),
-  })),
-)
+const productOptions = computed(() => products.value.map((item) => ({ label: item.name, value: Number(item.id) })))
+const procedureOptions = computed(() => procedures.value.map((item) => ({ label: item.name, value: Number(item.id) })))
 
-const procedureOptions = computed(() =>
-  procedures.value.map((item) => ({
-    label: item.name,
-    value: Number(item.id),
-  })),
-)
+const initials = (value?: string) => value?.split(' ').filter(Boolean).slice(0, 2).map((chunk) => chunk[0]?.toUpperCase()).join('') || 'PT'
 
-const initials = (value?: string) =>
-  value
-    ?.split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((chunk) => chunk[0]?.toUpperCase())
-    .join('') || 'PT'
+const formatDateTime = (value?: string | Date | null) => (value ? format(new Date(value), 'dd/MM/yyyy HH:mm') : '-')
+const formatDate = (value?: string | Date | null) => (value ? format(new Date(value), 'dd/MM/yyyy') : '-')
 
-const formatDateTime = (value?: string | Date | null) =>
-  value ? format(new Date(value), 'dd/MM/yyyy HH:mm') : '-'
-
-const formatDate = (value?: string | Date | null) =>
-  value ? format(new Date(value), 'dd/MM/yyyy') : '-'
+const stayDuration = (admissionAt?: string | Date | null) => {
+  if (!admissionAt) return '-'
+  const diffMs = Date.now() - new Date(admissionAt).getTime()
+  const hours = Math.floor(diffMs / (1000 * 60 * 60))
+  const days = Math.floor(hours / 24)
+  const remainingHours = hours % 24
+  if (days > 0) return `${days}d ${remainingHours}h`
+  return `${Math.max(0, hours)}h`
+}
 
 const petDescriptor = (pet?: any) => {
   if (!pet) return 'Paciente'
@@ -436,9 +549,128 @@ const petDescriptor = (pet?: any) => {
   return breed ? `${species} • ${breed}` : species
 }
 
+const inpatientResponsibleLabel = (inpatient?: any) =>
+  inpatient?.responsibleUser?.name
+  || inpatient?.admittedByUser?.name
+  || inpatient?.veterinarian?.name
+  || ''
+
+const boxStatusCode = (box: any) => {
+  if (box.currentInpatient) return 'OCCUPIED'
+  const raw = String(box.operationalStatus || box.status || '').toUpperCase()
+  if (raw.includes('CRIT')) return 'CRITICAL'
+  if (raw.includes('ISO')) return 'ISOLATION'
+  if (raw.includes('ALTA') || raw.includes('DISCH')) return 'DISCHARGE_PLANNED'
+  return 'FREE'
+}
+
+const statusLabel = (box: any) => {
+  const code = boxStatusCode(box)
+  if (code === 'OCCUPIED') return 'Ocupado'
+  if (code === 'DISCHARGE_PLANNED') return 'Alta prevista'
+  if (code === 'ISOLATION') return 'Isolamento'
+  if (code === 'CRITICAL') return 'Crítico'
+  return 'Livre'
+}
+
+const statusClass = (box: any) => {
+  const code = boxStatusCode(box)
+  if (code === 'OCCUPIED') return 'badge-occupied'
+  if (code === 'DISCHARGE_PLANNED') return 'badge-discharge'
+  if (code === 'ISOLATION') return 'badge-isolation'
+  if (code === 'CRITICAL') return 'badge-critical'
+  return 'badge-free'
+}
+
+const matchesSector = (box: any, sector: string | null) => {
+  if (!sector) return true
+  const text = `${box.name || ''} ${box.description || ''} ${box.sector || ''}`.toLowerCase()
+  if (sector === 'CANIL') return text.includes('canil')
+  if (sector === 'GATIL') return text.includes('gati')
+  if (sector === 'ISOLAMENTO') return text.includes('isola')
+  return true
+}
+
+const applyFilters = () => {
+  appliedFilters.search = draftFilters.search
+  appliedFilters.status = draftFilters.status
+  appliedFilters.sector = draftFilters.sector
+  appliedFilters.responsible = draftFilters.responsible
+
+  const term = appliedFilters.search.trim().toLowerCase()
+
+  filteredBoardBoxes.value = boardBoxes.value.filter((box) => {
+    const inpatient = box.currentInpatient
+    const haystack = `${box.name || ''} ${inpatient?.pet?.name || ''} ${inpatient?.pet?.client?.name || ''}`.toLowerCase()
+    const matchesSearch = !term || haystack.includes(term)
+    const matchesStatusFilter = !appliedFilters.status || boxStatusCode(box) === appliedFilters.status
+    const matchesResponsible = !appliedFilters.responsible || inpatientResponsibleLabel(inpatient) === appliedFilters.responsible
+    return matchesSearch && matchesStatusFilter && matchesSector(box, appliedFilters.sector) && matchesResponsible
+  })
+}
+
+const clearFilters = () => {
+  draftFilters.search = ''
+  draftFilters.status = null
+  draftFilters.sector = null
+  draftFilters.responsible = null
+  applyFilters()
+}
+
+const rowMenuOptions = (inpatient: any) => [
+  { label: 'Prescrição', key: `prescription:${inpatient.id}` },
+  { label: 'Mapa terapêutico', key: `treatment:${inpatient.id}` },
+  { label: 'Transferir leito', key: `transfer:${inpatient.id}` },
+  { label: 'Dar alta', key: `discharge:${inpatient.id}` },
+  { label: 'Histórico', key: `history:${inpatient.id}` },
+]
+
+const openRecordWithTab = async (recordId: number, tab: string) => {
+  activeDetailTab.value = tab
+  await openRecord(recordId)
+}
+
+const handleRowMenuSelect = async (key: string, inpatient: any) => {
+  if (key.startsWith('prescription:')) {
+    openPrescriptionModalForContext({ petId: Number(inpatient.petId), consultationId: inpatient.consultationId ? Number(inpatient.consultationId) : null })
+    return
+  }
+  if (key.startsWith('treatment:')) {
+    await openRecordWithTab(Number(inpatient.id), 'treatment')
+    return
+  }
+  if (key.startsWith('discharge:')) {
+    dialog.warning({
+      title: 'Confirmar alta',
+      content: 'Encerrar internação deste paciente?',
+      positiveText: 'Dar alta',
+      negativeText: 'Cancelar',
+      onPositiveClick: async () => {
+        await dischargeRecord(inpatient)
+      },
+    })
+    return
+  }
+  if (key.startsWith('transfer:')) {
+    message.info('Fluxo de transferência de leito será disponibilizado em breve.')
+    return
+  }
+  if (key.startsWith('history:')) {
+    await openRecordWithTab(Number(inpatient.id), 'prescriptions')
+  }
+}
+
 const treatmentState = (item: any) => {
   if (item.status === 'EXECUTED') return 'EXECUTED'
   return new Date(item.scheduledAt).getTime() < Date.now() ? 'OVERDUE' : 'PENDING'
+}
+
+const prescriptionStatus = (item: any) => {
+  const status = String(item?.status || '').toUpperCase()
+  if (status.includes('FINAL')) return 'Finalizada'
+  if (status.includes('ACTIVE') || status.includes('ATIVA')) return 'Ativa'
+  if (item?.expirationDate && new Date(item.expirationDate).getTime() < Date.now()) return 'Finalizada'
+  return 'Emitida'
 }
 
 const loadLookups = async () => {
@@ -463,6 +695,7 @@ const refreshBoard = async () => {
     const response = await api<any>('/api/v1/boxes?isActive=true')
     boardBoxes.value = response.data || []
     lastRefreshAt.value = new Date()
+    applyFilters()
   } catch (error: any) {
     message.error(error?.data?.message || 'Erro ao carregar o painel de internação.')
   } finally {
@@ -475,21 +708,14 @@ const openAdmissionModal = (initialValue?: Partial<InpatientAdmissionPayload>) =
   showAdmissionModal.value = true
 }
 
-const openPrescriptionModalForContext = (context: {
-  petId: number
-  consultationId?: number | null
-}) => {
+const openPrescriptionModalForContext = (context: { petId: number; consultationId?: number | null }) => {
   const pet = pets.value.find((item) => Number(item.id) === Number(context.petId))
-  const consultation = context.consultationId
-    ? consultations.value.find((item) => Number(item.id) === Number(context.consultationId))
-    : null
+  const consultation = context.consultationId ? consultations.value.find((item) => Number(item.id) === Number(context.consultationId)) : null
 
   prescriptionContext.petId = Number(context.petId)
   prescriptionContext.consultationId = context.consultationId ? Number(context.consultationId) : null
   prescriptionContext.petLabel = pet?.name || `Paciente #${context.petId}`
-  prescriptionContext.consultationLabel = consultation
-    ? `Consulta #${consultation.id} • ${formatDateTime(consultation.visitDate)}`
-    : ''
+  prescriptionContext.consultationLabel = consultation ? `Consulta #${consultation.id} • ${formatDateTime(consultation.visitDate)}` : ''
   showPrescriptionModal.value = true
 }
 
@@ -530,6 +756,7 @@ const loadRecordDetails = async (recordId: number) => {
 
 const openRecord = async (recordId: number) => {
   showDetailDrawer.value = true
+  showTreatmentForm.value = false
   await loadRecordDetails(recordId)
 }
 
@@ -541,11 +768,7 @@ const refreshSelectedRecord = async () => {
 const createAdmission = async (payload: any) => {
   savingAdmission.value = true
   try {
-    const created = await api<any>('/api/v1/inpatient-records', {
-      method: 'POST',
-      body: payload,
-    })
-
+    const created = await api<any>('/api/v1/inpatient-records', { method: 'POST', body: payload })
     message.success('Paciente internado com sucesso.')
     showAdmissionModal.value = false
     await refreshBoard()
@@ -562,10 +785,7 @@ const createClinicalParameter = async (payload: any) => {
   if (!selectedRecordId.value) return
   savingVitals.value = true
   try {
-    await api(`/api/v1/inpatient-records/${selectedRecordId.value}/clinical-parameters`, {
-      method: 'POST',
-      body: payload,
-    })
+    await api(`/api/v1/inpatient-records/${selectedRecordId.value}/clinical-parameters`, { method: 'POST', body: payload })
     message.success('Aferição registrada.')
     await refreshSelectedRecord()
   } catch (error: any) {
@@ -579,11 +799,9 @@ const createTreatmentItem = async (payload: any) => {
   if (!selectedRecordId.value) return
   savingTreatment.value = true
   try {
-    await api(`/api/v1/inpatient-records/${selectedRecordId.value}/treatment-map`, {
-      method: 'POST',
-      body: payload,
-    })
+    await api(`/api/v1/inpatient-records/${selectedRecordId.value}/treatment-map`, { method: 'POST', body: payload })
     message.success('Item adicionado ao mapa terapêutico.')
+    showTreatmentForm.value = true
     await refreshSelectedRecord()
   } catch (error: any) {
     message.error(error?.data?.message || 'Erro ao salvar o item de tratamento.')
@@ -594,10 +812,7 @@ const createTreatmentItem = async (payload: any) => {
 
 const executeTreatment = async (item: any) => {
   try {
-    await api(`/api/v1/treatment-map/${item.id}/execute`, {
-      method: 'PATCH',
-      body: {},
-    })
+    await api(`/api/v1/treatment-map/${item.id}/execute`, { method: 'PATCH', body: {} })
     message.success('Tratamento marcado como executado.')
     await refreshSelectedRecord()
     await refreshBoard()
@@ -609,10 +824,7 @@ const executeTreatment = async (item: any) => {
 const createPrescription = async (payload: any) => {
   savingPrescription.value = true
   try {
-    const created = await api<any>('/api/v1/prescriptions', {
-      method: 'POST',
-      body: payload,
-    })
+    const created = await api<any>('/api/v1/prescriptions', { method: 'POST', body: payload })
     lastCreatedPrescription.value = created
     showPrescriptionModal.value = false
     showPrintModal.value = true
@@ -636,21 +848,17 @@ const previewExistingPrescription = (item: any) => {
   showPrintModal.value = true
 }
 
-const buildPrescriptionText = (prescription: any) => {
-  return [
-    'Receituário Veterinário',
-    `Clínica: ${clinicTitle.value}`,
-    `Paciente: ${prescription.pet?.name || '-'}`,
-    `Tutor: ${prescription.pet?.client?.name || '-'}`,
-    `Veterinário: ${prescription.veterinarian?.name || '-'}`,
-    `Emitido em: ${formatDateTime(prescription.prescribedAt)}`,
-    prescription.expirationDate ? `Validade: ${formatDate(prescription.expirationDate)}` : '',
-    '',
-    prescription.content || '',
-  ]
-    .filter(Boolean)
-    .join('\n')
-}
+const buildPrescriptionText = (prescription: any) => [
+  'Receituário Veterinário',
+  `Clínica: ${clinicTitle.value}`,
+  `Paciente: ${prescription.pet?.name || '-'}`,
+  `Tutor: ${prescription.pet?.client?.name || '-'}`,
+  `Veterinário: ${prescription.veterinarian?.name || '-'}`,
+  `Emitido em: ${formatDateTime(prescription.prescribedAt)}`,
+  prescription.expirationDate ? `Validade: ${formatDate(prescription.expirationDate)}` : '',
+  '',
+  prescription.content || '',
+].filter(Boolean).join('\n')
 
 const printPrescription = () => {
   if (!lastCreatedPrescription.value || !process.client) return
@@ -678,11 +886,7 @@ const printPrescription = () => {
           <div><strong>Tutor:</strong> ${prescription.pet?.client?.name || '-'}</div>
           <div><strong>Veterinário:</strong> ${prescription.veterinarian?.name || '-'}</div>
           <div><strong>Emitido em:</strong> ${formatDateTime(prescription.prescribedAt)}</div>
-          ${
-            prescription.expirationDate
-              ? `<div><strong>Validade:</strong> ${formatDate(prescription.expirationDate)}</div>`
-              : ''
-          }
+          ${prescription.expirationDate ? `<div><strong>Validade:</strong> ${formatDate(prescription.expirationDate)}</div>` : ''}
         </div>
         <div class="content">${(prescription.content || '').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</div>
       </body>
@@ -703,10 +907,7 @@ const sharePrescriptionWhatsapp = () => {
 
 const dischargeRecord = async (record: any) => {
   try {
-    await api(`/api/v1/inpatient-records/${record.id}/discharge`, {
-      method: 'PATCH',
-      body: {},
-    })
+    await api(`/api/v1/inpatient-records/${record.id}/discharge`, { method: 'PATCH', body: {} })
     message.success('Internação encerrada.')
     await refreshBoard()
     if (selectedRecordId.value === Number(record.id)) {
@@ -739,14 +940,22 @@ const handleRouteAction = async () => {
   }
 
   if (action === 'prescription' && petId) {
-    openPrescriptionModalForContext({
-      petId,
-      consultationId: consultationId || null,
-    })
+    openPrescriptionModalForContext({ petId, consultationId: consultationId || null })
   }
 }
 
 onMounted(async () => {
+  if (process.client) {
+    mobileQuery = window.matchMedia('(max-width: 720px)')
+    const updateMobileView = (event?: MediaQueryList | MediaQueryListEvent) => {
+      isMobileView.value = 'matches' in (event || mobileQuery as MediaQueryList) ? (event || mobileQuery as MediaQueryList).matches : false
+      legendOpen.value = !isMobileView.value
+    }
+    handleMobileChange = (event: MediaQueryListEvent) => updateMobileView(event)
+    updateMobileView(mobileQuery)
+    mobileQuery.addEventListener('change', handleMobileChange)
+  }
+
   try {
     await loadLookups()
     await refreshBoard()
@@ -755,182 +964,281 @@ onMounted(async () => {
     message.error(error?.data?.message || 'Erro ao inicializar o painel clínico.')
   }
 })
+
+onBeforeUnmount(() => {
+  if (!mobileQuery || !handleMobileChange) return
+  mobileQuery.removeEventListener('change', handleMobileChange)
+})
+
+watch(activeDetailTab, async () => {
+  if (!process.client || !isMobileView.value) return
+  await nextTick()
+  const wrapper = document.querySelector('.detail-tabs .n-tabs-nav-scroll-wrapper') as HTMLElement | null
+  const activeEl = document.querySelector('.detail-tabs .n-tabs-tab--active') as HTMLElement | null
+  if (!wrapper || !activeEl) return
+  const targetLeft = activeEl.offsetLeft - (wrapper.clientWidth - activeEl.clientWidth) / 2
+  wrapper.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' })
+})
 </script>
 
 <style scoped>
 .hospital-page {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
-.hero {
+.page-head {
   display: flex;
   justify-content: space-between;
-  gap: 24px;
-  padding: 28px 32px;
-  border-radius: 28px;
-  background:
-    radial-gradient(circle at top left, rgba(34, 197, 94, 0.18), transparent 32%),
-    linear-gradient(135deg, #0f172a 0%, #13263a 42%, #1f6f78 100%);
-  color: #f8fafc;
-  overflow: hidden;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.head-copy h1 {
+  margin: 0;
+  font-size: 2rem;
+  color: #0f172a;
+}
+
+.refresh-action-btn {
+  opacity: 0.92;
 }
 
 .eyebrow {
   margin: 0 0 6px;
   font-size: 11px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: #64748b;
+  font-weight: 700;
 }
 
-.hero h1 {
-  margin: 0;
-  font-size: clamp(2rem, 3vw, 3rem);
-  line-height: 1.05;
+.subhead {
+  margin: 8px 0 0;
+  color: #475569;
 }
 
-.hero-copy {
-  max-width: 680px;
-  margin: 14px 0 0;
-  color: rgba(248, 250, 252, 0.84);
-  line-height: 1.6;
-}
-
-.hero-actions {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
+.btn-primary-green {
+  background: #16a34a;
+  border-color: #16a34a;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.stat-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 20px 22px;
-  border-radius: 22px;
-  background: linear-gradient(180deg, #ffffff 0%, #eef5ff 100%);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
-}
-
-.stat-card.accent {
-  background: linear-gradient(135deg, #0f766e 0%, #0f172a 100%);
-  color: #ecfeff;
+.summary-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
 }
 
 .stat-label {
   font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
   color: #64748b;
-}
-
-.accent .stat-label,
-.accent .stat-hint {
-  color: rgba(236, 254, 255, 0.7);
 }
 
 .stat-value {
-  font-size: 2rem;
-  line-height: 1;
+  display: block;
+  margin-top: 4px;
+  font-size: 1.8rem;
+  color: #0f172a;
 }
 
 .stat-value.small {
-  font-size: 1.2rem;
-  line-height: 1.4;
+  font-size: 1rem;
 }
 
-.stat-hint {
+.filters-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-clear {
   color: #64748b;
+}
+
+.view-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.view-chip {
+  flex: 0 0 auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: #fff;
+  color: #475569;
+}
+
+.view-chip.active {
+  background: #ecfeff;
+  color: #0f766e;
+  border-color: #99f6e4;
 }
 
 .board {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+  gap: 14px;
 }
 
-.box-column {
+.status-legend {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px 14px;
+}
+
+.legend-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  background: transparent;
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.box-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 14px;
+  background: #fff;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  min-height: 320px;
-  padding: 18px;
-  border-radius: 26px;
-  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
-  border: 1px solid rgba(148, 163, 184, 0.22);
-}
-
-.box-column.occupied {
-  background: linear-gradient(180deg, #fff7ed 0%, #fde68a 180%);
+  gap: 12px;
 }
 
 .box-header {
   display: flex;
-  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  align-items: flex-start;
 }
 
 .box-label {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 700;
+  color: #0f172a;
 }
 
 .box-header small {
   color: #64748b;
 }
 
+.status-badge {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-free {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.badge-occupied {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.badge-discharge {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.badge-critical {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.badge-isolation {
+  color: #6d28d9;
+  background: #f3e8ff;
+}
+
+.badge-prescription {
+  color: #0369a1;
+  background: #e0f2fe;
+}
+
+.badge-pending-signals {
+  color: #9a3412;
+  background: #ffedd5;
+}
+
 .inpatient-card {
   display: grid;
-  grid-template-columns: 72px 1fr;
-  gap: 14px;
-  padding: 16px;
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 18px 36px rgba(120, 53, 15, 0.14);
-  cursor: pointer;
+  grid-template-columns: 56px 1fr;
+  gap: 12px;
 }
 
 .pet-avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 22px;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #0f766e 0%, #22c55e 100%);
-  color: #ecfeff;
+  background: #dcfce7;
+  color: #166534;
   font-weight: 700;
-  font-size: 1.2rem;
+  cursor: pointer;
 }
 
 .card-content {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
+  cursor: pointer;
 }
 
-.card-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
+.card-group {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #f8fafc;
 }
 
-.card-head h3,
-.prescription-head h3,
-.print-head h2 {
-  margin: 0;
+.card-group-title {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
-.card-head p,
+.card-content h3,
+.card-content p,
 .card-reason,
 .feed-notes,
 .print-meta p {
@@ -940,37 +1248,103 @@ onMounted(async () => {
 .card-reason,
 .feed-notes {
   color: #475569;
-  line-height: 1.5;
-  white-space: pre-wrap;
 }
 
-.card-meta,
-.card-actions,
-.feed-head,
-.prescription-head {
+.card-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px 10px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.card-actions-row {
+  padding-top: 2px;
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.open-record-btn {
+  min-height: 36px;
+  --n-width: 100%;
+}
+
+.card-actions-secondary {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.secondary-action-btn {
+  min-height: 36px;
+}
+
+.menu-button {
+  font-weight: 700;
+  min-width: 38px;
+}
+
+.menu-button-square {
+  width: 36px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.empty-state {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-height: 150px;
+}
+
+.empty-state-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.empty-state p {
+  margin: 0;
+  color: #475569;
+}
+
+.admit-btn {
+  min-height: 38px;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.empty-title {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.empty-result-card {
+  grid-column: 1 / -1;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+}
+
+.future-badges {
+  display: flex;
+  gap: 8px;
   flex-wrap: wrap;
-}
-
-.card-meta,
-.executed-by {
-  color: #64748b;
-  font-size: 0.9rem;
-}
-
-.empty-state {
-  display: grid;
-  place-items: center;
-  gap: 12px;
-  flex: 1;
-  text-align: center;
-  padding: 18px;
-  border: 1px dashed rgba(100, 116, 139, 0.5);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.55);
 }
 
 .detail-loading {
@@ -985,31 +1359,79 @@ onMounted(async () => {
   gap: 18px;
 }
 
+.drawer-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #0f172a;
+}
+
+.drawer-header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
 .detail-summary {
-  display: grid;
-  grid-template-columns: 1.5fr repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  padding: 18px;
-  border-radius: 22px;
-  background: linear-gradient(135deg, #0f172a 0%, #164e63 100%);
-  color: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.summary-primary h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #0f172a;
+}
+
+.summary-primary p {
+  margin: 4px 0 0;
+  color: #475569;
+}
+
+.summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .summary-chip {
-  padding: 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.08);
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 12px;
+  color: #334155;
 }
 
-.summary-chip span {
-  display: block;
-  color: rgba(248, 250, 252, 0.64);
-  font-size: 0.8rem;
-  margin-bottom: 4px;
+.summary-chip strong {
+  font-weight: 600;
+}
+
+.status-chip {
+  border-color: transparent;
 }
 
 .panel-card {
   margin-bottom: 16px;
+}
+
+.feed-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.feed-head strong {
+  color: #0f172a;
+}
+
+.feed-head span {
+  color: #64748b;
+  font-size: 12px;
 }
 
 .feed {
@@ -1023,10 +1445,102 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px;
-  border-radius: 18px;
-  background: #f8fafc;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  padding: 14px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+
+.latest-vitals {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.latest-vitals-head {
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.feed-head-stacked {
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.detail-tabs :deep(.n-tabs-nav) {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+  padding-top: 2px;
+}
+
+.detail-tabs :deep(.n-tabs-nav-scroll-content) {
+  flex-wrap: nowrap !important;
+  min-width: max-content;
+  padding-right: 12px;
+}
+
+.detail-tabs :deep(.n-tabs-tab) {
+  white-space: nowrap;
+}
+
+.detail-tabs :deep(.n-tabs-pane-wrapper),
+.detail-tabs :deep(.n-tab-pane) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.empty-tab-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.new-prescription-btn {
+  min-height: 38px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.prescription-card {
+  gap: 8px;
+}
+
+.prescription-card-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.prescription-status-tag {
+  align-self: flex-start;
+  flex: 0 0 auto;
+}
+
+.prescriptions-feed {
+  margin-top: 14px;
+  padding-right: 1px;
+  box-sizing: border-box;
+}
+
+.prescription-responsible {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.prescription-content {
+  color: #334155;
+  font-weight: 500;
 }
 
 .metric-grid {
@@ -1036,11 +1550,19 @@ onMounted(async () => {
 }
 
 .metric-grid span {
-  padding: 8px 10px;
+  padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(14, 58, 86, 0.08);
+  background: #f1f5f9;
   color: #0f172a;
-  font-size: 0.92rem;
+  font-size: 13px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .print-sheet {
@@ -1064,54 +1586,262 @@ onMounted(async () => {
 
 .print-content {
   padding: 20px;
-  border-radius: 18px;
+  border-radius: 12px;
   background: #f8fafc;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid #e2e8f0;
   white-space: pre-wrap;
   line-height: 1.7;
 }
 
-@media (max-width: 1024px) {
-  .hero,
-  .detail-summary,
+@media (max-width: 1120px) {
   .stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .hero {
-    flex-direction: column;
+  .filters-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
-  .hero-actions {
-    align-items: stretch;
-    flex-wrap: wrap;
-  }
-
-  .detail-summary {
-    display: flex;
-    flex-direction: column;
+  .filter-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
   }
 }
 
 @media (max-width: 720px) {
   .hospital-page {
-    gap: 18px;
+    overflow-x: hidden;
   }
 
-  .hero {
-    padding: 22px;
-    border-radius: 22px;
-  }
-
-  .print-head,
-  .print-meta {
-    grid-template-columns: 1fr;
-    display: flex;
+  .page-head {
     flex-direction: column;
   }
 
-  .inpatient-card {
+  .head-actions {
+    width: 100%;
+    display: grid !important;
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .head-actions > div {
+    width: 100%;
+  }
+
+  .head-actions :deep(.n-button) {
+    width: 100% !important;
+    min-height: 42px;
+    --n-width: 100% !important;
+  }
+
+  .new-admission-btn {
+    min-height: 42px;
+  }
+
+  .refresh-action-btn {
+    min-height: 42px;
+    font-size: 15px;
+    opacity: 1;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filters-grid,
+  .card-meta-grid,
+  .print-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .inpatient-mobile-drawer :deep(.n-drawer) {
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-width: 100vw !important;
+    max-height: 100dvh !important;
+  }
+
+  .inpatient-mobile-drawer :deep(.n-drawer-content) {
+    width: 100%;
+    height: 100%;
+    border-radius: 0 !important;
+  }
+
+  .inpatient-mobile-drawer :deep(.n-drawer-header) {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #fff;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .inpatient-mobile-drawer :deep(.n-drawer-body-content-wrapper) {
+    padding: 0 16px 16px !important;
+    overflow-x: hidden !important;
+  }
+
+  .drawer-header h2 {
+    font-size: 1.02rem;
+  }
+
+  .drawer-header p {
+    margin-top: 2px;
+    font-size: 12px;
+  }
+
+  .detail-stack {
+    gap: 14px;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .detail-summary,
+  .panel-card,
+  .feed-card,
+  .treatment-card {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .summary-chips,
+  .metric-grid {
+    row-gap: 6px;
+  }
+
+  .detail-tabs :deep(.n-tabs-nav) {
+    top: 56px;
+    margin: 0;
+    padding: 8px 0 4px;
+    overflow-x: auto;
+  }
+
+  .detail-tabs :deep(.n-tabs-nav-scroll-wrapper) {
+    overflow-x: auto !important;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .detail-tabs :deep(.n-tabs-nav-scroll-wrapper::-webkit-scrollbar) {
+    display: none;
+  }
+
+  .detail-tabs :deep(.n-tabs-tab) {
+    font-size: 13px;
+    padding: 8px 10px;
+    flex: 0 0 auto;
+  }
+
+  .prescription-head,
+  .feed,
+  .feed-card,
+  .panel-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin-left: 0;
+    transform: none;
+    box-sizing: border-box;
+  }
+
+  .feed-head span {
+    font-size: 12px;
+  }
+
+  .new-prescription-btn {
+    width: 100%;
+    min-height: 40px;
+  }
+
+  .empty-tab-action :deep(.n-button) {
+    width: 100%;
+    min-height: 40px;
+  }
+
+  .empty-state {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .admit-btn {
+    width: 100%;
+    min-height: 42px;
+  }
+
+  .card-actions-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .open-record-btn {
+    width: 100%;
+    --n-width: 100%;
+    --n-padding: 0 12px;
+    --n-height: 40px;
+    min-height: 40px;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  .card-actions-row > .open-record-btn {
+    width: 100% !important;
+    min-width: 0 !important;
+    --n-width: 100% !important;
+    --n-height: 40px !important;
+    --n-padding: 0 12px !important;
+  }
+
+  .card-actions-row > .open-record-btn :deep(.n-button__content) {
+    white-space: nowrap;
+    overflow: visible;
+  }
+
+  .card-actions-secondary {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    width: 100%;
+    gap: 6px;
+  }
+
+  .secondary-action-btn {
+    width: 100%;
+    --n-width: 100%;
+    --n-height: 38px;
+    min-height: 38px;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .card-actions-row :deep(.n-button):not(.open-record-btn):not(.secondary-action-btn) {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .card-actions-secondary :deep(.n-dropdown) {
+    width: auto;
+  }
+
+  .card-actions-secondary .menu-button-square {
+    width: auto;
+    min-width: 116px;
+    --n-height: 38px;
+    height: 38px;
+    padding: 0 12px;
+    white-space: nowrap;
+  }
+
+  .filter-actions {
+    justify-content: space-between;
+  }
+
+  .btn-filter {
+    min-width: 128px;
+  }
+
+  .print-head {
+    flex-direction: column;
   }
 }
 </style>

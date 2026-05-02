@@ -330,6 +330,7 @@ interface DictationStructuredPayload {
 }
 
 const message = useMessage()
+const route = useRoute()
 const saving = ref(false)
 const currentStep = ref(0)
 const isMobile = ref(false)
@@ -507,6 +508,7 @@ const allSuggestionsApplied = computed(() => suggestionCards.value.length > 0 &&
 const clientLabel = computed(() => clientOptions.value.find((c) => c.value === model.clientId)?.label || 'Não informado')
 const petLabel = computed(() => petOptions.value.find((p) => p.value === model.petId)?.label || 'Não informado')
 const veterinarianLabel = computed(() => veterinarianOptions.value.find((v) => v.value === model.veterinarianId)?.label || 'Não informado')
+const isExistingConsultation = computed(() => Boolean(model.id))
 
 const loadLookups = async () => {
   const api = useApi()
@@ -528,6 +530,110 @@ const loadLookups = async () => {
     }))
   } catch (_error) {
     message.error('Erro ao carregar dados auxiliares')
+  }
+}
+
+const normalizeStepIndex = (value: unknown) => {
+  const raw = Number(value)
+  if (!Number.isFinite(raw)) return null
+  const parsed = Math.max(1, Math.min(steps.length, Math.trunc(raw)))
+  return parsed - 1
+}
+
+const resolveInitialStepFromModel = () => {
+  const hasComplaint = String(model.mainComplaint || '').trim().length > 0
+  const hasAnamnesis = String(model.clinicalFindings || '').trim().length > 0
+  const hasDiagnosis = String(model.diagnosis || '').trim().length > 0 || String(model.treatmentPlan || '').trim().length > 0
+
+  if (!hasComplaint) return 2
+  if (hasComplaint && !hasAnamnesis) return 3
+  if (hasAnamnesis && !hasDiagnosis) return 4
+  return 5
+}
+
+const hasAnyText = (value: unknown) => String(value || '').trim().length > 0
+
+const hydrateCompletedStepsFromModel = (activeStep: number) => {
+  const done = new Set<number>()
+
+  const hasCoreContext = Boolean(model.clientId && model.petId && model.veterinarianId && model.visitDate)
+  const hasTriage = [
+    model.weightKg,
+    model.temperatureC,
+    model.heartRateBpm,
+    model.respiratoryRateIpm,
+    model.mucosaStatus,
+    model.hydrationStatus,
+    model.painStatus
+  ].some((value) => {
+    if (typeof value === 'number') return Number.isFinite(value) && value > 0
+    return hasAnyText(value)
+  })
+  const hasComplaint = hasAnyText(model.mainComplaint)
+  const hasAnamnesis = hasAnyText(model.clinicalFindings) || Boolean(visibleSuggestion.value?.structuredPayload)
+  const hasConduct = [
+    model.diagnosis,
+    model.treatmentPlan,
+    clinical.prescription,
+    clinical.exams,
+    clinical.followUp
+  ].some(hasAnyText) || clinical.referInpatient
+
+  if (hasCoreContext) done.add(0)
+  if (hasTriage) done.add(1)
+  if (hasComplaint) done.add(2)
+  if (hasAnamnesis) done.add(3)
+  if (hasConduct) done.add(4)
+  if (hasCoreContext && hasComplaint && hasConduct) done.add(5)
+
+  for (let idx = 0; idx < activeStep; idx += 1) done.add(idx)
+  completedSteps.value = done
+}
+
+const hydrateClinicalNotesFromModel = () => {
+  const notes = String(model.notes || '')
+  const getLineValue = (label: string) => {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const match = notes.match(new RegExp(`${escaped}:\\s*(.+)`))
+    return match?.[1]?.trim() || ''
+  }
+
+  clinical.prescription = getLineValue('Prescrição')
+  clinical.exams = getLineValue('Exames')
+  clinical.followUp = getLineValue('Retorno')
+  clinical.referInpatient = /Encaminhar para internação:\s*Sim/i.test(notes)
+}
+
+const loadConsultationFromRoute = async () => {
+  const rawId = Array.isArray(route.query.id) ? route.query.id[0] : route.query.id
+  const consultationId = Number(rawId)
+  if (!Number.isFinite(consultationId) || consultationId <= 0) {
+    const requestedStep = normalizeStepIndex(Array.isArray(route.query.step) ? route.query.step[0] : route.query.step)
+    if (requestedStep != null) currentStep.value = requestedStep
+    return
+  }
+
+  try {
+    const api = useApi()
+    const consultation = await api<any>(`/api/v1/consultations/${consultationId}`)
+    Object.assign(model, {
+      ...consultation,
+      id: Number(consultation.id),
+      appointmentId: consultation.appointmentId ? Number(consultation.appointmentId) : null,
+      petId: consultation.petId ? Number(consultation.petId) : null,
+      clientId: consultation.clientId ? Number(consultation.clientId) : null,
+      veterinarianId: consultation.veterinarianId ? Number(consultation.veterinarianId) : null,
+      visitDate: consultation.visitDate ? new Date(consultation.visitDate).getTime() : Date.now()
+    })
+    updatePetOptions()
+    hydrateClinicalNotesFromModel()
+    await loadDictations()
+
+    const requestedStep = normalizeStepIndex(Array.isArray(route.query.step) ? route.query.step[0] : route.query.step)
+    currentStep.value = requestedStep ?? resolveInitialStepFromModel()
+    hydrateCompletedStepsFromModel(currentStep.value)
+  } catch (error: any) {
+    message.error(error?.data?.message || 'Erro ao carregar atendimento clínico')
   }
 }
 
@@ -635,6 +741,7 @@ const goPrev = () => {
 }
 
 const isStepLocked = (stepIndex: number) => {
+  if (isExistingConsultation.value) return false
   if (stepIndex <= currentStep.value) return false
   for (let idx = 0; idx < stepIndex; idx += 1) {
     if (!completedSteps.value.has(idx)) return true
@@ -1015,6 +1122,7 @@ onMounted(async () => {
   updateIsMobile()
   mediaQuery.addEventListener('change', updateIsMobile)
   await loadLookups()
+  await loadConsultationFromRoute()
 })
 
 onBeforeUnmount(() => {
