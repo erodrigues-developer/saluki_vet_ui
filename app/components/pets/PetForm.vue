@@ -7,114 +7,133 @@
     :show-require-mark="false"
     :disabled="loading"
   >
-    <div class="grid">
-      <n-form-item label="Ativo" path="isActive" class="full-row">
-        <n-switch v-model:value="model.isActive" />
-      </n-form-item>
-      <n-form-item label="Nome" path="name" required>
-        <n-input v-model:value="model.name" placeholder="Nome do pet" />
-      </n-form-item>
-      <n-form-item label="Tutor" path="clientId" required>
-        <n-select
-          v-model:value="model.clientId"
-          :options="clientOptions"
-          placeholder="Selecione o tutor"
-          filterable
-          remote
-          clearable
-          :loading="clientLoading"
-          @search="onClientSearch"
-          @focus="ensureClientsLoaded"
-        />
-      </n-form-item>
-      <n-form-item label="Espécie" path="speciesId" required>
-        <n-select
-          v-model:value="model.speciesId"
-          :options="speciesOptions"
-          placeholder="Selecione a espécie"
-          filterable
-          remote
-          clearable
-          :loading="speciesLoading"
-          @search="onSpeciesSearch"
-          @focus="ensureSpeciesLoaded"
-        />
-      </n-form-item>
-      <n-form-item label="Raça" path="breedId">
-        <n-select
-          v-model:value="model.breedId"
-          :options="breedOptions"
-          placeholder="Selecione a raça"
-          filterable
-          remote
-          clearable
-          :loading="breedLoading"
-          :disabled="!model.speciesId"
-          @search="onBreedSearch"
-          @focus="ensureBreedsLoaded"
-        />
-      </n-form-item>
-      <n-form-item label="Sexo" path="sex" required>
-        <n-select
-          v-model:value="model.sex"
-          :options="sexOptions"
-          placeholder="Selecione o sexo"
-          clearable
-        />
-      </n-form-item>
-      <n-form-item label="Data de nascimento" path="dateOfBirth">
-        <n-date-picker
-          v-model:value="dateOfBirthValue"
-          type="date"
-          clearable
-          class="full-width"
-        />
-      </n-form-item>
-      <n-form-item label="Peso (kg)" path="weightKg">
-        <n-input-number
-          v-model:value="model.weightKg"
-          placeholder="0.0"
-          :min="0"
-          :step="0.1"
-          clearable
-        />
-      </n-form-item>
-      <n-form-item label="Cor" path="color">
-        <n-input v-model:value="model.color" placeholder="Cor do pet" />
-      </n-form-item>
-      <n-form-item label="Microchip" path="microchipCode">
-        <n-input v-model:value="model.microchipCode" placeholder="MC-123456" />
-      </n-form-item>
-      <n-form-item label="Alergias" path="allergies" class="full-row">
-        <n-input
-          v-model:value="model.allergies"
-          type="textarea"
-          :rows="2"
-          placeholder="Ex.: Poeira"
-        />
-      </n-form-item>
-      <n-form-item label="Doenças crônicas" path="chronicDiseases" class="full-row">
-        <n-input
-          v-model:value="model.chronicDiseases"
-          type="textarea"
-          :rows="2"
-          placeholder="Ex.: Diabetes"
-        />
-      </n-form-item>
-      <n-form-item label="Observações" path="notes" class="full-row">
-        <n-input
-          v-model:value="model.notes"
-          type="textarea"
-          :rows="3"
-          placeholder="Comportamento, cuidados especiais..."
-        />
-      </n-form-item>
-    </div>
-    <div class="actions">
-      <n-button tertiary @click="$emit('cancel')" :disabled="loading">Cancelar</n-button>
-      <n-button type="primary" :loading="loading" @click="handleSubmit">
-        {{ submitLabel }}
-      </n-button>
+    <div class="sections">
+      <section class="form-section">
+        <div class="section-head">
+          <h4 class="section-title">Identificação</h4>
+          <div class="active-wrap">
+            <span class="active-label">Ativo</span>
+            <n-switch v-model:value="model.isActive" />
+          </div>
+        </div>
+        <div class="section-grid">
+          <n-form-item label="Nome *" path="name" required>
+            <n-input v-model:value="model.name" placeholder="Nome do pet" />
+          </n-form-item>
+          <n-form-item label="Tutor *" path="clientId" required>
+            <n-select
+              v-model:value="model.clientId"
+              :options="clientOptions"
+              placeholder="Selecione o tutor"
+              filterable
+              remote
+              clearable
+              :loading="clientLoading"
+              @search="onClientSearch"
+              @focus="ensureClientsLoaded"
+            />
+          </n-form-item>
+          <n-form-item label="Espécie *" path="speciesId" required>
+            <n-select
+              v-model:value="model.speciesId"
+              :options="speciesOptions"
+              placeholder="Selecione a espécie"
+              filterable
+              remote
+              clearable
+              :loading="speciesLoading"
+              @search="onSpeciesSearch"
+              @focus="ensureSpeciesLoaded"
+            />
+          </n-form-item>
+          <n-form-item label="Raça" path="breedId">
+            <n-select
+              v-model:value="model.breedId"
+              :options="breedOptions"
+              placeholder="Selecione a raça"
+              filterable
+              remote
+              clearable
+              :loading="breedLoading"
+              :disabled="!model.speciesId"
+              @search="onBreedSearch"
+              @focus="ensureBreedsLoaded"
+            />
+          </n-form-item>
+          <n-form-item label="Sexo" path="sex">
+            <n-select
+              v-model:value="model.sex"
+              :options="sexOptions"
+              placeholder="Selecione o sexo"
+              clearable
+            />
+          </n-form-item>
+          <n-form-item label="Data de nascimento" path="dateOfBirth">
+            <n-date-picker
+              v-model:value="dateOfBirthValue"
+              type="date"
+              placeholder="DD/MM/AAAA"
+              clearable
+              class="full-width"
+            />
+          </n-form-item>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <div class="section-head">
+          <h4 class="section-title">Características</h4>
+        </div>
+        <div class="section-grid">
+          <n-form-item label="Peso (kg)" path="weightKg">
+            <n-input-number
+              v-model:value="model.weightKg"
+              placeholder="Ex.: 12.5"
+              :min="0"
+              :step="0.1"
+              clearable
+            />
+          </n-form-item>
+          <n-form-item label="Cor" path="color">
+            <n-input v-model:value="model.color" placeholder="Cor do pet" />
+          </n-form-item>
+          <n-form-item label="Microchip" path="microchipCode">
+            <n-input v-model:value="model.microchipCode" placeholder="MC-123456" />
+          </n-form-item>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <div class="section-head">
+          <h4 class="section-title">Informações clínicas</h4>
+        </div>
+        <div class="section-grid">
+          <n-form-item label="Alergias" path="allergies" class="full-row">
+            <n-input
+              v-model:value="model.allergies"
+              type="textarea"
+              :rows="2"
+              placeholder="Ex.: poeira, dipirona, ração específica"
+            />
+          </n-form-item>
+          <n-form-item label="Doenças crônicas" path="chronicDiseases" class="full-row">
+            <n-input
+              v-model:value="model.chronicDiseases"
+              type="textarea"
+              :rows="2"
+              placeholder="Ex.: diabetes, cardiopatia, doença renal"
+            />
+          </n-form-item>
+          <n-form-item label="Observações" path="notes" class="full-row">
+            <n-input
+              v-model:value="model.notes"
+              type="textarea"
+              :rows="2"
+              placeholder="Comportamento, cuidados especiais ou restrições"
+            />
+          </n-form-item>
+        </div>
+      </section>
     </div>
   </n-form>
 </template>
@@ -259,16 +278,8 @@ const rules: FormRules = {
     trigger: ['change', 'blur'],
     validator: (_rule, value: number | null) =>
       value === null ? new Error('Selecione a espécie') : true
-  },
-  sex: {
-    required: true,
-    trigger: ['change', 'blur'],
-    validator: (_rule, value: string | null) =>
-      !value ? new Error('Selecione o sexo') : true
   }
 }
-
-const submitLabel = computed(() => (model.id ? 'Salvar alterações' : 'Criar pet'))
 
 const dateOfBirthValue = computed({
   get: () => {
@@ -300,6 +311,7 @@ const handleSubmit = async () => {
     weightKg: model.weightKg != null ? Number(model.weightKg) : null
   })
 }
+defineExpose({ submit: handleSubmit })
 
 const fetchClientOptions = async (search?: string) => {
   clientLoading.value = true
@@ -371,7 +383,7 @@ watch(
       breedId: val?.breedId != null ? Number(val.breedId) : null,
       sex: val?.sex ?? null,
       dateOfBirth: val?.dateOfBirth ? val.dateOfBirth.slice(0, 10) : '',
-      weightKg: val?.weightKg ?? null,
+      weightKg: val?.weightKg && Number(val.weightKg) > 0 ? Number(val.weightKg) : null,
       color: val?.color ?? '',
       microchipCode: val?.microchipCode ?? '',
       allergies: val?.allergies ?? '',
@@ -446,11 +458,53 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.grid {
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: #334155;
+}
+
+.active-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  margin-top: 1px;
+}
+
+.active-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.section-grid {
   display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  margin-top: 6px;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .full-row {
@@ -461,10 +515,28 @@ onMounted(() => {
   width: 100%;
 }
 
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
+@media (max-width: 1024px) {
+  .section-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .form-section {
+    padding: 10px;
+  }
+
+  .section-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .section-head {
+    margin-bottom: 6px;
+  }
+
+  .section-title {
+    font-size: 15px;
+  }
 }
 </style>

@@ -32,6 +32,7 @@ export default defineNuxtConfig({
   },
   vite: {
     server: {
+      allowedHosts: ['1311-2804-d45-c503-4100-563c-6b1b-a9e2-340c.ngrok-free.app'],
       hmr: {
         port: Number(process.env.NUXT_HMR_PORT || 24679),
       },

@@ -722,18 +722,42 @@ h1 { margin: 0; font-size: 34px; line-height: 1.1; }
 }
 
 @media (max-width: 768px) {
+  .page { gap: 12px; }
   .page-head { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .head-copy { gap: 2px; }
   .head-cta { width: 100%; }
-  h1 { font-size: 28px; }
+  h1 { font-size: 26px; }
   .subhead { font-size: 13px; }
 
   .card-list { display: flex; flex-direction: column; gap: 12px; }
-  .entity-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fff; }
-  .card-top { display: flex; align-items: center; justify-content: space-between; }
-  .card-time { margin: 0; font-size: 18px; font-weight: 700; }
-  .card-date { margin: 6px 0 0; font-size: 12px; color: #64748b; }
-  .card-title { margin: 8px 0 0; font-size: 16px; font-weight: 700; }
-  .card-subtitle { margin: 4px 0 0; font-size: 12px; color: #64748b; }
-  .card-actions { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .entity-card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 12px; background: #fff; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; min-width: 0; }
+  .card-time { margin: 0; font-size: 22px; line-height: 1; font-weight: 700; color: #0f172a; }
+  .card-top :deep(.status-pill) {
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 1;
+  }
+  .card-date { margin: -6px 0 0; font-size: 12px; color: #64748b; }
+  .card-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .card-subtitle { margin: 0; font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-summary { margin-top: 0; }
+  .mobile-filters-card { padding: 8px; }
+  .mobile-filter-top { gap: 8px; }
+  .mobile-filter-top :deep(.n-input) { width: 100%; }
+  .card-actions { margin-top: 2px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
+  .card-actions :deep(.n-button) { min-height: 36px; }
+  .menu-button { min-width: 40px; height: 36px; display: inline-flex; align-items: center; justify-content: center; }
 }
 </style>
