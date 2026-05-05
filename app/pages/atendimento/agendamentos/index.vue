@@ -206,7 +206,12 @@
                 <n-input v-model:value="quickForm.client.name" placeholder="Ex.: Ana Lima" />
               </n-form-item>
               <n-form-item label="Celular" required>
-                <n-input v-model:value="quickForm.client.mobilePhone" placeholder="WhatsApp" />
+                <n-input
+                  v-model:value="quickForm.client.mobilePhone"
+                  placeholder="(11) 99999-9999"
+                  :input-props="{ maxlength: 15 }"
+                  @update:value="onQuickMobilePhoneInput"
+                />
               </n-form-item>
               <n-form-item label="CPF">
                 <n-input v-model:value="quickForm.client.document" placeholder="Opcional" />
@@ -296,6 +301,7 @@ import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { NButton, NDropdown, NSpace, useDialog, useMessage } from 'naive-ui'
 import AppointmentForm, { type AppointmentPayload } from '~/components/appointments/AppointmentForm.vue'
 import { format } from 'date-fns'
+import { formatBrazilPhone } from '~/composables/useBrazilPhone'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -371,6 +377,10 @@ const quickForm = reactive({
 })
 
 const checkInForm = reactive({ reason: '' })
+
+const onQuickMobilePhoneInput = (value: string) => {
+  quickForm.client.mobilePhone = formatBrazilPhone(value)
+}
 
 const pagination = reactive({
   page: 1,

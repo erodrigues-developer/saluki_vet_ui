@@ -30,7 +30,12 @@
       </n-form-item>
 
       <n-form-item label="Telefone" path="phone">
-        <n-input v-model:value="model.phone" placeholder="(11) 99999-9999" />
+        <n-input
+          v-model:value="model.phone"
+          placeholder="(11) 99999-9999"
+          :input-props="{ maxlength: 15 }"
+          @update:value="onPhoneInput"
+        />
       </n-form-item>
 
       <n-form-item label="Papéis (Roles)" path="roleIds" required class="full-row">
@@ -57,6 +62,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import type { FormInst, FormRules } from 'naive-ui'
+import { formatBrazilPhone } from '~/composables/useBrazilPhone'
 
 export interface Role {
   id: number
@@ -138,7 +144,7 @@ watch(
       name: val?.name ?? '',
       email: val?.email ?? '',
       password: '',
-      phone: val?.phone ?? '',
+      phone: formatBrazilPhone(val?.phone ?? ''),
       isActive: val?.isActive ?? true,
       roleIds: val?.roles?.map(r => Number(r.id)) ?? val?.roleIds ?? []
     })
@@ -147,6 +153,10 @@ watch(
 )
 
 const submitLabel = computed(() => (model.id ? 'Salvar alterações' : 'Criar usuário'))
+
+const onPhoneInput = (value: string) => {
+  model.phone = formatBrazilPhone(value)
+}
 
 const handleSubmit = async () => {
   try {

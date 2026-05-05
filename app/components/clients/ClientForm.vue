@@ -121,6 +121,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import cepPromise from 'cep-promise'
 import { useMessage } from 'naive-ui'
 import type { FormInst, FormRules, SelectOption } from 'naive-ui'
+import { formatBrazilPhone, normalizeBrazilPhoneDigits } from '~/composables/useBrazilPhone'
 
 export interface Client {
   id?: number
@@ -207,8 +208,8 @@ watch(
       id: val?.id,
       name: val?.name ?? '',
       document: val?.document ?? '',
-      phone: val?.phone ?? '',
-      mobilePhone: val?.mobilePhone ?? '',
+      phone: formatBrazilPhone(val?.phone ?? ''),
+      mobilePhone: formatBrazilPhone(val?.mobilePhone ?? ''),
       email: val?.email ?? '',
       street: val?.street ?? '',
       number: val?.number ?? '',
@@ -232,27 +233,12 @@ defineExpose({ submit: handleSubmit })
 
 const digitsOnly = (val: string) => (val || '').replace(/\D+/g, '')
 
-const formatPhone = (val: string) => {
-  const digits = digitsOnly(val).slice(0, 11)
-  if (digits.length <= 2) return digits
-  if (digits.length <= 6) {
-    return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
-  }
-  if (digits.length <= 10) {
-    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
-  }
-  if (digits.length === 11) {
-    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
-  }
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`
-}
-
 const onPhoneInput = (val: string) => {
-  model.phone = formatPhone(val)
+  model.phone = formatBrazilPhone(val)
 }
 
 const onMobileInput = (val: string) => {
-  model.mobilePhone = formatPhone(val)
+  model.mobilePhone = formatBrazilPhone(val)
 }
 
 const formatDocument = (val: string) => {
@@ -318,7 +304,7 @@ const validateDocument = (value: string) => {
 
 const validatePhone = (value: string, _isMobile: boolean) => {
   if (!value) return true
-  const len = digitsOnly(value).length
+  const len = normalizeBrazilPhoneDigits(value).length
   return (len === 10 || len === 11) || new Error('Telefone deve ter 10 ou 11 dígitos')
 }
 

@@ -28,7 +28,12 @@
       </n-form-item>
 
       <n-form-item label="Telefone" path="phone">
-        <n-input v-model:value="model.phone" placeholder="+55 11 99999-9999" />
+        <n-input
+          v-model:value="model.phone"
+          placeholder="(11) 99999-9999"
+          :input-props="{ maxlength: 15 }"
+          @update:value="onPhoneInput"
+        />
       </n-form-item>
 
       <n-form-item label="Ativo" path="isActive">
@@ -57,6 +62,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import type { FormInst, FormRules } from 'naive-ui'
+import { formatBrazilPhone } from '~/composables/useBrazilPhone'
 
 export interface Supplier {
   id?: number
@@ -100,7 +106,7 @@ watch(
       legalName: val?.legalName ?? '',
       document: val?.document ?? '',
       email: val?.email ?? '',
-      phone: val?.phone ?? '',
+      phone: formatBrazilPhone(val?.phone ?? ''),
       isActive: val?.isActive ?? true,
       notes: val?.notes ?? ''
     })
@@ -135,6 +141,10 @@ const rules: FormRules = {
 }
 
 const submitLabel = computed(() => (model.id ? 'Salvar alterações' : 'Criar fornecedor'))
+
+const onPhoneInput = (value: string) => {
+  model.phone = formatBrazilPhone(value)
+}
 
 const normalizeEmpty = (value?: string | null) => {
   if (!value) return null

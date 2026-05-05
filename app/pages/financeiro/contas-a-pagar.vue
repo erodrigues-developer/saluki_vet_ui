@@ -18,46 +18,52 @@
     <div v-if="!isMobile" class="summary-grid">
       <n-card size="small" :bordered="false" class="summary-card">
         <p class="summary-label">Total do mês</p>
-        <strong class="summary-value">{{ formatCurrency(dashboardData?.kpis?.expectedTotal || 0) }}</strong>
+        <strong class="summary-value">{{ formatCurrency(filteredSummary.expectedTotal) }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card summary-card-warning">
         <p class="summary-label">Pendente</p>
-        <strong class="summary-value">{{ formatCurrency(dashboardData?.kpis?.totalPending || 0) }}</strong>
+        <strong class="summary-value">{{ formatCurrency(filteredSummary.totalPending) }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card summary-card-success">
         <p class="summary-label">Pago</p>
-        <strong class="summary-value">{{ formatCurrency(dashboardData?.kpis?.totalPaid || 0) }}</strong>
+        <strong class="summary-value">{{ formatCurrency(filteredSummary.totalPaid) }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card summary-card-danger">
         <p class="summary-label">Atrasado</p>
-        <strong class="summary-value">{{ formatCurrency(dashboardData?.kpis?.totalOverdue || 0) }}</strong>
+        <strong class="summary-value">{{ formatCurrency(filteredSummary.totalOverdue) }}</strong>
       </n-card>
     </div>
 
     <div v-else class="summary-grid-mobile summary-grid">
       <n-card size="small" :bordered="false" class="summary-card mobile-card">
         <p class="summary-label">Total do mês</p>
-        <strong class="summary-value-mobile">{{ formatCurrency(dashboardData?.kpis?.expectedTotal || 0) }}</strong>
+        <strong class="summary-value-mobile">{{ formatCurrency(filteredSummary.expectedTotal) }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card mobile-card summary-card-warning">
         <p class="summary-label">Pendente</p>
-        <strong class="summary-value-mobile">{{ formatCurrency(dashboardData?.kpis?.totalPending || 0) }}</strong>
+        <strong class="summary-value-mobile">{{ formatCurrency(filteredSummary.totalPending) }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card mobile-card summary-card-success">
         <p class="summary-label">Pago</p>
-        <strong class="summary-value-mobile">{{ formatCurrency(dashboardData?.kpis?.totalPaid || 0) }}</strong>
+        <strong class="summary-value-mobile">{{ formatCurrency(filteredSummary.totalPaid) }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card mobile-card summary-card-danger">
         <p class="summary-label">Atrasado</p>
-        <strong class="summary-value-mobile">{{ formatCurrency(dashboardData?.kpis?.totalOverdue || 0) }}</strong>
+        <strong class="summary-value-mobile">{{ formatCurrency(filteredSummary.totalOverdue) }}</strong>
       </n-card>
     </div>
 
     <n-card v-if="!isMobile" :bordered="false" size="small" class="filters-card">
       <div class="filters-grid filters-grid-finance">
         <n-input v-model:value="filters.search" placeholder="Buscar por descrição ou fornecedor" clearable />
-        <n-select v-model:value="filters.month" :options="monthOptions" placeholder="Mês" />
-        <n-select v-model:value="filters.year" :options="yearOptions" placeholder="Ano" />
+        <n-date-picker
+          v-model:value="filters.dueDateRange"
+          type="daterange"
+          format="dd/MM/yyyy"
+          clearable
+          start-placeholder="Período de vencimento"
+          end-placeholder="Período de vencimento"
+        />
         <n-select v-model:value="filters.category" :options="categoryOptions" placeholder="Categoria" />
         <n-select v-model:value="filters.status" :options="statusOptions" placeholder="Status" />
         <div class="filter-actions">
@@ -134,6 +140,7 @@
         :loading="loading"
         :pagination="tablePagination"
         :bordered="false"
+        :row-props="tableRowProps"
         @update:page="onPageChange"
         @update:page-size="onPageSizeChange"
       />
@@ -142,8 +149,14 @@
     <n-drawer v-model:show="showMobileFilters" placement="bottom" height="52%" :trap-focus="false">
       <n-drawer-content title="Filtros">
         <div class="mobile-filters-panel">
-          <n-select v-model:value="filters.month" :options="monthOptions" placeholder="Mês" />
-          <n-select v-model:value="filters.year" :options="yearOptions" placeholder="Ano" />
+          <n-date-picker
+            v-model:value="filters.dueDateRange"
+            type="daterange"
+            format="dd/MM/yyyy"
+            clearable
+            start-placeholder="Período de vencimento"
+            end-placeholder="Período de vencimento"
+          />
           <n-select v-model:value="filters.category" :options="categoryOptions" placeholder="Categoria" />
           <n-select v-model:value="filters.status" :options="statusOptions" placeholder="Status" />
           <div class="mobile-filter-actions">
@@ -157,98 +170,144 @@
     <n-modal
       v-model:show="showCreateModal"
       preset="card"
-      :title="editingAccountId ? 'Editar Conta a Pagar' : 'Nova Conta a Pagar'"
-      style="width: 600px"
+      class="accounts-payable-modal"
+      :mask-closable="false"
+      style="width: 760px"
     >
-      <n-form :model="createForm" ref="createFormRef" :rules="createRules">
-        <n-form-item label="Descrição" path="description">
-          <n-input v-model:value="createForm.description" placeholder="Ex: Aluguel" />
-        </n-form-item>
-        <n-form-item label="Fornecedor" path="supplierId">
-          <n-select
-            v-model:value="createForm.supplierId"
-            :options="supplierOptions"
-            placeholder="Selecione o fornecedor"
-            filterable
-            remote
-            clearable
-            :loading="supplierLoading"
-            @search="onSupplierSearch"
-            @focus="ensureSuppliersLoaded"
-          />
-        </n-form-item>
-        <n-form-item label="Categoria" path="category">
-          <n-select
-            v-model:value="createForm.category"
-            :options="categoryOptions.filter((o) => o.value !== 'Todas as categorias')"
-          />
-        </n-form-item>
-        <n-grid :cols="2" x-gap="12">
-          <n-grid-item>
-            <n-form-item label="Valor (R$)" path="amount">
-              <n-input-number
-                v-model:value="createForm.amount"
-                :min="0"
-                :precision="2"
-                clearable
-              />
-            </n-form-item>
-          </n-grid-item>
-          <n-grid-item>
-            <n-form-item label="Data de Vencimento" path="dueDate">
-              <n-date-picker
-                v-model:value="createForm.dueDate"
-                type="date"
-                clearable
-                style="width: 100%"
-              />
-            </n-form-item>
-          </n-grid-item>
-        </n-grid>
-        <n-form-item label="Anotações" path="notes">
-          <n-input type="textarea" v-model:value="createForm.notes" />
-        </n-form-item>
-        <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
-          <n-button @click="closeCreateModal" style="margin-right: 8px;">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" @click="handleSubmitAccount">
-            Salvar
+      <template #header>
+        <div class="modal-head">
+          <h3 class="modal-title">{{ editingAccountId ? 'Editar conta a pagar' : 'Nova conta a pagar' }}</h3>
+          <p class="modal-subtitle">Informe os dados da despesa, vencimento e pagamento.</p>
+        </div>
+      </template>
+      <n-form :model="createForm" ref="createFormRef" :rules="createRules" label-placement="top" :show-require-mark="false">
+        <div class="sections">
+          <section class="form-section">
+            <h4 class="section-title">Dados da conta</h4>
+            <div class="form-grid">
+              <n-form-item label="Descrição *" path="description" required>
+                <n-input v-model:value="createForm.description" placeholder="Ex: Aluguel" />
+              </n-form-item>
+              <n-form-item label="Fornecedor *" path="supplierId" required>
+                <n-select
+                  v-model:value="createForm.supplierId"
+                  :options="supplierOptions"
+                  placeholder="Selecione o fornecedor"
+                  filterable
+                  remote
+                  clearable
+                  :loading="supplierLoading"
+                  @search="onSupplierSearch"
+                  @focus="ensureSuppliersLoaded"
+                />
+              </n-form-item>
+              <n-form-item label="Categoria" path="category">
+                <n-select
+                  v-model:value="createForm.category"
+                  :options="categoryOptions.filter((o) => o.value !== 'Todas as categorias')"
+                />
+              </n-form-item>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <div class="section-head">
+              <h4 class="section-title">Financeiro</h4>
+              <n-tag :bordered="false" class="status-chip" :class="statusBadgeClass(modalCurrentStatus)">
+                {{ statusLabel(modalCurrentStatus) }}
+              </n-tag>
+            </div>
+            <div class="form-grid">
+              <n-form-item label="Valor *" path="amount" required>
+                <n-input
+                  v-model:value="amountDisplay"
+                  placeholder="R$ 0,00"
+                  @update:value="onAmountInput"
+                  @blur="onAmountBlur"
+                />
+              </n-form-item>
+              <n-form-item label="Data de vencimento *" path="dueDate" required>
+                <n-date-picker
+                  v-model:value="createForm.dueDate"
+                  type="date"
+                  clearable
+                  style="width: 100%"
+                />
+              </n-form-item>
+              <p v-if="modalCurrentStatus === 'OVERDUE'" class="overdue-hint full-row">
+                Esta conta está vencida e ainda não possui pagamento registrado.
+              </p>
+            </div>
+            <div v-if="editingAccountId" class="payment-inline-area">
+              <div v-if="modalCurrentStatus === 'PAID'" class="payment-registered-card">
+                <p class="payment-registered-title">Pagamento registrado</p>
+                <p><span class="card-line-label">Data de pagamento: </span><span class="card-line-value">{{ formatDateTimeDisplay(registeredPayment.paidAt) }}</span></p>
+                <p><span class="card-line-label">Valor pago: </span><span class="card-line-value">{{ formatCurrency(Number(registeredPayment.paidAmount || 0)) }}</span></p>
+                <p><span class="card-line-label">Forma de pagamento: </span><span class="card-line-value">{{ registeredPayment.paymentMethod || '-' }}</span></p>
+                <n-button size="small" tertiary @click="handleUndoInlinePayment">Estornar pagamento</n-button>
+              </div>
+
+              <template v-else>
+                <n-button
+                  v-if="!showInlinePaymentForm"
+                  size="small"
+                  secondary
+                  type="primary"
+                  @click="openInlinePaymentForm"
+                >
+                  Registrar pagamento
+                </n-button>
+
+                <div v-else class="payment-form-inline">
+                  <div class="payment-form-head">
+                    <p class="payment-form-title">Registrar pagamento</p>
+                    <n-button text class="btn-clear" @click="collapseInlinePaymentForm">Ocultar pagamento</n-button>
+                  </div>
+                  <p class="payment-form-status-impact">Ao confirmar, esta conta será marcada como Paga.</p>
+                  <div class="form-grid">
+                    <n-form-item label="Data de pagamento *">
+                      <n-date-picker v-model:value="inlinePayForm.paidAt" type="date" clearable style="width: 100%" />
+                    </n-form-item>
+                    <n-form-item label="Valor pago *">
+                      <n-input
+                        v-model:value="inlinePaidAmountDisplay"
+                        placeholder="R$ 0,00"
+                        @update:value="onInlinePaidAmountInput"
+                        @blur="onInlinePaidAmountBlur"
+                      />
+                    </n-form-item>
+                    <n-form-item label="Forma de pagamento *">
+                      <n-select v-model:value="inlinePayForm.paymentMethod" :options="paymentMethodOptions" />
+                    </n-form-item>
+                    <n-form-item label="Observação do pagamento" class="full-row">
+                      <n-input v-model:value="inlinePayForm.note" type="textarea" :rows="2" />
+                    </n-form-item>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <h4 class="section-title">Observações</h4>
+            <div class="form-grid">
+              <n-form-item label="Anotações" path="notes" class="full-row">
+                <n-input type="textarea" v-model:value="createForm.notes" :rows="3" />
+              </n-form-item>
+            </div>
+          </section>
+        </div>
+      </n-form>
+      <template #footer>
+        <div class="modal-actions">
+          <n-button tertiary :disabled="saving" @click="closeCreateModal">Cancelar</n-button>
+          <n-button type="primary" :loading="primaryActionLoading" @click="handlePrimaryModalAction">
+            {{ primaryActionLabel }}
           </n-button>
         </div>
-      </n-form>
+      </template>
     </n-modal>
 
-    <n-modal
-      v-model:show="showPayModal"
-      preset="card"
-      title="Registrar Pagamento"
-      style="width: 400px"
-    >
-      <n-form :model="payForm">
-        <n-form-item label="Data de Pagamento">
-          <n-date-picker
-            v-model:value="payForm.paidAt"
-            type="date"
-            clearable
-            style="width: 100%"
-          />
-        </n-form-item>
-        <n-form-item label="Valor Pago (R$)">
-          <n-input-number
-            v-model:value="payForm.paidAmount"
-            :min="0"
-            :precision="2"
-            clearable
-          />
-        </n-form-item>
-        <n-form-item label="Forma de Pagamento">
-          <n-select v-model:value="payForm.paymentMethod" :options="paymentMethodOptions" />
-        </n-form-item>
-        <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
-          <n-button @click="showPayModal = false" style="margin-right: 8px;">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" @click="handlePay">Confirmar</n-button>
-        </div>
-      </n-form>
-    </n-modal>
   </div>
 </template>
 
@@ -273,6 +332,8 @@ interface AccountPayableItem {
   dueDate: string;
   status: string;
   paidAmount?: number | null;
+  paidAt?: string | null;
+  paymentMethod?: string | null;
   notes?: string | null;
 }
 
@@ -281,16 +342,34 @@ type FinancialStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELED';
 const message = useMessage();
 const loading = ref(false);
 const saving = ref(false);
+const savingInlinePayment = ref(false);
 const showCreateModal = ref(false);
-const showPayModal = ref(false);
 const showMobileFilters = ref(false);
 const createFormRef = ref();
 const editingAccountId = ref<number | null>(null);
 const editingOriginalNotes = ref<string | null>(null);
+const modalBaseStatus = ref<string>('PENDING');
+const modalHadPayment = ref(false);
+const amountDisplay = ref('R$ 0,00');
+const showInlinePaymentForm = ref(false);
+const inlinePayForm = reactive({
+  paidAt: Date.now(),
+  paidAmount: 0,
+  paymentMethod: 'PIX',
+  note: '',
+});
+const inlinePaidAmountDisplay = ref('R$ 0,00');
+const registeredPayment = reactive<{
+  paidAt: string | null;
+  paidAmount: number | null;
+  paymentMethod: string | null;
+}>({
+  paidAt: null,
+  paidAmount: null,
+  paymentMethod: null,
+});
 
 const payables = ref<AccountPayableItem[]>([]);
-const dashboardData = ref<any>(null);
-const selectedAccount = ref<AccountPayableItem | null>(null);
 const isMobile = ref(false);
 let mediaQuery: MediaQueryList | null = null;
 const updateIsMobile = () => { isMobile.value = mediaQuery?.matches ?? false; };
@@ -303,26 +382,18 @@ const pagination = reactive({
 const supplierOptions = ref<{ label: string; value: number }[]>([]);
 const supplierLoading = ref(false);
 
-const currentMonth = new Date().getMonth() + 1;
-const currentYear = new Date().getFullYear();
+const today = new Date();
+today.setHours(0, 0, 0, 0);
+const defaultDueDateTo = today.getTime();
+const defaultDueDateFrom = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).getTime();
 
 const filters = reactive({
   search: '',
-  month: currentMonth,
-  year: currentYear,
+  dueDateRange: [defaultDueDateFrom, defaultDueDateTo] as [number, number] | null,
   category: 'Todas as categorias',
   status: 'ALL',
 });
 
-const monthNames = ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-const monthOptions = Array.from({ length: 12 }, (_, i) => ({
-  label: monthNames[i],
-  value: i + 1,
-}));
-const yearOptions = [currentYear - 1, currentYear, currentYear + 1].map((y) => ({
-  label: y.toString(),
-  value: y,
-}));
 const categoryOptions = [
   { label: 'Todas as categorias', value: 'Todas as categorias' },
   { label: 'Custos Fixos', value: 'Custos Fixos' },
@@ -357,12 +428,6 @@ const createForm = reactive({
   notes: '',
 });
 
-const payForm = reactive({
-  paidAt: Date.now(),
-  paidAmount: 0,
-  paymentMethod: 'PIX',
-});
-
 const createRules = {
   description: { required: true, message: 'Requerido', trigger: 'blur' },
   supplierId: {
@@ -391,9 +456,44 @@ const formatCurrency = (val: number) =>
     currency: 'BRL',
   }).format(val);
 
+const parseCurrencyBr = (value: string) => {
+  const digits = (value || '').replace(/\D/g, '');
+  if (!digits) return 0;
+  return Number(digits) / 100;
+};
+
+const formatCurrencyInput = (value: number) => formatCurrency(Number(value || 0));
+
+const onAmountInput = (value: string) => {
+  const parsed = parseCurrencyBr(value);
+  createForm.amount = parsed;
+  amountDisplay.value = formatCurrencyInput(parsed);
+};
+
+const onAmountBlur = () => {
+  amountDisplay.value = formatCurrencyInput(createForm.amount);
+};
+
+const onInlinePaidAmountInput = (value: string) => {
+  const parsed = parseCurrencyBr(value);
+  inlinePayForm.paidAmount = parsed;
+  inlinePaidAmountDisplay.value = formatCurrencyInput(parsed);
+};
+
+const onInlinePaidAmountBlur = () => {
+  inlinePaidAmountDisplay.value = formatCurrencyInput(inlinePayForm.paidAmount);
+};
+
 const formatDateDisplay = (value?: string | null) => {
   if (!value) return '-';
   return new Date(`${value}T00:00:00`).toLocaleDateString('pt-BR');
+};
+
+const formatDateTimeDisplay = (value?: string | null) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('pt-BR');
 };
 
 const isOverdue = (row: AccountPayableItem) => {
@@ -409,6 +509,38 @@ const getEffectiveStatus = (row: AccountPayableItem): FinancialStatus => {
   if (isOverdue(row)) return 'OVERDUE';
   return 'PENDING';
 };
+
+const getCalculatedStatus = (
+  baseStatus: string,
+  dueDateMs: number,
+  hasPayment: boolean,
+): FinancialStatus => {
+  if (baseStatus === 'CANCELED') return 'CANCELED';
+  if (baseStatus === 'PAID' || hasPayment) return 'PAID';
+  const due = new Date(dueDateMs);
+  due.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return due.valueOf() < today.valueOf() ? 'OVERDUE' : 'PENDING';
+};
+
+const modalCurrentStatus = computed<FinancialStatus>(() =>
+  getCalculatedStatus(modalBaseStatus.value, Number(createForm.dueDate), modalHadPayment.value),
+);
+
+const primaryActionLabel = computed(() => {
+  if (editingAccountId.value && showInlinePaymentForm.value) {
+    return 'Salvar e registrar pagamento';
+  }
+  return editingAccountId.value ? 'Salvar alterações' : 'Criar conta';
+});
+
+const primaryActionLoading = computed(() => {
+  if (editingAccountId.value && showInlinePaymentForm.value) {
+    return savingInlinePayment.value;
+  }
+  return saving.value;
+});
 
 const statusLabel = (status: FinancialStatus) => {
   const labels: Record<FinancialStatus, string> = {
@@ -442,10 +574,32 @@ const filteredPayables = computed(() => {
     });
   }
 
+  if (filters.category !== 'Todas as categorias') {
+    data = data.filter((row) => (row.category || 'Outros') === filters.category);
+  }
+
   if (filters.status === 'OVERDUE') {
     data = data.filter((row) => getEffectiveStatus(row) === 'OVERDUE');
   } else if (filters.status !== 'ALL') {
     data = data.filter((row) => getEffectiveStatus(row) === filters.status);
+  }
+
+  if (filters.dueDateRange?.[0]) {
+    const from = new Date(filters.dueDateRange[0]);
+    from.setHours(0, 0, 0, 0);
+    data = data.filter((row) => {
+      const due = new Date(`${row.dueDate}T00:00:00`);
+      return due.valueOf() >= from.valueOf();
+    });
+  }
+
+  if (filters.dueDateRange?.[1]) {
+    const to = new Date(filters.dueDateRange[1]);
+    to.setHours(0, 0, 0, 0);
+    data = data.filter((row) => {
+      const due = new Date(`${row.dueDate}T00:00:00`);
+      return due.valueOf() <= to.valueOf();
+    });
   }
 
   return data;
@@ -467,10 +621,25 @@ const tablePagination = computed(() => ({
 const hasActiveFilters = computed(() => {
   return Boolean(
     filters.search.trim()
-    || filters.month !== currentMonth
-    || filters.year !== currentYear
+    || filters.dueDateRange?.[0] !== defaultDueDateFrom
+    || filters.dueDateRange?.[1] !== defaultDueDateTo
     || filters.category !== 'Todas as categorias'
     || filters.status !== 'ALL',
+  );
+});
+
+const filteredSummary = computed(() => {
+  return filteredPayables.value.reduce(
+    (acc, row) => {
+      const status = getEffectiveStatus(row);
+      const amount = Number(row.amount || 0);
+      acc.expectedTotal += amount;
+      if (status === 'PAID') acc.totalPaid += Number(row.paidAmount || row.amount || 0);
+      if (status === 'PENDING') acc.totalPending += amount;
+      if (status === 'OVERDUE') acc.totalOverdue += amount;
+      return acc;
+    },
+    { expectedTotal: 0, totalPending: 0, totalPaid: 0, totalOverdue: 0 },
   );
 });
 
@@ -543,13 +712,20 @@ const columns = [
   },
 ];
 
+const tableRowProps = (row: AccountPayableItem) => {
+  return {
+    style: 'cursor: pointer;',
+    onClick: () => openEditModal(row),
+  };
+};
+
 const buildActionOptions = (row: AccountPayableItem) => {
   const options: Array<{ label: string; key: string }> = [
     { label: 'Editar', key: 'edit' },
   ];
 
   if (getEffectiveStatus(row) !== 'PAID') {
-    options.push({ label: 'Marcar como paga', key: 'pay' });
+    options.push({ label: 'Registrar pagamento', key: 'pay' });
   }
 
   options.push({ label: 'Duplicar', key: 'duplicate' });
@@ -563,7 +739,7 @@ const handleActionSelect = (key: string, row: AccountPayableItem) => {
   }
 
   if (key === 'pay') {
-    openPayModal(row);
+    openEditModal(row, { openPayment: true });
     return;
   }
 
@@ -642,30 +818,12 @@ const fetchPayables = async () => {
   loading.value = true;
 
   try {
-    const query = new URLSearchParams({
-      month: filters.month.toString(),
-      year: filters.year.toString(),
-    });
-
-    if (filters.category !== 'Todas as categorias') {
-      query.set('category', filters.category);
-    }
-
-    const statusForBackend = filters.status === 'OVERDUE' ? 'PENDING' : filters.status;
-
-    if (statusForBackend !== 'ALL') {
-      query.set('status', statusForBackend);
-    }
-
     const api = useApi();
-    const [listRes, dashRes] = await Promise.all([
-      api(`/api/v1/accounts-payable?${query.toString()}`),
-      api(`/api/v1/accounts-payable/dashboard?${query.toString()}`),
+    const [listRes] = await Promise.all([
+      api('/api/v1/accounts-payable'),
     ]);
 
     payables.value = ((listRes as any).data || []) as AccountPayableItem[];
-    dashboardData.value = (dashRes as any).data || null;
-
     if (pagination.page > 1 && (pagination.page - 1) * pagination.pageSize >= filteredPayables.value.length) {
       pagination.page = 1;
     }
@@ -684,6 +842,18 @@ const resetCreateForm = () => {
   createForm.dueDate = Date.now();
   createForm.notes = '';
   editingOriginalNotes.value = null;
+  modalBaseStatus.value = 'PENDING';
+  modalHadPayment.value = false;
+  amountDisplay.value = formatCurrencyInput(0);
+  showInlinePaymentForm.value = false;
+  inlinePayForm.paidAt = Date.now();
+  inlinePayForm.paidAmount = 0;
+  inlinePayForm.paymentMethod = 'PIX';
+  inlinePayForm.note = '';
+  inlinePaidAmountDisplay.value = formatCurrencyInput(0);
+  registeredPayment.paidAt = null;
+  registeredPayment.paidAmount = null;
+  registeredPayment.paymentMethod = null;
 };
 
 const closeCreateModal = () => {
@@ -722,7 +892,7 @@ const toDatePickerValue = (rawDate?: string) => {
   return date.getTime();
 };
 
-const openEditModal = (row: AccountPayableItem) => {
+const openEditModal = (row: AccountPayableItem, options?: { openPayment?: boolean }) => {
   editingAccountId.value = Number(row.id);
   createForm.description = row.description || '';
   createForm.supplierId =
@@ -736,6 +906,18 @@ const openEditModal = (row: AccountPayableItem) => {
   createForm.dueDate = toDatePickerValue(row.dueDate);
   createForm.notes = row.notes || '';
   editingOriginalNotes.value = normalizeOptionalNote(row.notes);
+  modalBaseStatus.value = row.status || 'PENDING';
+  modalHadPayment.value = Boolean(row.paidAt || row.paidAmount);
+  amountDisplay.value = formatCurrencyInput(createForm.amount);
+  registeredPayment.paidAt = row.paidAt || null;
+  registeredPayment.paidAmount = row.paidAmount != null ? Number(row.paidAmount) : null;
+  registeredPayment.paymentMethod = row.paymentMethod || null;
+  showInlinePaymentForm.value = Boolean(options?.openPayment && modalCurrentStatus.value !== 'PAID');
+  inlinePayForm.paidAt = Date.now();
+  inlinePayForm.paidAmount = Number(row.amount || 0);
+  inlinePayForm.paymentMethod = 'PIX';
+  inlinePayForm.note = '';
+  inlinePaidAmountDisplay.value = formatCurrencyInput(inlinePayForm.paidAmount);
 
   ensureSelectedSupplierOption(createForm.supplierId, row.supplier?.name);
 
@@ -796,48 +978,125 @@ const handleSubmitAccount = async () => {
   }
 };
 
-const openPayModal = (row: AccountPayableItem) => {
-  selectedAccount.value = row;
-  payForm.paidAmount = Number(row.amount);
-  payForm.paidAt = Date.now();
-  showPayModal.value = true;
+const openInlinePaymentForm = () => {
+  inlinePayForm.paidAt = Date.now();
+  inlinePayForm.paidAmount = Number(createForm.amount || 0);
+  inlinePayForm.paymentMethod = 'PIX';
+  inlinePayForm.note = '';
+  inlinePaidAmountDisplay.value = formatCurrencyInput(inlinePayForm.paidAmount);
+  showInlinePaymentForm.value = true;
 };
 
-const handlePay = async () => {
-  if (!selectedAccount.value) return;
+const collapseInlinePaymentForm = () => {
+  showInlinePaymentForm.value = false;
+};
 
-  saving.value = true;
+const cancelInlinePayment = () => {
+  inlinePayForm.paidAt = Date.now();
+  inlinePayForm.paidAmount = Number(createForm.amount || 0);
+  inlinePayForm.paymentMethod = 'PIX';
+  inlinePayForm.note = '';
+  inlinePaidAmountDisplay.value = formatCurrencyInput(inlinePayForm.paidAmount);
+  showInlinePaymentForm.value = false;
+};
+
+const handlePrimaryModalAction = async () => {
+  if (editingAccountId.value && showInlinePaymentForm.value) {
+    await confirmInlinePayment();
+    return;
+  }
+  await handleSubmitAccount();
+};
+
+const confirmInlinePayment = async () => {
+  if (!editingAccountId.value) return;
+  if (!inlinePayForm.paidAt || !inlinePayForm.paidAmount || !inlinePayForm.paymentMethod) {
+    message.error('Preencha os campos obrigatórios do pagamento');
+    return;
+  }
+  if (Math.abs(Number(inlinePayForm.paidAmount) - Number(createForm.amount)) > 0.0001) {
+    message.error('Pagamento parcial ainda não é suportado. Informe o valor total da conta.');
+    return;
+  }
+
+  savingInlinePayment.value = true;
   const api = useApi();
 
   try {
-    await api(`/api/v1/accounts-payable/${selectedAccount.value.id}/pay`, {
+    await api(`/api/v1/accounts-payable/${editingAccountId.value}/pay`, {
       method: 'PATCH',
       body: {
-        paidAt: new Date(payForm.paidAt).toISOString(),
-        paidAmount: payForm.paidAmount,
-        paymentMethod: payForm.paymentMethod,
+        paidAt: new Date(inlinePayForm.paidAt).toISOString(),
+        paidAmount: inlinePayForm.paidAmount,
+        paymentMethod: inlinePayForm.paymentMethod,
       },
     });
 
+    if (inlinePayForm.note.trim()) {
+      const mergedNote = [normalizeOptionalNote(createForm.notes), `[Pagamento] ${inlinePayForm.note.trim()}`]
+        .filter(Boolean)
+        .join('\n');
+      await api(`/api/v1/accounts-payable/${editingAccountId.value}`, {
+        method: 'PATCH',
+        body: { notes: mergedNote },
+      });
+      createForm.notes = mergedNote;
+    }
+
+    modalBaseStatus.value = 'PAID';
+    modalHadPayment.value = true;
+    registeredPayment.paidAt = new Date(inlinePayForm.paidAt).toISOString();
+    registeredPayment.paidAmount = inlinePayForm.paidAmount;
+    registeredPayment.paymentMethod = inlinePayForm.paymentMethod;
+    showInlinePaymentForm.value = false;
     message.success('Pagamento registrado!');
-    showPayModal.value = false;
-    fetchPayables();
+    await fetchPayables();
   } catch (_err) {
     message.error('Erro ao registrar pagamento');
   } finally {
-    saving.value = false;
+    savingInlinePayment.value = false;
+  }
+};
+
+const handleUndoInlinePayment = async () => {
+  if (!editingAccountId.value) return;
+  savingInlinePayment.value = true;
+  const api = useApi();
+
+  try {
+    await api(`/api/v1/accounts-payable/${editingAccountId.value}/undo-pay`, {
+      method: 'PATCH',
+    });
+    modalBaseStatus.value = 'PENDING';
+    modalHadPayment.value = false;
+    registeredPayment.paidAt = null;
+    registeredPayment.paidAmount = null;
+    registeredPayment.paymentMethod = null;
+    message.success('Pagamento estornado');
+    await fetchPayables();
+  } catch (_err) {
+    message.error('Erro ao estornar pagamento');
+  } finally {
+    savingInlinePayment.value = false;
   }
 };
 
 const handleFilter = () => {
+  if (!filters.dueDateRange || !filters.dueDateRange[0] || !filters.dueDateRange[1]) {
+    message.error('Selecione o período de vencimento completo');
+    return;
+  }
+  if (filters.dueDateRange[0] > filters.dueDateRange[1]) {
+    message.error('Data inicial do período não pode ser maior que a final');
+    return;
+  }
   pagination.page = 1;
   fetchPayables();
 };
 
 const handleClearFilters = () => {
   filters.search = '';
-  filters.month = currentMonth;
-  filters.year = currentYear;
+  filters.dueDateRange = [defaultDueDateFrom, defaultDueDateTo];
   filters.category = 'Todas as categorias';
   filters.status = 'ALL';
   pagination.page = 1;
@@ -1247,6 +1506,130 @@ h1 {
   margin-top: -6px;
 }
 
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+}
+
+.section-title {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.section-head .section-title {
+  margin-bottom: 0;
+}
+
+.overdue-hint {
+  margin: -6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #b45309;
+}
+
+.payment-inline-area {
+  margin-top: 8px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 10px;
+}
+
+.payment-form-inline {
+  margin-top: 8px;
+}
+
+.payment-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.payment-form-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.payment-form-status-impact {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.payment-registered-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.payment-registered-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.payment-registered-card p {
+  margin: 4px 0;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.full-row {
+  grid-column: 1 / -1;
+}
+
+.modal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.modal-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 @media (max-width: 1280px) {
   .filters-grid-finance {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1263,5 +1646,75 @@ h1 {
     flex-direction: column;
     gap: 8px;
   }
+}
+
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+}
+</style>
+
+<style>
+:root .n-modal-container:has(.accounts-payable-modal) .n-modal-body-wrapper {
+  overflow: hidden !important;
+}
+
+:root .n-modal-container:has(.accounts-payable-modal) .n-modal-body-wrapper > .n-scrollbar,
+:root .n-modal-container:has(.accounts-payable-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container,
+:root .n-modal-container:has(.accounts-payable-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container > .n-scrollbar-content {
+  max-height: 100vh !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
+}
+
+.accounts-payable-modal.n-card {
+  --n-padding-top: 0;
+  --n-padding-bottom: 0;
+  --n-padding-left: 0;
+  --n-padding-right: 0;
+  width: 760px !important;
+  max-width: calc(100vw - 24px) !important;
+  max-height: calc(100vh - 48px) !important;
+  max-height: calc(100dvh - 48px) !important;
+  margin: 0 auto !important;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.accounts-payable-modal.n-card .n-card-header {
+  flex: 0 0 auto;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 16px 20px 12px;
+  z-index: 4;
+}
+
+.accounts-payable-modal.n-card .n-card__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none !important;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 16px 112px;
+  scroll-padding-bottom: 136px;
+}
+
+.accounts-payable-modal.n-card .n-card__footer {
+  flex: 0 0 auto;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -6px 14px rgba(15, 23, 42, 0.05);
+  padding: 10px 16px;
+  z-index: 4;
 }
 </style>
