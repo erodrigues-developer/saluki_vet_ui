@@ -17,7 +17,7 @@
 
     <div v-if="!isMobile" class="summary-grid">
       <n-card size="small" :bordered="false" class="summary-card">
-        <p class="summary-label">Total do mês</p>
+        <p class="summary-label">Total do período</p>
         <strong class="summary-value">{{ formatCurrency(filteredSummary.expectedTotal) }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card summary-card-warning">
@@ -36,7 +36,7 @@
 
     <div v-else class="summary-grid-mobile summary-grid">
       <n-card size="small" :bordered="false" class="summary-card mobile-card">
-        <p class="summary-label">Total do mês</p>
+        <p class="summary-label">Total do período</p>
         <strong class="summary-value-mobile">{{ formatCurrency(filteredSummary.expectedTotal) }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card mobile-card summary-card-warning">
@@ -1237,7 +1237,7 @@ h1 {
 }
 
 .filters-grid-finance {
-  grid-template-columns: 2fr repeat(4, minmax(0, 1fr)) auto;
+  grid-template-columns: 2fr 1.35fr repeat(2, minmax(0, 1fr)) auto;
 }
 
 .filter-actions {

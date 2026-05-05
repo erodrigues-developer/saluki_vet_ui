@@ -69,11 +69,8 @@
         </div>
         <div class="flex justify-between mb-2 items-center">
           <span>Desconto (R$):</span>
-          <n-input-number
-            v-model:value="model.discountAmount"
-            :min="0"
-            :precision="2"
-            :max="calculatedSubtotal"
+          <CurrencyInput
+            v-model="model.discountAmount"
             size="small"
             style="width: 150px"
             :disabled="readonly"
@@ -99,6 +96,7 @@
 import { ref, reactive, computed, onMounted, h, resolveComponent } from 'vue';
 import { NSelect, NInputNumber, NButton, useMessage } from 'naive-ui';
 import type { FormInst, FormRules } from 'naive-ui';
+import CurrencyInput from '../common/CurrencyInput.vue';
 
 const props = defineProps<{
   initialData?: any;
@@ -323,12 +321,9 @@ const itemColumns = computed(() => {
       width: 140,
       render(row: any) {
         if (props.readonly) return formatCurrency(row.unitPrice);
-        return h(NInputNumber, {
-          value: row.unitPrice,
-          min: 0,
-          precision: 2,
-          showButton: false,
-          onUpdateValue: (val) => {
+        return h(CurrencyInput, {
+          modelValue: row.unitPrice,
+          'onUpdate:modelValue': (val: number) => {
             row.unitPrice = val || 0;
             recalculateRow(row);
           }
@@ -341,12 +336,9 @@ const itemColumns = computed(() => {
       width: 120,
       render(row: any) {
         if (props.readonly) return formatCurrency(row.discountAmount);
-        return h(NInputNumber, {
-          value: row.discountAmount,
-          min: 0,
-          precision: 2,
-          showButton: false,
-          onUpdateValue: (val) => {
+        return h(CurrencyInput, {
+          modelValue: row.discountAmount,
+          'onUpdate:modelValue': (val: number) => {
             row.discountAmount = val || 0;
             recalculateRow(row);
           }

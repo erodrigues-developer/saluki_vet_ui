@@ -171,7 +171,7 @@ const menuItems = [
     icon: '💰',
     children: [
       { label: 'Contas a Pagar', icon: '🧾', to: '/financeiro/contas-a-pagar' },
-      { label: 'Caixa / PDV', icon: '💳', to: '/financeiro/vendas' },
+      { label: 'Vendas', icon: '💳', to: '/financeiro/vendas' },
       { label: 'Comissões', icon: '🪙', to: '/financeiro/comissoes' }
     ]
   },
