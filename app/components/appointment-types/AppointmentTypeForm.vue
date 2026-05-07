@@ -7,46 +7,47 @@
     :show-require-mark="false"
     :disabled="loading"
   >
-    <div class="grid">
-      <n-form-item label="Ativo" path="isActive" class="full-row">
-        <n-switch v-model:value="model.isActive" />
-      </n-form-item>
+    <section class="form-section">
+      <div class="section-head">
+        <h4 class="section-title">Informações do tipo</h4>
+        <div class="status-inline">
+          <span class="status-label">Ativo</span>
+          <n-switch v-model:value="model.isActive" />
+        </div>
+      </div>
+      <div class="grid">
+        <n-form-item label="Nome *" path="name" required class="full-row">
+          <n-input v-model:value="model.name" placeholder="Ex: Consulta clínica, Vacinação..." />
+        </n-form-item>
 
-      <n-form-item label="Nome do Tipo" path="name" required class="full-row">
-        <n-input v-model:value="model.name" placeholder="Ex: Consulta Clínica, Vacinação..." />
-      </n-form-item>
+        <n-form-item label="Descrição" path="description" class="full-row">
+          <n-input
+            v-model:value="model.description"
+            type="textarea"
+            :rows="2"
+            placeholder="Opcional. Ex: Avaliação geral do pet..."
+          />
+        </n-form-item>
 
-      <n-form-item label="Descrição" path="description" class="full-row">
-        <n-input
-          v-model:value="model.description"
-          type="textarea"
-          :rows="3"
-          placeholder="Opcional. Ex: Avaliação geral do pet..."
-        />
-      </n-form-item>
-
-      <n-form-item label="Duração Padrão (minutos)" path="defaultDurationMinutes">
-        <n-input-number
-          v-model:value="model.defaultDurationMinutes"
-          :min="1"
-          :step="5"
-          placeholder="Ex: 30"
-          style="width: 100%"
-        />
-      </n-form-item>
-    </div>
-
-    <div class="actions">
-      <n-button tertiary @click="$emit('cancel')" :disabled="loading">Cancelar</n-button>
-      <n-button type="primary" :loading="loading" @click="handleSubmit">
-        {{ submitLabel }}
-      </n-button>
-    </div>
+        <n-form-item label="Duração padrão *" path="defaultDurationMinutes">
+          <div class="duration-field">
+            <n-input-number
+              v-model:value="model.defaultDurationMinutes"
+              :min="5"
+              :step="5"
+              placeholder="Ex: 30"
+              style="width: 100%"
+            />
+            <span class="duration-suffix">min</span>
+          </div>
+        </n-form-item>
+      </div>
+    </section>
   </n-form>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import type { FormInst, FormRules } from 'naive-ui'
 
 export interface AppointmentType {
@@ -64,7 +65,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'submit', payload: AppointmentType): void
-  (e: 'cancel'): void
 }>()
 
 const formRef = ref<FormInst | null>(null)
@@ -77,8 +77,27 @@ const model = reactive<AppointmentType>({
 })
 
 const rules: FormRules = {
-  name: { required: true, message: 'Nome é obrigatório', trigger: 'blur' },
-  defaultDurationMinutes: { type: 'number', required: true, message: 'Duração é obrigatória', trigger: ['blur', 'change'] }
+  name: {
+    required: true,
+    message: 'Nome é obrigatório',
+    trigger: 'blur',
+    validator: (_rule, value: string) => {
+      if (!value || !value.trim()) return new Error('Nome é obrigatório')
+      return true
+    }
+  },
+  defaultDurationMinutes: {
+    type: 'number',
+    required: true,
+    trigger: ['blur', 'change'],
+    validator: (_rule, value: number) => {
+      if (value === null || value === undefined) return new Error('Duração padrão é obrigatória')
+      if (!Number.isFinite(Number(value))) return new Error('Informe uma duração válida')
+      if (Number(value) <= 0) return new Error('Duração deve ser maior que zero')
+      if (Number(value) < 5) return new Error('Duração mínima é 5 min')
+      return true
+    }
+  }
 }
 
 watch(
@@ -95,34 +114,79 @@ watch(
   { immediate: true }
 )
 
-const submitLabel = computed(() => (model.id ? 'Salvar alterações' : 'Criar tipo'))
-
-const handleSubmit = async () => {
-  try {
-    await formRef.value?.validate()
-    emit('submit', { ...model })
-  } catch (err) {
-    // Validation failed
-  }
+const submit = async () => {
+  await formRef.value?.validate()
+  emit('submit', {
+    ...model,
+    name: model.name.trim(),
+    defaultDurationMinutes: Number(model.defaultDurationMinutes)
+  })
 }
+
+defineExpose({ submit })
 </script>
 
 <style scoped>
+.form-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px 16px;
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.status-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-label {
+  font-size: 13px;
+  color: #475569;
+  font-weight: 600;
+}
+
 .grid {
   display: grid;
   gap: 12px;
   grid-template-columns: 1fr 1fr;
-  margin-top: 6px;
 }
 
 .full-row {
   grid-column: 1 / -1;
 }
 
-.actions {
-  display: flex;
-  justify-content: flex-end;
+.duration-field {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
   gap: 8px;
-  margin-top: 24px;
+}
+
+.duration-suffix {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
