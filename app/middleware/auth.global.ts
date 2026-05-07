@@ -3,12 +3,6 @@ import { useAuthStore } from '~/stores/auth';
 export default defineNuxtRouteMiddleware((to) => {
   const authStore = useAuthStore();
   const publicRoutes = ['/login'];
-  const normalizeRedirect = (value: unknown) => {
-    const path = Array.isArray(value) ? value[0] : value;
-    if (typeof path !== 'string') return '/';
-    if (!path.startsWith('/') || path.startsWith('//') || path === '/login') return '/';
-    return path;
-  };
 
   // Assegura que recuperou sessão persistida antes de validar a rota.
   if (!authStore.isAuthenticated) {
@@ -18,7 +12,7 @@ export default defineNuxtRouteMiddleware((to) => {
   if (publicRoutes.includes(to.path)) {
     // Se o usuário já está logado e tenta acessar o login, redireciona
     if (authStore.isAuthenticated) {
-      return navigateTo(normalizeRedirect(to.query.redirect));
+      return navigateTo('/');
     }
     return;
   }
