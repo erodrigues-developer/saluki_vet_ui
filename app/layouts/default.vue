@@ -4,20 +4,144 @@
       <NDialogProvider>
         <div class="layout" @touchstart="onEdgeTouchStart" @touchmove="onEdgeTouchMove" @touchend="onEdgeTouchEnd">
           <Sidebar v-if="!isMobile" :items="menuItems" />
+
           <main class="content">
-            <div v-if="isMobile" class="mobile-topbar">
-              <button type="button" class="menu-btn" aria-label="Abrir menu" @click="openSidebar">☰</button>
-              <div class="mobile-brand">
-                <span class="brand-icon">🛡️</span>
-                <span class="brand-name">SalukiVet</span>
-              </div>
+            <header class="topbar" :class="{ mobile: isMobile }">
+              <template v-if="!isMobile">
+                <div class="topbar-left" ref="searchWrapRef">
+                  <NInput
+                    v-model:value="searchQuery"
+                    placeholder="Buscar cliente, pet, venda, produto..."
+                    clearable
+                    class="global-search"
+                    @focus="searchOpen = true"
+                  />
+
+                  <div v-if="searchOpen" class="search-dropdown">
+                    <template v-if="searchGroups.length">
+                      <div v-for="group in searchGroups" :key="group.type" class="search-group">
+                        <p class="search-group-title">{{ group.label }}</p>
+                        <button
+                          v-for="item in group.items"
+                          :key="item.label + item.to"
+                          class="search-item"
+                          type="button"
+                          @click="goTo(item.to)"
+                        >
+                          <span class="item-label">{{ item.label }}</span>
+                          <span class="item-meta">{{ item.meta }}</span>
+                        </button>
+                      </div>
+                    </template>
+                    <p v-else class="search-empty">Nenhum resultado encontrado.</p>
+                  </div>
+                </div>
+
+                <div class="topbar-right">
+                  <NDropdown :options="quickCreateOptions" @select="handleQuickCreate">
+                    <NButton type="primary" secondary class="topbar-btn">+ Criar</NButton>
+                  </NDropdown>
+
+                  <div ref="notificationRef" class="notification-wrap">
+                    <NBadge :value="notificationCount" :max="99" class="notification-badge">
+                      <NButton quaternary circle class="icon-btn" @click="notificationOpen = !notificationOpen">🔔</NButton>
+                    </NBadge>
+                    <div v-if="notificationOpen" class="notification-panel">
+                      <p class="panel-title">Notificações</p>
+                      <button
+                        v-for="item in notifications"
+                        :key="item.id"
+                        type="button"
+                        class="notification-item"
+                        @click="goTo(item.to)"
+                      >
+                        <span>{{ item.title }}</span>
+                        <small>{{ item.meta }}</small>
+                      </button>
+                    </div>
+                  </div>
+
+                  <NSelect v-model:value="selectedUnit" :options="unitOptions" size="small" class="unit-select" />
+                  <span class="clinic-chip">{{ clinicStatus }}</span>
+
+                  <NDropdown :options="profileOptions" @select="handleProfileAction">
+                    <button type="button" class="profile-btn">
+                      <NAvatar size="small" round>{{ userInitials }}</NAvatar>
+                      <span class="profile-name">{{ userName }}</span>
+                    </button>
+                  </NDropdown>
+                </div>
+              </template>
+
+              <template v-else>
+                <button type="button" class="menu-btn" aria-label="Abrir menu" @click="openSidebar">☰</button>
+                <div class="mobile-brand">
+                  <span class="brand-icon">🛡️</span>
+                  <span class="brand-name">SalukiVet</span>
+                </div>
+                <div class="mobile-actions">
+                  <NButton quaternary circle class="icon-btn" @click="mobileSearchOpen = true">🔎</NButton>
+                  <div ref="notificationRef" class="notification-wrap">
+                    <NBadge :value="notificationCount" :max="99" class="notification-badge">
+                      <NButton quaternary circle class="icon-btn" @click="notificationOpen = !notificationOpen">🔔</NButton>
+                    </NBadge>
+                    <div v-if="notificationOpen" class="notification-panel">
+                      <p class="panel-title">Notificações</p>
+                      <button
+                        v-for="item in notifications"
+                        :key="`mobile-${item.id}`"
+                        type="button"
+                        class="notification-item"
+                        @click="goTo(item.to)"
+                      >
+                        <span>{{ item.title }}</span>
+                        <small>{{ item.meta }}</small>
+                      </button>
+                    </div>
+                  </div>
+                  <NDropdown :options="profileOptions" @select="handleProfileAction">
+                    <NAvatar size="small" round>{{ userInitials }}</NAvatar>
+                  </NDropdown>
+                </div>
+              </template>
+            </header>
+
+            <div class="page-slot">
+              <slot />
             </div>
-            <slot />
           </main>
+
+          <NModal v-model:show="mobileSearchOpen" preset="card" class="mobile-search-modal" title="Buscar">
+            <NInput
+              v-model:value="searchQuery"
+              placeholder="Buscar cliente, pet, venda, produto..."
+              clearable
+              class="global-search"
+              @focus="searchOpen = true"
+            />
+            <div class="mobile-search-results">
+              <template v-if="searchGroups.length">
+                <div v-for="group in searchGroups" :key="`m-${group.type}`" class="search-group">
+                  <p class="search-group-title">{{ group.label }}</p>
+                  <button
+                    v-for="item in group.items"
+                    :key="`m-${item.label}-${item.to}`"
+                    class="search-item"
+                    type="button"
+                    @click="goFromMobileSearch(item.to)"
+                  >
+                    <span class="item-label">{{ item.label }}</span>
+                    <span class="item-meta">{{ item.meta }}</span>
+                  </button>
+                </div>
+              </template>
+              <p v-else class="search-empty">Nenhum resultado encontrado.</p>
+            </div>
+          </NModal>
+
           <div v-if="isMobile" class="mobile-overlay" :class="{ open: sidebarOpen }">
             <div class="scrim" @click="closeSidebar" />
-            <div class="drawer" @touchstart="onDrawerTouchStart" @touchmove="onDrawerTouchMove"
-              @touchend="onDrawerTouchEnd">
+            <div class="drawer" @touchstart="onDrawerTouchStart" @touchmove="onDrawerTouchMove" @touchend="onDrawerTouchEnd">
               <Sidebar :items="menuItems" :is-mobile="true" @navigate="closeSidebar" />
             </div>
           </div>
@@ -28,17 +152,29 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { NConfigProvider, NDialogProvider, NMessageProvider, datePtBR, ptBR } from 'naive-ui'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { NAvatar, NBadge, NButton, NConfigProvider, NDialogProvider, NDropdown, NInput, NMessageProvider, NModal, NSelect, datePtBR, ptBR } from 'naive-ui'
 import Sidebar from '~/components/Sidebar.vue'
+import { useAuthStore } from '~/stores/auth'
 
 const isMobile = ref(false)
 const sidebarOpen = ref(false)
+const searchOpen = ref(false)
+const notificationOpen = ref(false)
+const mobileSearchOpen = ref(false)
+const searchQuery = ref('')
+const selectedUnit = ref('centro')
+const searchWrapRef = ref(null)
+const notificationRef = ref(null)
+const auth = useAuthStore()
+const router = useRouter()
 let mediaQuery = null
+
 const updateIsMobile = () => {
   isMobile.value = mediaQuery?.matches ?? false
   if (!isMobile.value) {
     sidebarOpen.value = false
+    mobileSearchOpen.value = false
   }
 }
 
@@ -127,6 +263,116 @@ const onDrawerTouchEnd = () => {
   drawerTracking = false
 }
 
+const clinicStatus = computed(() => 'Aberto até 20h')
+const userName = computed(() => auth.user?.name || 'Usuário')
+const userInitials = computed(() => {
+  const name = userName.value.trim()
+  if (!name) return 'SV'
+  const chunks = name.split(' ').filter(Boolean)
+  return (chunks[0]?.[0] || 'S') + (chunks[1]?.[0] || 'V')
+})
+
+const unitOptions = [
+  { label: 'Clínica Centro', value: 'centro' },
+  { label: 'Clínica Zona Sul', value: 'sul' }
+]
+
+const quickCreateOptions = [
+  { label: 'Novo atendimento', key: '/consultas/novo-atendimento' },
+  { label: 'Novo agendamento', key: '/atendimento/agendamentos' },
+  { label: 'Nova venda', key: '/financeiro/vendas/nova' },
+  { label: 'Novo cliente', key: '/clientes' },
+  { label: 'Novo pet', key: '/pets' },
+  { label: 'Nova conta a pagar', key: '/financeiro/contas-a-pagar' }
+]
+
+const profileOptions = [
+  { label: 'Meu perfil', key: '/usuarios' },
+  { label: 'Configurações', key: '/configuracoes/clinica' },
+  { label: 'Trocar clínica/unidade', key: 'switch-unit' },
+  { type: 'divider', key: 'divider-1' },
+  { label: 'Sair', key: 'logout' }
+]
+
+const notifications = [
+  { id: 'n1', title: '3 vacinas atrasadas', meta: 'Agenda de vacinas', to: '/atendimento/agendamentos' },
+  { id: 'n2', title: '3 itens com estoque crítico', meta: 'Produtos', to: '/cadastros/produtos' },
+  { id: 'n3', title: 'R$ 3.550 em contas atrasadas', meta: 'Financeiro', to: '/financeiro/contas-a-pagar' },
+  { id: 'n4', title: '3 vendas abertas', meta: 'Vendas', to: '/financeiro/vendas?status=aberta' }
+]
+
+const notificationCount = computed(() => notifications.length)
+
+const searchableItems = [
+  { type: 'Clientes', label: 'Cadastro de clientes', meta: 'Clientes', to: '/clientes' },
+  { type: 'Pets', label: 'Cadastro de pets', meta: 'Pets', to: '/pets' },
+  { type: 'Vendas', label: 'Vendas', meta: 'Financeiro', to: '/financeiro/vendas' },
+  { type: 'Produtos', label: 'Produtos e serviços', meta: 'Cadastros', to: '/cadastros/produtos' },
+  { type: 'Financeiro', label: 'Contas a pagar', meta: 'Financeiro', to: '/financeiro/contas-a-pagar' },
+  { type: 'Financeiro', label: 'Comissões', meta: 'Financeiro', to: '/financeiro/comissoes' },
+  { type: 'Fornecedores', label: 'Fornecedores', meta: 'Cadastros', to: '/cadastros/fornecedores' },
+  { type: 'Agendamentos', label: 'Agendamentos', meta: 'Atendimentos', to: '/atendimento/agendamentos' },
+  { type: 'Usuários', label: 'Usuários e permissões', meta: 'Cadastros', to: '/usuarios' }
+]
+
+const searchGroups = computed(() => {
+  const term = searchQuery.value.trim().toLowerCase()
+  const filtered = term
+    ? searchableItems.filter((item) => `${item.label} ${item.meta} ${item.type}`.toLowerCase().includes(term))
+    : searchableItems.slice(0, 6)
+
+  const groupedMap = new Map()
+  filtered.forEach((item) => {
+    const current = groupedMap.get(item.type) || []
+    current.push(item)
+    groupedMap.set(item.type, current)
+  })
+
+  return Array.from(groupedMap.entries()).map(([type, items]) => ({
+    type,
+    label: type,
+    items
+  }))
+})
+
+const handleQuickCreate = (key) => {
+  goTo(String(key))
+}
+
+const handleProfileAction = (key) => {
+  if (key === 'logout') {
+    auth.logout()
+    return
+  }
+  if (key === 'switch-unit') {
+    selectedUnit.value = selectedUnit.value === 'centro' ? 'sul' : 'centro'
+    return
+  }
+  goTo(String(key))
+}
+
+const goTo = (to) => {
+  searchOpen.value = false
+  notificationOpen.value = false
+  mobileSearchOpen.value = false
+  router.push(to)
+}
+
+const goFromMobileSearch = (to) => {
+  goTo(to)
+}
+
+const handleDocumentClick = (event) => {
+  const searchEl = searchWrapRef.value
+  const notificationEl = notificationRef.value
+  if (searchEl && !searchEl.contains(event.target)) {
+    searchOpen.value = false
+  }
+  if (notificationEl && !notificationEl.contains(event.target)) {
+    notificationOpen.value = false
+  }
+}
+
 onMounted(() => {
   if (typeof window === 'undefined') return
   mediaQuery = window.matchMedia('(max-width: 900px)')
@@ -136,14 +382,20 @@ onMounted(() => {
   } else {
     mediaQuery.addListener(updateIsMobile)
   }
+  document.addEventListener('click', handleDocumentClick)
 })
 
 onBeforeUnmount(() => {
-  if (!mediaQuery) return
-  if (mediaQuery.removeEventListener) {
-    mediaQuery.removeEventListener('change', updateIsMobile)
-  } else {
-    mediaQuery.removeListener(updateIsMobile)
+  if (mediaQuery) {
+    if (mediaQuery.removeEventListener) {
+      mediaQuery.removeEventListener('change', updateIsMobile)
+    } else {
+      mediaQuery.removeListener(updateIsMobile)
+    }
+  }
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('click', handleDocumentClick)
+    document.body.style.overflow = ''
   }
 })
 
@@ -161,9 +413,7 @@ const menuItems = [
   {
     label: 'Pets',
     icon: '🐾',
-    children: [
-      { label: 'Cadastro de pets', icon: '🐶', to: '/pets' }
-    ]
+    children: [{ label: 'Cadastro de pets', icon: '🐶', to: '/pets' }]
   },
   { label: 'Clientes', icon: '👥', to: '/clientes' },
   {
@@ -188,90 +438,254 @@ const menuItems = [
       { label: 'Formas de Pagamento', icon: '💲', to: '/cadastros/formas-pagamento' },
       { label: 'Espécies', icon: '🧬', to: '/tabelas/especies' },
       { label: 'Raças', icon: '🐕', to: '/tabelas/racas' },
-      { label: 'Status', icon: '✅', to: '/tabelas/status' },
+      { label: 'Status', icon: '✅', to: '/tabelas/status' }
     ]
   },
   {
     label: 'Configurações',
     icon: '⚙️',
-    children: [
-      { label: 'Clínica', icon: '🏥', to: '/configuracoes/clinica' }
-    ]
+    children: [{ label: 'Clínica', icon: '🏥', to: '/configuracoes/clinica' }]
   }
 ]
 </script>
 
 <style scoped>
+:global(html),
+:global(body),
+:global(#__nuxt) {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 .layout {
   display: grid;
   grid-template-columns: auto 1fr;
   min-height: 100vh;
   background: #f4f6fb;
   position: relative;
-  --sidebar-bg: #f4f6fb;
-  --sidebar-text: #111827;
-  --sidebar-muted: #6b7280;
-  --sidebar-primary: #0E3A56;
-  --sidebar-secondary: #2CB67D;
 }
 
 .content {
-  padding: 24px;
+  padding: 0 24px 24px;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
-.mobile-topbar {
-  display: none;
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: 64px;
+  background: #f4f6fb;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 4px 16px;
-  background: var(--sidebar-bg);
-  color: var(--sidebar-text);
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  overflow: visible;
 }
 
-.menu-btn {
-  border: none;
-  background: rgba(15, 23, 42, 0.08);
-  color: var(--sidebar-text);
-  border-radius: 10px;
-  width: 40px;
-  height: 40px;
-  font-size: 20px;
+.topbar-left {
+  position: relative;
+  width: min(560px, 100%);
+}
+
+.global-search {
+  width: 100%;
+}
+
+.search-dropdown {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  width: 100%;
+  z-index: 60;
+  max-height: 420px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  padding: 10px;
+}
+
+.search-group {
   display: grid;
-  place-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.search-group-title {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+.search-item {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
   cursor: pointer;
 }
 
-.mobile-brand {
+.search-item:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.item-label {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.item-meta {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.search-empty {
+  margin: 4px 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.topbar-right {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-weight: 700;
-  color: var(--sidebar-text);
 }
 
-.brand-icon {
-  width: 32px;
-  height: 32px;
+.topbar-btn,
+.icon-btn {
+  cursor: pointer;
+}
+
+.notification-wrap {
+  position: relative;
+}
+
+.notification-badge :deep(.n-badge-sup) {
+  left: auto;
+  inset-inline-start: auto;
+  inset-inline-end: 2px;
+  top: 0;
+  right: 2px;
+  transform: translate(0, -20%);
+}
+
+.notification-panel {
+  position: absolute;
+  right: 0;
+  top: 46px;
+  z-index: 60;
+  width: 300px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  padding: 10px;
   display: grid;
-  place-items: center;
+  gap: 8px;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+.notification-item {
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--sidebar-primary), var(--sidebar-secondary));
-  font-size: 16px;
+  background: #fff;
+  padding: 8px 10px;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.notification-item span {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.notification-item small {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.unit-select {
+  width: 160px;
+}
+
+.clinic-chip {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.profile-btn {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 999px;
+  padding: 4px 8px 4px 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.profile-name {
+  font-size: 13px;
+  color: #334155;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-slot {
+  padding-top: 16px;
+}
+
+.mobile-search-modal :deep(.n-card) {
+  width: min(94vw, 520px);
+}
+
+.mobile-search-results {
+  margin-top: 10px;
+  max-height: 60vh;
+  overflow: auto;
 }
 
 .mobile-overlay {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 50;
+  z-index: 40;
+  overflow: hidden;
 }
 
 .mobile-overlay .scrim {
   position: absolute;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.38);
   opacity: 0;
-  transition: opacity 240ms ease-out;
+  transition: opacity 0.2s ease;
 }
 
 .mobile-overlay .drawer {
@@ -279,12 +693,11 @@ const menuItems = [
   top: 0;
   left: 0;
   height: 100%;
-  width: 82vw;
-  max-width: 360px;
-  min-width: 260px;
-  background: var(--sidebar-bg);
+  width: min(300px, 86vw);
+  background: #f4f6fb;
+  box-shadow: 4px 0 18px rgba(15, 23, 42, 0.22);
   transform: translateX(-100%);
-  transition: transform 240ms ease-out;
+  transition: transform 0.22s ease;
 }
 
 .mobile-overlay.open {
@@ -299,14 +712,83 @@ const menuItems = [
   transform: translateX(0);
 }
 
+.mobile-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 0;
+  flex-shrink: 0;
+  justify-self: end;
+}
+
+.mobile-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  color: #111827;
+  min-width: 0;
+}
+
+.brand-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #0e3a56, #2cb67d);
+  font-size: 16px;
+}
+
+.menu-btn {
+  border: none;
+  background: rgba(15, 23, 42, 0.08);
+  color: #111827;
+  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;
   }
 
+  .content {
+    padding: 0 14px 18px;
+  }
 
-  .mobile-topbar {
-    display: flex;
+  .topbar.mobile {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    align-items: center;
+    height: 58px;
+    gap: 10px;
+    overflow: visible;
+    padding-right: 4px;
+  }
+
+  .profile-name,
+  .unit-select,
+  .clinic-chip {
+    display: none;
+  }
+
+  .page-slot {
+    padding-top: 12px;
+    min-width: 0;
+    overflow-x: hidden;
   }
 }
 </style>

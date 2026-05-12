@@ -29,17 +29,11 @@
       </n-form-item>
     </div>
 
-    <div class="actions">
-      <n-button tertiary @click="$emit('cancel')" :disabled="loading">Cancelar</n-button>
-      <n-button type="primary" :loading="loading" @click="handleSubmit" :disabled="model.isSystem">
-        Criar Status
-      </n-button>
-    </div>
   </n-form>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import type { FormInst, FormRules } from 'naive-ui'
 
 export interface AppointmentStatus {
@@ -56,7 +50,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'submit', payload: AppointmentStatus): void
-  (e: 'cancel'): void
 }>()
 
 const formRef = ref<FormInst | null>(null)
@@ -93,14 +86,12 @@ const onCodeInput = (val: string) => {
   model.code = (val || '').toUpperCase().replace(/[^A-Z0-9_]/g, '')
 }
 
-const handleSubmit = async () => {
-  try {
-    await formRef.value?.validate()
-    emit('submit', { ...model })
-  } catch (err) {
-    // Validation failed
-  }
+const submit = async () => {
+  await formRef.value?.validate()
+  emit('submit', { ...model })
 }
+
+defineExpose({ submit })
 </script>
 
 <style scoped>
@@ -115,10 +106,4 @@ const handleSubmit = async () => {
   grid-column: 1 / -1;
 }
 
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 24px;
-}
 </style>

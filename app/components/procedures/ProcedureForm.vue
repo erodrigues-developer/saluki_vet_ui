@@ -68,17 +68,11 @@
       </n-form-item>
     </div>
 
-    <div class="actions">
-      <n-button tertiary @click="$emit('cancel')" :disabled="loading">Cancelar</n-button>
-      <n-button type="primary" :loading="loading" @click="handleSubmit">
-        {{ submitLabel }}
-      </n-button>
-    </div>
   </n-form>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import type { FormInst, FormRules } from 'naive-ui'
 import { useMessage } from 'naive-ui'
 
@@ -100,7 +94,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'submit', payload: Procedure): void
-  (e: 'cancel'): void
 }>()
 
 const formRef = ref<FormInst | null>(null)
@@ -171,20 +164,16 @@ onMounted(() => {
   loadProducts()
 })
 
-const submitLabel = computed(() => (model.id ? 'Salvar alterações' : 'Criar procedimento'))
-
-const handleSubmit = async () => {
-  try {
-    await formRef.value?.validate()
-    const payload = { ...model }
-    if (!payload.consumedProductId) {
-      payload.consumptionQuantity = null
-    }
-    emit('submit', payload)
-  } catch (err) {
-    // Validation failed
+const submit = async () => {
+  await formRef.value?.validate()
+  const payload = { ...model }
+  if (!payload.consumedProductId) {
+    payload.consumptionQuantity = null
   }
+  emit('submit', payload)
 }
+
+defineExpose({ submit })
 </script>
 
 <style scoped>
@@ -199,10 +188,4 @@ const handleSubmit = async () => {
   grid-column: 1 / -1;
 }
 
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 24px;
-}
 </style>

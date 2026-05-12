@@ -207,7 +207,7 @@ watch(
     Object.assign(model, {
       id: val?.id,
       name: val?.name ?? '',
-      document: val?.document ?? '',
+      document: formatDocument(val?.document ?? ''),
       phone: formatBrazilPhone(val?.phone ?? ''),
       mobilePhone: formatBrazilPhone(val?.mobilePhone ?? ''),
       email: val?.email ?? '',
@@ -254,10 +254,6 @@ const formatDocument = (val: string) => {
     .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
     .replace(/\.(\d{3})(\d)/, '.$1/$2')
     .replace(/(\d{4})(\d)/, '$1-$2')
-}
-
-const onDocumentInput = (val: string) => {
-  model.document = formatDocument(val)
 }
 
 const formatZip = (val: string) => {

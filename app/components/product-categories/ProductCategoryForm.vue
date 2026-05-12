@@ -7,38 +7,43 @@
     :show-require-mark="false"
     :disabled="loading"
   >
-    <div class="grid">
-      <n-form-item label="Nome da Categoria" path="name" required class="full-row">
-        <n-input v-model:value="model.name" placeholder="Ex: Medicamentos, Rações, Acessórios..." />
-      </n-form-item>
+    <section class="form-section">
+      <div class="section-head">
+        <h4 class="section-title">Informações da categoria</h4>
+        <div class="status-inline">
+          <span class="status-label">Ativo</span>
+          <n-switch v-model:value="model.isActive" />
+        </div>
+      </div>
+      <div class="grid">
+        <n-form-item label="Nome *" path="name" required class="full-row">
+          <n-input v-model:value="model.name" placeholder="Ex.: Medicamentos" />
+        </n-form-item>
 
-      <n-form-item label="Descrição" path="description" class="full-row">
-        <n-input
-          v-model:value="model.description"
-          type="textarea"
-          :rows="3"
-          placeholder="Opcional. Breve descrição sobre a categoria."
-        />
-      </n-form-item>
-    </div>
-
-    <div class="actions">
-      <n-button tertiary @click="$emit('cancel')" :disabled="loading">Cancelar</n-button>
-      <n-button type="primary" :loading="loading" @click="handleSubmit">
-        {{ submitLabel }}
-      </n-button>
-    </div>
+        <n-form-item label="Descrição" path="description" class="full-row">
+          <n-input
+            v-model:value="model.description"
+            type="textarea"
+            :rows="2"
+            placeholder="Opcional. Breve descrição sobre a categoria."
+          />
+        </n-form-item>
+      </div>
+    </section>
   </n-form>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import type { FormInst, FormRules } from 'naive-ui'
 
 export interface ProductCategory {
   id?: number
   name: string
   description?: string | null
+  isActive: boolean
+  updatedAt?: string
+  productsLinked?: number
 }
 
 const props = defineProps<{
@@ -48,18 +53,27 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'submit', payload: ProductCategory): void
-  (e: 'cancel'): void
+  (e: 'validity-change', valid: boolean): void
 }>()
 
 const formRef = ref<FormInst | null>(null)
 const model = reactive<ProductCategory>({
   id: undefined,
   name: '',
-  description: ''
+  description: '',
+  isActive: true
 })
 
 const rules: FormRules = {
-  name: { required: true, message: 'Nome é obrigatório', trigger: 'blur' },
+  name: {
+    required: true,
+    message: 'Nome é obrigatório',
+    trigger: 'blur',
+    validator: (_rule, value: string) => {
+      if (!value || !value.trim()) return new Error('Nome é obrigatório')
+      return true
+    }
+  }
 }
 
 watch(
@@ -68,29 +82,71 @@ watch(
     Object.assign(model, {
       id: val?.id,
       name: val?.name ?? '',
-      description: val?.description ?? ''
+      description: val?.description ?? '',
+      isActive: val?.isActive ?? true
     })
   },
   { immediate: true }
 )
 
-const submitLabel = computed(() => (model.id ? 'Salvar alterações' : 'Criar categoria'))
+watch(
+  () => model.name,
+  (value) => {
+    emit('validity-change', Boolean(value?.trim()))
+  },
+  { immediate: true }
+)
 
-const handleSubmit = async () => {
-  try {
-    await formRef.value?.validate()
-    emit('submit', { ...model })
-  } catch (err) {
-    // Validation failed
-  }
+const submit = async () => {
+  await formRef.value?.validate()
+  emit('submit', {
+    ...model,
+    name: model.name.trim()
+  })
 }
+
+defineExpose({ submit })
 </script>
 
 <style scoped>
+.form-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px 16px;
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.status-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-label {
+  font-size: 13px;
+  color: #475569;
+  font-weight: 600;
+}
+
 .grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   margin-top: 6px;
 }
 
@@ -98,10 +154,9 @@ const handleSubmit = async () => {
   grid-column: 1 / -1;
 }
 
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 24px;
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

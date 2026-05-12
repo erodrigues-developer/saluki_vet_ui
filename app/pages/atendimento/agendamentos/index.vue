@@ -214,7 +214,11 @@
                 />
               </n-form-item>
               <n-form-item label="CPF">
-                <n-input v-model:value="quickForm.client.document" placeholder="Opcional" />
+                <n-input
+                  v-model:value="quickForm.client.document"
+                  placeholder="Opcional"
+                  @update:value="onQuickDocumentInput"
+                />
               </n-form-item>
               <n-form-item label="E-mail">
                 <n-input v-model:value="quickForm.client.email" placeholder="Opcional" />
@@ -380,6 +384,22 @@ const checkInForm = reactive({ reason: '' })
 
 const onQuickMobilePhoneInput = (value: string) => {
   quickForm.client.mobilePhone = formatBrazilPhone(value)
+}
+
+const onQuickDocumentInput = (value: string) => {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 14)
+  if (digits.length <= 11) {
+    quickForm.client.document = digits
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+    return
+  }
+  quickForm.client.document = digits
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1/$2')
+    .replace(/(\d{4})(\d)/, '$1-$2')
 }
 
 const pagination = reactive({
@@ -799,7 +819,10 @@ const handleQuickSubmit = async () => {
     await api('/api/v1/appointments/quick-create', {
       method: 'POST',
       body: {
-        client: quickForm.client,
+        client: {
+          ...quickForm.client,
+          document: String(quickForm.client.document || '').replace(/\\D/g, '')
+        },
         pet: quickForm.pet,
         appointment: {
           ...quickForm.appointment,

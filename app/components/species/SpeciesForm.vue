@@ -9,26 +9,16 @@
   >
     <section class="form-section">
       <div class="section-head">
-        <h4 class="section-title">Informações da forma</h4>
+        <h4 class="section-title">Informações da espécie</h4>
         <div class="active-wrap">
           <span class="active-label">Ativo</span>
           <n-switch v-model:value="model.isActive" />
         </div>
       </div>
 
-      <div class="grid">
-        <n-form-item label="Nome *" path="name" required>
-          <n-input v-model:value="model.name" placeholder="Ex.: Cartão de crédito" />
-        </n-form-item>
-
-        <n-form-item label="Código interno *" path="code" required>
-          <n-input
-            v-model:value="model.code"
-            placeholder="Ex.: CREDIT_CARD"
-            @update:value="onCodeInput"
-          />
-        </n-form-item>
-      </div>
+      <n-form-item label="Nome *" path="name" required>
+        <n-input v-model:value="model.name" placeholder="Ex.: Cachorro" />
+      </n-form-item>
     </section>
   </n-form>
 </template>
@@ -37,31 +27,29 @@
 import { computed, reactive, ref, watch } from 'vue'
 import type { FormInst, FormRules } from 'naive-ui'
 
-export interface PaymentMethod {
+export interface Species {
   id?: number
   name: string
-  code: string
   isActive: boolean
+  breedsCount?: number
   updatedAt?: string
   createdAt?: string
-  usagesCount?: number
 }
 
 const props = defineProps<{
-  value?: PaymentMethod | null
+  value?: Species | null
   loading?: boolean
 }>()
 
 const emit = defineEmits<{
-  (e: 'submit', payload: PaymentMethod): void
+  (e: 'submit', payload: Species): void
   (e: 'validity-change', valid: boolean): void
 }>()
 
 const formRef = ref<FormInst | null>(null)
-const model = reactive<PaymentMethod>({
+const model = reactive<Species>({
   id: undefined,
   name: '',
-  code: '',
   isActive: true
 })
 
@@ -71,55 +59,28 @@ watch(
     Object.assign(model, {
       id: val?.id,
       name: val?.name ?? '',
-      code: val?.code ?? '',
       isActive: val?.isActive ?? true
     })
   },
   { immediate: true }
 )
 
-const normalizeCode = (value: string) =>
-  String(value || '')
-    .toUpperCase()
-    .replace(/[^A-Z0-9_]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
-
-const onCodeInput = (value: string) => {
-  model.code = normalizeCode(value)
-}
-
 const rules: FormRules = {
   name: {
     required: true,
     trigger: ['blur', 'input'],
     validator: (_rule, value: string) => value?.trim() ? true : new Error('Nome é obrigatório.')
-  },
-  code: {
-    required: true,
-    trigger: ['blur', 'input'],
-    validator: (_rule, value: string) => {
-      if (!value?.trim()) return new Error('Código interno é obrigatório.')
-      if (!/^[A-Z0-9_]+$/.test(value.trim())) {
-        return new Error('Use apenas letras maiúsculas, números e underscore.')
-      }
-      return true
-    }
   }
 }
 
-const isValidLocal = computed(() => {
-  return Boolean(model.name?.trim()) && Boolean(model.code?.trim()) && /^[A-Z0-9_]+$/.test(model.code.trim())
-})
-
+const isValidLocal = computed(() => Boolean(model.name?.trim()))
 watch(isValidLocal, (valid) => emit('validity-change', valid), { immediate: true })
 
 const submit = async () => {
   await formRef.value?.validate()
   emit('submit', {
     ...model,
-    name: model.name.trim(),
-    code: normalizeCode(model.code)
+    name: model.name.trim()
   })
 }
 
@@ -161,19 +122,9 @@ defineExpose({ submit })
   font-weight: 600;
 }
 
-.grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 @media (max-width: 768px) {
   .form-section {
     padding: 12px;
-  }
-
-  .grid {
-    grid-template-columns: 1fr;
   }
 }
 </style>

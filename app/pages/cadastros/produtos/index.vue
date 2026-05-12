@@ -58,17 +58,31 @@
       v-model:show="showModal"
       :mask-closable="false"
       preset="card"
+      class="product-modal"
       style="width: 600px"
     >
       <template #header>
-        <p class="eyebrow" style="margin: 0">{{ editingProduct ? 'Editar Produto / Serviço' : 'Novo Item' }}</p>
+        <div class="modal-head">
+          <h3 class="modal-title">{{ editingProduct ? 'Editar produto / serviço' : 'Novo produto / serviço' }}</h3>
+          <p class="modal-subtitle">
+            {{ editingProduct ? 'Atualize dados, tipo e status do item.' : 'Cadastre um novo produto ou serviço para o catálogo da clínica.' }}
+          </p>
+        </div>
       </template>
       <ProductForm
+        ref="productFormRef"
         :value="editingProduct"
         :loading="saving"
         @submit="handleSubmit"
-        @cancel="closeModal"
       />
+      <template #footer>
+        <div class="modal-actions">
+          <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
+          <n-button type="primary" :loading="saving" @click="submitProductForm">
+            {{ editingProduct ? 'Salvar alterações' : 'Criar produto / serviço' }}
+          </n-button>
+        </div>
+      </template>
     </n-modal>
   </div>
 </template>
@@ -86,6 +100,7 @@ const loading = ref(false)
 const saving = ref(false)
 const showModal = ref(false)
 const editingProduct = ref<Product | null>(null)
+const productFormRef = ref<{ submit: () => Promise<void> } | null>(null)
 const isMobile = ref(false)
 let mediaQuery: MediaQueryList | null = null
 const updateIsMobile = () => { isMobile.value = mediaQuery?.matches ?? false }
@@ -224,6 +239,10 @@ const handleSubmit = async (payload: Product) => {
   }
 }
 
+const submitProductForm = async () => {
+  await productFormRef.value?.submit()
+}
+
 const confirmDelete = (product: Product) => {
   dialog.warning({
     title: 'Confirmar exclusão',
@@ -279,11 +298,130 @@ onBeforeUnmount(() => {
 .eyebrow { font-size: 12px; color: #6b7280; text-transform: uppercase; margin: 0; }
 h1 { margin: 4px 0 0; font-size: 24px; }
 .actions { display: flex; gap: 8px; }
+
+.modal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.modal-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 @media (max-width: 768px) {
   .card-list { display: flex; flex-direction: column; gap: 12px; }
   .entity-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fff; }
   .card-title { margin: 0; font-size: 16px; font-weight: 700; }
   .card-subtitle { margin: 4px 0 0; font-size: 12px; color: #64748b; }
   .card-actions { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .modal-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .modal-actions .n-button {
+    min-height: 44px;
+    width: 100%;
+  }
+}
+</style>
+
+<style>
+:root .n-modal-container:has(.product-modal) .n-modal-body-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:root .n-modal-container:has(.product-modal) .n-modal-body-wrapper > .n-scrollbar,
+:root .n-modal-container:has(.product-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container,
+:root .n-modal-container:has(.product-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container > .n-scrollbar-content {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.product-modal.n-card {
+  --n-padding-top: 0;
+  --n-padding-bottom: 0;
+  --n-padding-left: 0;
+  --n-padding-right: 0;
+  width: 760px !important;
+  max-width: calc(100vw - 24px) !important;
+  max-height: calc(100vh - 48px) !important;
+  max-height: calc(100dvh - 48px) !important;
+  margin: 0 auto !important;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.product-modal.n-card .n-card-header {
+  flex: 0 0 auto;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 16px 20px 12px;
+  z-index: 4;
+}
+
+.product-modal.n-card .n-card__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none !important;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 16px 20px;
+  scroll-padding-bottom: 88px;
+}
+
+.product-modal.n-card .n-card__footer {
+  flex: 0 0 auto;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -6px 14px rgba(15, 23, 42, 0.05);
+  padding: 10px 16px;
+  z-index: 4;
+}
+
+@media (max-width: 768px) {
+  .product-modal.n-card {
+    width: 100% !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100vh - 48px) !important;
+    max-height: calc(100dvh - 48px) !important;
+  }
+
+  .product-modal.n-card .n-card-header {
+    padding: 14px 14px 10px;
+  }
+
+  .product-modal.n-card .n-card__content {
+    padding: 10px 12px 16px;
+    scroll-padding-bottom: 96px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .product-modal.n-card .n-card__footer {
+    padding: 8px 12px;
+  }
 }
 </style>
