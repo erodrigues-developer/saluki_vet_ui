@@ -1,86 +1,161 @@
 <template>
   <div class="page">
     <div class="page-head">
-      <div>
-        <p class="eyebrow">Cadastros</p>
-        <h1>Produtos e Serviços</h1>
+      <div class="head-copy">
+        <p class="eyebrow">CADASTROS</p>
+        <h1>Produtos e serviços</h1>
+        <p class="subhead">Gerencie produtos, serviços, preços, categorias, estoque e disponibilidade da clínica.</p>
       </div>
-      <n-button type="primary" @click="openCreate">
-        Novo Item
-      </n-button>
+      <n-button v-if="!isMobile" type="primary" size="large" class="head-cta" @click="openCreate">Novo produto/serviço</n-button>
     </div>
 
-    <!-- Filtros -->
-    <n-card :bordered="false" size="small" style="margin-bottom: 16px;">
-      <n-form inline :show-feedback="false">
-        <n-form-item label="Nome">
-          <n-input v-model:value="filters.name" placeholder="Buscar por nome" clearable @keyup.enter="handleFilter" />
-        </n-form-item>
-        <n-form-item label="SKU">
-          <n-input v-model:value="filters.sku" placeholder="Buscar por SKU" clearable @keyup.enter="handleFilter" />
-        </n-form-item>
-        <n-form-item label="Tipo">
-          <n-select v-model:value="filters.isService" :options="typeOptions" placeholder="Todos" clearable style="width: 150px" @update:value="handleFilter" />
-        </n-form-item>
-        <n-form-item>
-          <n-button @click="handleFilter" type="info" secondary>Filtrar</n-button>
-        </n-form-item>
-      </n-form>
-    </n-card>
+    <n-button v-if="isMobile" type="primary" size="large" block class="mobile-head-cta" @click="openCreate">Novo produto/serviço</n-button>
 
-    <div v-if="isMobile" class="card-list">
-      <div v-for="item in products" :key="item.id" class="entity-card" @click="openEdit(item)">
-        <p class="card-title">{{ item.name }}</p>
-        <p class="card-subtitle">SKU {{ item.sku || '-' }}</p>
-        <p class="card-subtitle">Preço {{ item.salePrice !== undefined && item.salePrice !== null ? `R$ ${Number(item.salePrice).toFixed(2)}` : '-' }}</p>
-        <div class="card-actions">
-          <n-tag :type="item.isService ? 'info' : 'primary'" :bordered="false" size="small">{{ item.isService ? 'Serviço' : 'Produto' }}</n-tag>
-          <n-button size="small" tertiary type="error" @click.stop="confirmDelete(item)">Excluir</n-button>
-        </div>
-      </div>
+    <div :class="isMobile ? 'summary-grid-mobile summary-grid' : 'summary-grid'">
+      <n-card v-for="card in summaryCards" :key="card.label" size="small" :bordered="false" class="summary-card">
+        <template v-if="loadingSummary">
+          <n-skeleton text style="width: 70%; margin-bottom: 10px" />
+          <n-skeleton text style="width: 36%" />
+        </template>
+        <template v-else>
+          <p class="summary-label">{{ card.label }}</p>
+          <strong :class="isMobile ? 'summary-value-mobile' : 'summary-value'">{{ card.value }}</strong>
+        </template>
+      </n-card>
     </div>
 
-    <div v-else class="table-mobile-wrapper">
-      <n-data-table
-        :loading="loading"
-        :columns="columns"
-        :data="products"
-        :pagination="pagination"
-        :bordered="false"
-        :row-props="rowProps"
-        @update:page="handlePageChange"
-        @update:page-size="handlePageSizeChange"
-        remote
-      />
-    </div>
-
-    <n-modal
-      v-model:show="showModal"
-      :mask-closable="false"
-      preset="card"
-      class="product-modal"
-      style="width: 600px"
-    >
-      <template #header>
-        <div class="modal-head">
-          <h3 class="modal-title">{{ editingProduct ? 'Editar produto / serviço' : 'Novo produto / serviço' }}</h3>
-          <p class="modal-subtitle">
-            {{ editingProduct ? 'Atualize dados, tipo e status do item.' : 'Cadastre um novo produto ou serviço para o catálogo da clínica.' }}
-          </p>
+    <n-card v-if="!isMobile" :bordered="false" size="small" class="filters-card">
+      <template v-if="loading">
+        <div class="filters-skeleton-grid">
+          <n-skeleton text :repeat="2" />
+          <n-skeleton text :repeat="2" />
+          <n-skeleton text :repeat="2" />
+          <n-skeleton text :repeat="2" />
+          <n-skeleton text :repeat="2" />
+          <n-skeleton text :repeat="2" />
         </div>
       </template>
-      <ProductForm
-        ref="productFormRef"
-        :value="editingProduct"
-        :loading="saving"
-        @submit="handleSubmit"
-      />
+      <div v-else class="filters-grid">
+        <n-input v-model:value="filters.name" placeholder="Buscar por nome" clearable @keyup.enter="handleFilter" />
+        <n-input v-model:value="filters.sku" placeholder="Buscar por SKU" clearable @keyup.enter="handleFilter" />
+        <n-select v-model:value="filters.categoryId" :options="categoryOptions" placeholder="Todas as categorias" clearable />
+        <n-select v-model:value="filters.type" :options="typeOptions" placeholder="Tipo" />
+        <n-select v-model:value="filters.status" :options="statusOptions" placeholder="Status" />
+        <n-select v-model:value="filters.stock" :options="stockOptions" placeholder="Estoque" />
+        <div class="filter-actions">
+          <n-button text class="btn-clear" @click="handleClearFilters">Limpar filtros</n-button>
+          <n-button secondary strong class="btn-filter" @click="handleFilter">Filtrar</n-button>
+        </div>
+      </div>
+    </n-card>
+
+    <n-card v-else :bordered="false" size="small" class="filters-card mobile-filters-card">
+      <div class="mobile-filter-top">
+        <n-input v-model:value="mobileSearch" placeholder="Buscar por nome ou SKU" clearable @keyup.enter="applyMobileFilters" />
+        <n-button secondary strong class="mobile-filter-trigger" @click="showMobileFilters = true">Filtros</n-button>
+      </div>
+    </n-card>
+
+    <template v-if="loading">
+      <div class="skeleton-layout" v-if="isMobile">
+        <n-card v-for="i in 3" :key="i" size="small" :bordered="false" class="entity-card"><n-skeleton text :repeat="6" /></n-card>
+      </div>
+      <div v-else class="skeleton-layout">
+        <n-skeleton text :repeat="10" />
+      </div>
+    </template>
+
+    <template v-else>
+      <div v-if="isMobile" class="card-list">
+        <template v-if="items.length">
+          <div v-for="item in items" :key="item.id" class="entity-card" @click="openEdit(item)">
+            <p class="card-title">{{ item.name }}</p>
+            <p class="card-subtitle"><span class="card-line-label">SKU:</span> <span :class="{ 'text-secondary': !item.sku?.trim() }">{{ formatSku(item.sku) }}</span></p>
+            <p class="card-subtitle"><span class="card-line-label">Categoria:</span> {{ formatCategory(item) }}</p>
+            <p class="card-subtitle"><span class="card-line-label">Tipo:</span> {{ item.isService ? 'Serviço' : 'Produto' }}</p>
+            <p class="card-subtitle"><span class="card-line-label">Preço:</span> {{ formatBRL(item.salePrice) }}</p>
+            <p class="card-subtitle"><span class="card-line-label">Estoque:</span> {{ formatStock(item) }}</p>
+            <p class="card-subtitle card-status">
+              <span class="card-line-label">Status:</span>
+              <n-tag :bordered="false" class="status-chip" :style="statusTagStyle(item.isActive)">{{ item.isActive ? 'Ativo' : 'Inativo' }}</n-tag>
+            </p>
+            <p class="card-subtitle card-subtitle-muted"><span class="card-line-label">Atualizado em:</span> {{ formatDate(item.updatedAt || '') || '—' }}</p>
+            <div class="card-actions" @click.stop>
+              <n-button size="small" secondary type="primary" @click="openEdit(item)">Ver item</n-button>
+              <n-dropdown trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
+                <n-button size="small" quaternary class="menu-button">•••</n-button>
+              </n-dropdown>
+            </div>
+          </div>
+          <div class="pagination">
+            <n-pagination
+              :page="pagination.page"
+              :page-size="pagination.limit"
+              :item-count="pagination.total"
+              show-size-picker
+              :page-sizes="[10, 20, 50]"
+              @update:page="onPageChange"
+              @update:page-size="onPageSizeChange"
+            />
+          </div>
+        </template>
+        <n-empty v-else :description="emptyDescription">
+          <template #extra>
+            <n-button v-if="hasActiveFilters" @click="handleClearFilters">Limpar filtros</n-button>
+            <n-button v-else type="primary" @click="openCreate">Novo produto/serviço</n-button>
+          </template>
+        </n-empty>
+      </div>
+
+      <template v-else>
+        <template v-if="items.length">
+          <n-data-table
+            :columns="columns"
+            :data="items"
+            :pagination="tablePagination"
+            :bordered="false"
+            :row-props="rowProps"
+            remote
+            @update:page="onPageChange"
+            @update:page-size="onPageSizeChange"
+          />
+        </template>
+        <n-empty v-else :description="emptyDescription">
+          <template #extra>
+            <n-button v-if="hasActiveFilters" @click="handleClearFilters">Limpar filtros</n-button>
+            <n-button v-else type="primary" @click="openCreate">Novo produto/serviço</n-button>
+          </template>
+        </n-empty>
+      </template>
+    </template>
+
+    <n-drawer v-model:show="showMobileFilters" placement="bottom" height="45%" :trap-focus="false">
+      <n-drawer-content title="Filtros">
+        <div class="mobile-filters-panel">
+          <n-select v-model:value="filters.categoryId" :options="categoryOptions" placeholder="Todas as categorias" clearable />
+          <n-select v-model:value="filters.type" :options="typeOptions" placeholder="Tipo" />
+          <n-select v-model:value="filters.status" :options="statusOptions" placeholder="Status" />
+          <n-select v-model:value="filters.stock" :options="stockOptions" placeholder="Estoque" />
+          <div class="mobile-filter-actions">
+            <n-button text class="btn-clear" @click="handleClearFilters">Limpar filtros</n-button>
+            <n-button type="primary" @click="applyMobileFilters">Aplicar filtros</n-button>
+          </div>
+        </div>
+      </n-drawer-content>
+    </n-drawer>
+
+    <n-modal v-model:show="showModal" :mask-closable="false" preset="card" class="product-modal" style="width: 760px">
+      <template #header>
+        <div class="modal-head">
+          <h3 class="modal-title">{{ editingItem ? 'Editar produto/serviço' : 'Novo produto/serviço' }}</h3>
+          <p class="modal-subtitle">{{ editingItem ? 'Atualize dados, preços, estoque e status do item.' : 'Cadastre um novo produto ou serviço para o catálogo da clínica.' }}</p>
+        </div>
+      </template>
+      <ProductForm ref="productFormRef" :value="editingItem" :loading="saving" @submit="handleSubmit" />
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" @click="submitProductForm">
-            {{ editingProduct ? 'Salvar alterações' : 'Criar produto / serviço' }}
-          </n-button>
+          <n-button type="primary" :loading="saving" @click="submitProductForm">{{ editingItem ? 'Salvar alterações' : 'Criar produto/serviço' }}</n-button>
         </div>
       </template>
     </n-modal>
@@ -88,19 +163,34 @@
 </template>
 
 <script setup lang="ts">
-import { h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { NButton, NTag, useMessage, useDialog } from 'naive-ui'
+import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { format } from 'date-fns'
+import { NButton, NDropdown, NTag, useDialog, useMessage } from 'naive-ui'
 import ProductForm, { type Product } from '~/components/products/ProductForm.vue'
+
+interface ProductsResponse {
+  data: Product[]
+  meta: {
+    page: number
+    limit: number
+    total: number
+  }
+}
 
 const message = useMessage()
 const dialog = useDialog()
 
-const products = ref<Product[]>([])
+const items = ref<Product[]>([])
+const allItems = ref<Product[]>([])
+const categoryOptions = ref<{ label: string; value: number }[]>([])
 const loading = ref(false)
+const loadingSummary = ref(false)
 const saving = ref(false)
 const showModal = ref(false)
-const editingProduct = ref<Product | null>(null)
+const showMobileFilters = ref(false)
+const editingItem = ref<Product | null>(null)
 const productFormRef = ref<{ submit: () => Promise<void> } | null>(null)
+
 const isMobile = ref(false)
 let mediaQuery: MediaQueryList | null = null
 const updateIsMobile = () => { isMobile.value = mediaQuery?.matches ?? false }
@@ -108,132 +198,314 @@ const updateIsMobile = () => { isMobile.value = mediaQuery?.matches ?? false }
 const filters = reactive({
   name: '',
   sku: '',
-  isService: null
+  categoryId: null as number | null,
+  type: 'all' as 'all' | 'product' | 'service',
+  status: 'all' as 'all' | 'active' | 'inactive',
+  stock: 'all' as 'all' | 'in_stock' | 'low' | 'out' | 'na'
 })
 
-const typeOptions = [
-  { label: 'Produto', value: 'false' },
-  { label: 'Serviço', value: 'true' }
-]
+const mobileSearch = ref('')
 
 const pagination = reactive({
   page: 1,
-  pageSize: 10,
-  itemCount: 0,
-  showSizePicker: true,
-  pageSizes: [10, 20, 50]
+  limit: 10,
+  total: 0
 })
 
+const summary = reactive({
+  total: 0,
+  activeProducts: 0,
+  activeServices: 0,
+  criticalStock: 0
+})
+
+const typeOptions = [
+  { label: 'Todos', value: 'all' },
+  { label: 'Produto', value: 'product' },
+  { label: 'Serviço', value: 'service' }
+]
+
+const statusOptions = [
+  { label: 'Todos', value: 'all' },
+  { label: 'Ativo', value: 'active' },
+  { label: 'Inativo', value: 'inactive' }
+]
+
+const stockOptions = [
+  { label: 'Todos', value: 'all' },
+  { label: 'Em estoque', value: 'in_stock' },
+  { label: 'Estoque baixo', value: 'low' },
+  { label: 'Sem estoque', value: 'out' },
+  { label: 'Não aplicável', value: 'na' }
+]
+
+const summaryCards = computed(() => [
+  { label: 'ITENS CADASTRADOS', value: summary.total },
+  { label: 'PRODUTOS ATIVOS', value: summary.activeProducts },
+  { label: 'SERVIÇOS ATIVOS', value: summary.activeServices },
+  { label: 'ESTOQUE CRÍTICO', value: summary.criticalStock }
+])
+
+const tablePagination = computed(() => ({
+  page: pagination.page,
+  pageSize: pagination.limit,
+  itemCount: pagination.total,
+  showSizePicker: true,
+  pageSizes: [10, 20, 50]
+}))
+
+const hasActiveFilters = computed(() => (
+  Boolean(filters.name || filters.sku || filters.categoryId || filters.type !== 'all' || filters.status !== 'all' || filters.stock !== 'all')
+))
+
+const emptyDescription = computed(() => hasActiveFilters.value
+  ? 'Nenhum item encontrado com os filtros aplicados.'
+  : 'Nenhum produto ou serviço encontrado.')
+
+const formatDate = (value: string) => value ? format(new Date(value), 'dd/MM/yyyy HH:mm') : ''
+
+const formatBRL = (value?: number | null) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0))
+
+const formatSku = (value?: string | null) => value?.trim() || 'Sem SKU'
+
+const formatCategory = (item: Product) => item.productCategory?.name || 'Sem categoria'
+
+const getStockState = (item: Product) => {
+  if (item.isService || !item.trackStock) return 'na'
+  const stock = Number(item.currentStock ?? 0)
+  if (stock <= 0) return 'out'
+  if (stock <= 3) return 'critical'
+  if (stock <= 10) return 'low'
+  return 'in_stock'
+}
+
+const stockStateLabel = (state: string) => {
+  if (state === 'critical') return 'Crítico'
+  if (state === 'low') return 'Baixo'
+  if (state === 'out') return 'Sem estoque'
+  return 'Em estoque'
+}
+
+const stockStateClass = (state: string) => {
+  if (state === 'critical' || state === 'out') return 'stock-danger'
+  if (state === 'low') return 'stock-warning'
+  if (state === 'na') return 'text-secondary'
+  return 'stock-ok'
+}
+
+const formatStock = (item: Product) => {
+  if (item.isService || !item.trackStock) return 'Não aplicável'
+  const qty = Number(item.currentStock ?? 0)
+  const unit = (item.unit || 'un').trim() || 'un'
+  const state = getStockState(item)
+  return `${Math.floor(qty)} ${unit} · ${stockStateLabel(state)}`
+}
+
+const typeTagClass = (item: Product) => item.isService ? 'type-service' : 'type-product'
+const statusTagStyle = (isActive: boolean) => (
+  isActive
+    ? '--n-color: #edf7ef; --n-text-color: #28663b; --n-border: 1px solid #d5eadb;'
+    : '--n-color: #f3f4f6; --n-text-color: #374151; --n-border: 1px solid #e5e7eb;'
+)
+
 const columns = [
-  { title: 'SKU', key: 'sku' },
-  { title: 'Nome', key: 'name' },
   {
-    title: 'Categoria',
-    key: 'productCategory.name',
-    render: (row: any) => row.productCategory?.name || '-'
+    title: 'Item',
+    key: 'name',
+    render: (row: Product) => h('div', { class: 'item-cell' }, [
+      h('p', { class: 'item-name' }, row.name),
+      ...(row.notes?.trim() ? [h('p', { class: 'item-subline' }, row.notes)] : [])
+    ])
   },
   {
-    title: 'Preço de Venda',
-    key: 'salePrice',
-    render: (row: Product) => row.salePrice !== undefined && row.salePrice !== null ? `R$ ${Number(row.salePrice).toFixed(2)}` : '-'
+    title: 'SKU',
+    key: 'sku',
+    render: (row: Product) => h('span', { class: row.sku?.trim() ? '' : 'text-secondary' }, formatSku(row.sku))
   },
+  { title: 'Categoria', key: 'category', render: (row: Product) => formatCategory(row) },
   {
     title: 'Tipo',
     key: 'isService',
-    render: (row: Product) =>
-      h(NTag, { type: row.isService ? 'info' : 'primary', bordered: false, size: 'small' }, { default: () => (row.isService ? 'Serviço' : 'Produto') })
+    render: (row: Product) => h(NTag, { bordered: false, class: ['type-chip', typeTagClass(row)] }, { default: () => row.isService ? 'Serviço' : 'Produto' })
   },
+  { title: 'Preço de venda', key: 'salePrice', render: (row: Product) => formatBRL(Number(row.salePrice || 0)) },
   {
     title: 'Estoque',
     key: 'currentStock',
-    render: (row: any) => row.trackStock ? Number(row.currentStock ?? 0).toFixed(3) : '-'
+    render: (row: Product) => {
+      const state = getStockState(row)
+      return h('span', { class: stockStateClass(state) }, formatStock(row))
+    }
   },
   {
     title: 'Status',
     key: 'isActive',
-    render: (row: Product) =>
-      h(NTag, { type: row.isActive ? 'success' : 'error', bordered: false, size: 'small' }, { default: () => (row.isActive ? 'Ativo' : 'Inativo') })
+    render: (row: Product) => h(NTag, { bordered: false, class: 'status-chip', style: statusTagStyle(row.isActive) }, { default: () => row.isActive ? 'Ativo' : 'Inativo' })
   },
+  { title: 'Atualizado em', key: 'updatedAt', render: (row: Product) => formatDate(String(row.updatedAt || '')) || '—' },
   {
     title: 'Ações',
     key: 'actions',
-    width: 100,
-    render: (row: Product) =>
-      h('div', { class: 'actions', style: 'justify-content: flex-end;' }, [
-        h(NButton, {
+    render: (row: Product) => h('div', { class: 'table-actions' }, [
+      h(NButton, {
+        size: 'small',
+        secondary: true,
+        type: 'primary',
+        onClick: (e) => {
+          e.stopPropagation()
+          openEdit(row)
+        }
+      }, { default: () => 'Ver item' }),
+      h(NDropdown, {
+        trigger: 'click',
+        options: buildActionOptions(row),
+        onSelect: (key: string) => handleActionSelect(key, row)
+      }, {
+        default: () => h(NButton, {
           size: 'small',
-          tertiary: true,
-          type: 'error',
-          onClick: (e) => {
-            e.stopPropagation()
-            confirmDelete(row)
-          }
-        }, { default: () => 'Excluir' })
-      ])
+          quaternary: true,
+          class: 'menu-button',
+          onClick: (e) => e.stopPropagation()
+        }, { default: () => '•••' })
+      })
+    ])
   }
 ]
 
-const fetchProducts = async () => {
+const buildActionOptions = (item: Product) => [
+  { label: 'Editar', key: 'edit' },
+  { label: item.isActive ? 'Inativar' : 'Ativar', key: 'toggleStatus' },
+  { type: 'divider', key: `divider-${item.id}` },
+  { label: 'Excluir', key: 'delete' }
+]
+
+const handleActionSelect = (key: string, item: Product) => {
+  if (key === 'edit') return openEdit(item)
+  if (key === 'toggleStatus') return item.isActive ? confirmDeactivate(item) : confirmReactivate(item)
+  if (key === 'delete') return confirmDelete(item)
+}
+
+const matchesStockFilter = (item: Product) => {
+  if (filters.stock === 'all') return true
+  const state = getStockState(item)
+  if (filters.stock === 'na') return state === 'na'
+  if (filters.stock === 'out') return state === 'out'
+  if (filters.stock === 'low') return state === 'low' || state === 'critical'
+  if (filters.stock === 'in_stock') return state === 'in_stock'
+  return true
+}
+
+const applyClientSideFilters = (list: Product[]) => list.filter((item) => {
+  if (filters.stock !== 'all' && !matchesStockFilter(item)) return false
+  return true
+})
+
+const fetchCategories = async () => {
+  try {
+    const api = useApi()
+    const res = await api<any>('/api/v1/product-categories?limit=100')
+    categoryOptions.value = [{ label: 'Todas as categorias', value: -1 }, ...(res.data || []).map((c: any) => ({ label: c.name, value: Number(c.id) }))]
+  } catch {
+    categoryOptions.value = [{ label: 'Todas as categorias', value: -1 }]
+  }
+}
+
+const fetchSummary = async () => {
+  loadingSummary.value = true
+  try {
+    const api = useApi()
+    const res = await api<ProductsResponse>('/api/v1/products', {
+      query: {
+        page: 1,
+        limit: 500,
+        name: filters.name || undefined,
+        sku: filters.sku || undefined,
+        productCategoryId: filters.categoryId || undefined,
+        isService: filters.type === 'all' ? undefined : filters.type === 'service',
+        isActive: filters.status === 'all' ? undefined : filters.status === 'active',
+        sortBy: 'updatedAt',
+        sortDirection: 'desc'
+      }
+    })
+    allItems.value = applyClientSideFilters(res.data || [])
+    summary.total = allItems.value.length
+    summary.activeProducts = allItems.value.filter((item) => !item.isService && item.isActive).length
+    summary.activeServices = allItems.value.filter((item) => item.isService && item.isActive).length
+    summary.criticalStock = allItems.value.filter((item) => !item.isService && ['critical', 'out'].includes(getStockState(item))).length
+  } catch {
+    summary.total = 0
+    summary.activeProducts = 0
+    summary.activeServices = 0
+    summary.criticalStock = 0
+  } finally {
+    loadingSummary.value = false
+  }
+}
+
+const fetchItems = async () => {
   loading.value = true
   try {
-    const queryParams: any = {
-      page: pagination.page,
-      limit: pagination.pageSize
-    }
-    if (filters.name) queryParams.name = filters.name
-    if (filters.sku) queryParams.sku = filters.sku
-    if (filters.isService !== null) queryParams.isService = filters.isService
-
     const api = useApi()
-    const res = await api<any>('/api/v1/products', {
-      query: queryParams
+    const res = await api<ProductsResponse>('/api/v1/products', {
+      query: {
+        page: pagination.page,
+        limit: pagination.limit,
+        name: filters.name || undefined,
+        sku: filters.sku || undefined,
+        productCategoryId: filters.categoryId || undefined,
+        isService: filters.type === 'all' ? undefined : filters.type === 'service',
+        isActive: filters.status === 'all' ? undefined : filters.status === 'active',
+        sortBy: 'updatedAt',
+        sortDirection: 'desc'
+      }
     })
-    products.value = res.data
-    pagination.itemCount = res.meta.total
-  } catch (err) {
-    message.error('Erro ao buscar produtos e serviços')
+
+    const filtered = applyClientSideFilters(res.data || [])
+    items.value = filtered
+    pagination.total = Number(res.meta.total || 0)
+
+    if (filters.stock !== 'all') {
+      const estimatedTotal = Math.max(filtered.length, Math.min(Number(res.meta.total || 0), pagination.page * pagination.limit))
+      pagination.total = estimatedTotal
+    }
+
+    await fetchSummary()
+  } catch (err: any) {
+    message.error(err?.data?.message || 'Erro ao buscar produtos e serviços')
   } finally {
     loading.value = false
   }
 }
 
-const handleFilter = () => {
-  pagination.page = 1
-  fetchProducts()
-}
-
-const handlePageChange = (p: number) => {
-  pagination.page = p
-  fetchProducts()
-}
-
-const handlePageSizeChange = (s: number) => {
-  pagination.pageSize = s
-  pagination.page = 1
-  fetchProducts()
-}
-
 const handleSubmit = async (payload: Product) => {
   saving.value = true
   const api = useApi()
+
   try {
-    if (payload.id) {
-      await api(`/api/v1/products/${payload.id}`, {
+    const { id, ...body } = payload
+
+    if (id) {
+      await api(`/api/v1/products/${id}`, {
         method: 'PATCH',
-        body: payload
+        body
       })
       message.success('Item atualizado')
     } else {
       await api('/api/v1/products', {
         method: 'POST',
-        body: payload
+        body
       })
       message.success('Item criado')
     }
+
     closeModal()
-    fetchProducts()
+    await fetchItems()
   } catch (err: any) {
-    message.error(err?.data?.message || 'Erro ao salvar item')
+    const apiMessage = Array.isArray(err?.data?.message)
+      ? err.data.message.join(', ')
+      : err?.data?.message
+
+    message.error(apiMessage || 'Erro ao salvar item')
   } finally {
     saving.value = false
   }
@@ -243,32 +515,82 @@ const submitProductForm = async () => {
   await productFormRef.value?.submit()
 }
 
-const confirmDelete = (product: Product) => {
+const confirmDeactivate = (item: Product) => {
+  if (!item.id) return
+
+  dialog.warning({
+    title: 'Confirmar inativação',
+    content: `Deseja inativar o item ${item.name}?`,
+    positiveText: 'Inativar',
+    negativeText: 'Cancelar',
+    onPositiveClick: async () => {
+      const api = useApi()
+      try {
+        await api(`/api/v1/products/${item.id}`, {
+          method: 'PATCH',
+          body: { isActive: false }
+        })
+        message.success('Item inativado')
+        await fetchItems()
+      } catch (err: any) {
+        message.error(err?.data?.message || 'Erro ao inativar item')
+      }
+    }
+  })
+}
+
+const confirmReactivate = (item: Product) => {
+  if (!item.id) return
+
+  dialog.success({
+    title: 'Confirmar ativação',
+    content: `Deseja ativar o item ${item.name}?`,
+    positiveText: 'Ativar',
+    negativeText: 'Cancelar',
+    onPositiveClick: async () => {
+      const api = useApi()
+      try {
+        await api(`/api/v1/products/${item.id}`, {
+          method: 'PATCH',
+          body: { isActive: true }
+        })
+        message.success('Item ativado')
+        await fetchItems()
+      } catch (err: any) {
+        message.error(err?.data?.message || 'Erro ao ativar item')
+      }
+    }
+  })
+}
+
+const confirmDelete = (item: Product) => {
+  if (!item.id) return
+
   dialog.warning({
     title: 'Confirmar exclusão',
-    content: `Deseja excluir o item ${product.name}?`,
+    content: `Deseja excluir o item ${item.name}?`,
     positiveText: 'Excluir',
     negativeText: 'Cancelar',
     onPositiveClick: async () => {
       const api = useApi()
       try {
-        await api(`/api/v1/products/${product.id}`, { method: 'DELETE' })
+        await api(`/api/v1/products/${item.id}`, { method: 'DELETE' })
         message.success('Item excluído')
-        fetchProducts()
+        await fetchItems()
       } catch (err: any) {
-        message.error(err?.data?.message || 'Erro ao excluir item')
+        message.error(err?.data?.message || 'Não foi possível excluir o item.')
       }
     }
   })
 }
 
 const openCreate = () => {
-  editingProduct.value = null
+  editingItem.value = null
   showModal.value = true
 }
 
-const openEdit = (product: Product) => {
-  editingProduct.value = product
+const openEdit = (item: Product) => {
+  editingItem.value = item
   showModal.value = true
 }
 
@@ -276,17 +598,56 @@ const closeModal = () => {
   showModal.value = false
 }
 
+const onPageChange = (page: number) => {
+  pagination.page = page
+  fetchItems()
+}
+
+const onPageSizeChange = (size: number) => {
+  pagination.limit = size
+  pagination.page = 1
+  fetchItems()
+}
+
+const handleFilter = () => {
+  pagination.page = 1
+  fetchItems()
+}
+
+const handleClearFilters = () => {
+  filters.name = ''
+  filters.sku = ''
+  filters.categoryId = null
+  filters.type = 'all'
+  filters.status = 'all'
+  filters.stock = 'all'
+  mobileSearch.value = ''
+  pagination.page = 1
+  showMobileFilters.value = false
+  fetchItems()
+}
+
+const applyMobileFilters = () => {
+  const search = (mobileSearch.value || '').trim()
+  filters.name = search
+  filters.sku = ''
+  pagination.page = 1
+  showMobileFilters.value = false
+  fetchItems()
+}
+
 const rowProps = (row: Product) => ({
   style: { cursor: 'pointer' },
   onClick: () => openEdit(row)
 })
 
-onMounted(() => {
+onMounted(async () => {
   mediaQuery = window.matchMedia('(max-width: 768px)')
   updateIsMobile()
   mediaQuery.addEventListener('change', updateIsMobile)
-  fetchProducts()
+  await Promise.all([fetchCategories(), fetchItems()])
 })
+
 onBeforeUnmount(() => {
   mediaQuery?.removeEventListener('change', updateIsMobile)
 })
@@ -294,53 +655,91 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .page { display: flex; flex-direction: column; gap: 16px; }
-.page-head { display: flex; justify-content: space-between; align-items: center; }
-.eyebrow { font-size: 12px; color: #6b7280; text-transform: uppercase; margin: 0; }
-h1 { margin: 4px 0 0; font-size: 24px; }
-.actions { display: flex; gap: 8px; }
+.page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.head-copy { display: flex; flex-direction: column; gap: 4px; }
+.eyebrow { margin: 0; font-size: 12px; color: #6b7280; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+h1 { margin: 0; font-size: 30px; line-height: 1.1; }
+.subhead { margin: 0; color: #64748b; font-size: 14px; }
+.mobile-head-cta { margin-top: -4px; }
 
-.modal-head {
+.summary-grid { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.summary-grid-mobile { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.summary-card { border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; min-height: 112px; }
+.summary-card :deep(.n-card__content) {
+  padding: 14px 16px !important;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  justify-content: space-between;
 }
+.summary-label { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; font-weight: 500; }
+.summary-value { display: block; margin-top: 10px; font-size: 32px; font-weight: 700; color: #111827; line-height: 1; }
+.summary-value-mobile { display: block; margin-top: 8px; font-size: 26px; line-height: 1; font-weight: 700; color: #111827; }
 
-.modal-title {
-  margin: 0;
-  font-size: 24px;
-  line-height: 1.2;
-  color: #0f172a;
-  font-weight: 700;
-}
+.filters-card { border-radius: 14px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+.filters-grid { display: grid; grid-template-columns: repeat(6, minmax(120px, 1fr)); gap: 12px; align-items: center; }
+.filter-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.filters-skeleton-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.btn-clear { color: #6b7280; font-weight: 500; }
+.btn-filter { width: 112px; }
+:deep(.btn-filter.n-button) { border: 1px solid #334155; color: #1e293b; }
 
-.modal-subtitle {
-  margin: 0;
-  font-size: 13px;
-  color: #64748b;
-}
+.skeleton-layout { display: grid; gap: 10px; }
 
-.modal-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
+:deep(.n-data-table) { border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
+:deep(.n-data-table-th) { font-weight: 600; color: #374151; }
+:deep(.n-data-table-tr:hover td) { background: #f8fafc; }
+:deep(.n-data-table-td) { padding-top: 6px !important; padding-bottom: 6px !important; line-height: 1.15; }
+:deep(.n-data-table-th), :deep(.n-data-table-td) { white-space: nowrap; word-break: normal; }
+
+.item-cell { display: flex; flex-direction: column; gap: 4px; }
+.item-name { margin: 0; font-weight: 700; color: #0f172a; }
+.item-subline { margin: 0; font-size: 12px; color: #64748b; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.text-secondary { color: #94a3b8; font-weight: 400; }
+.stock-ok { color: #28663b; }
+.stock-warning { color: #a16207; }
+.stock-danger { color: #b91c1c; font-weight: 600; }
+
+.type-chip, .status-chip {
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  line-height: 1.15;
+  border: 1px solid transparent;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
 }
+.type-product { background: #edf7ef !important; color: #28663b !important; border-color: #d5eadb !important; }
+.type-service { background: #eef2f7 !important; color: #334155 !important; border-color: #dbe2ea !important; }
+
+.table-actions { display: flex; align-items: center; gap: 8px; }
+
+.card-list { display: flex; flex-direction: column; gap: 12px; }
+.entity-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fff; }
+.card-title { margin: 0; font-size: 16px; font-weight: 700; }
+.card-subtitle { margin: 4px 0 0; font-size: 12px; color: #334155; }
+.card-subtitle-muted { color: #64748b; }
+.card-line-label { color: #64748b; font-weight: 500; }
+.card-status { display: flex; align-items: center; gap: 6px; }
+.card-actions { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pagination { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+
+.mobile-filter-top { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.mobile-filters-panel { display: grid; gap: 10px; }
+.mobile-filter-actions { margin-top: 2px; display: flex; justify-content: flex-end; gap: 8px; }
+
+.modal-head { display: flex; flex-direction: column; gap: 4px; }
+.modal-title { margin: 0; font-size: 24px; line-height: 1.2; color: #0f172a; font-weight: 700; }
+.modal-subtitle { margin: 0; font-size: 13px; color: #64748b; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
 @media (max-width: 768px) {
-  .card-list { display: flex; flex-direction: column; gap: 12px; }
-  .entity-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fff; }
-  .card-title { margin: 0; font-size: 16px; font-weight: 700; }
-  .card-subtitle { margin: 4px 0 0; font-size: 12px; color: #64748b; }
-  .card-actions { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .modal-actions {
-    width: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-  .modal-actions .n-button {
-    min-height: 44px;
-    width: 100%;
-  }
+  .page-head { gap: 10px; }
+  h1 { font-size: 26px; }
+  .subhead { font-size: 13px; }
+  .modal-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .modal-actions .n-button { min-height: 44px; width: 100%; }
 }
 </style>
 
@@ -364,7 +763,7 @@ h1 { margin: 4px 0 0; font-size: 24px; }
   --n-padding-bottom: 0;
   --n-padding-left: 0;
   --n-padding-right: 0;
-  width: 760px !important;
+  width: 900px !important;
   max-width: calc(100vw - 24px) !important;
   max-height: calc(100vh - 48px) !important;
   max-height: calc(100dvh - 48px) !important;

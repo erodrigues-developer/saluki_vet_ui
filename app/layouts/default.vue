@@ -3,9 +3,14 @@
     <NMessageProvider>
       <NDialogProvider>
         <div class="layout" @touchstart="onEdgeTouchStart" @touchmove="onEdgeTouchMove" @touchend="onEdgeTouchEnd">
-          <Sidebar v-if="!isMobile" :items="menuItems" />
+          <Sidebar
+            v-if="!isMobile"
+            :items="menuItems"
+            @pinned-change="sidebarPinned = $event"
+            @expanded-change="sidebarExpanded = $event"
+          />
 
-          <main class="content">
+          <main class="content" :class="{ 'sidebar-expanded': sidebarExpanded }">
             <header class="topbar" :class="{ mobile: isMobile }">
               <template v-if="!isMobile">
                 <div class="topbar-left" ref="searchWrapRef">
@@ -74,9 +79,11 @@
               </template>
 
               <template v-else>
-                <button type="button" class="menu-btn" aria-label="Abrir menu" @click="openSidebar">☰</button>
+                <button type="button" class="menu-btn" aria-label="Abrir menu" @click="openSidebar">
+                  <PanelLeft :size="20" />
+                </button>
                 <div class="mobile-brand">
-                  <span class="brand-icon">🛡️</span>
+                  <span class="brand-icon"><ShieldCheck :size="16" :stroke-width="2" /></span>
                   <span class="brand-name">SalukiVet</span>
                 </div>
                 <div class="mobile-actions">
@@ -153,12 +160,39 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import {
+  BadgePercent,
+  BarChart3,
+  Building2,
+  CalendarCog,
+  CalendarDays,
+  ClipboardList,
+  CircleDollarSign,
+  CreditCard,
+  Dna,
+  FolderKanban,
+  Hospital,
+  Package,
+  PanelLeft,
+  PawPrint,
+  ReceiptText,
+  Settings,
+  ShieldCheck,
+  ShoppingCart,
+  Stethoscope,
+  Tags,
+  Truck,
+  UserCog,
+  Users
+} from 'lucide-vue-next'
 import { NAvatar, NBadge, NButton, NConfigProvider, NDialogProvider, NDropdown, NInput, NMessageProvider, NModal, NSelect, datePtBR, ptBR } from 'naive-ui'
 import Sidebar from '~/components/Sidebar.vue'
 import { useAuthStore } from '~/stores/auth'
 
 const isMobile = ref(false)
 const sidebarOpen = ref(false)
+const sidebarPinned = ref(false)
+const sidebarExpanded = ref(false)
 const searchOpen = ref(false)
 const notificationOpen = ref(false)
 const mobileSearchOpen = ref(false)
@@ -175,6 +209,9 @@ const updateIsMobile = () => {
   if (!isMobile.value) {
     sidebarOpen.value = false
     mobileSearchOpen.value = false
+  } else {
+    sidebarPinned.value = false
+    sidebarExpanded.value = false
   }
 }
 
@@ -373,6 +410,13 @@ const handleDocumentClick = (event) => {
   }
 }
 
+const handleDocumentKeydown = (event) => {
+  if (event.key !== 'Escape') return
+  if (isMobile.value && sidebarOpen.value) {
+    closeSidebar()
+  }
+}
+
 onMounted(() => {
   if (typeof window === 'undefined') return
   mediaQuery = window.matchMedia('(max-width: 900px)')
@@ -383,6 +427,7 @@ onMounted(() => {
     mediaQuery.addListener(updateIsMobile)
   }
   document.addEventListener('click', handleDocumentClick)
+  document.addEventListener('keydown', handleDocumentKeydown)
 })
 
 onBeforeUnmount(() => {
@@ -395,56 +440,57 @@ onBeforeUnmount(() => {
   }
   if (typeof document !== 'undefined') {
     document.removeEventListener('click', handleDocumentClick)
+    document.removeEventListener('keydown', handleDocumentKeydown)
     document.body.style.overflow = ''
   }
 })
 
 const menuItems = [
-  { label: 'Dashboard', icon: '📊', to: '/' },
+  { label: 'Dashboard', icon: BarChart3, to: '/' },
   {
     label: 'Atendimentos',
-    icon: '🩺',
+    icon: Stethoscope,
     children: [
-      { label: 'Agendamentos', icon: '📅', to: '/atendimento/agendamentos' },
-      { label: 'Consultas', icon: '📋', to: '/atendimento/consultas' },
-      { label: 'Internação', icon: '🏥', to: '/atendimento/internacao' }
+      { label: 'Agendamentos', icon: CalendarDays, to: '/atendimento/agendamentos' },
+      { label: 'Consultas', icon: ClipboardList, to: '/atendimento/consultas' },
+      { label: 'Internação', icon: Hospital, to: '/atendimento/internacao' }
     ]
   },
   {
     label: 'Pets',
-    icon: '🐾',
-    children: [{ label: 'Cadastro de pets', icon: '🐶', to: '/pets' }]
+    icon: PawPrint,
+    children: [{ label: 'Cadastro de pets', icon: PawPrint, to: '/pets' }]
   },
-  { label: 'Clientes', icon: '👥', to: '/clientes' },
+  { label: 'Clientes', icon: Users, to: '/clientes' },
   {
     label: 'Financeiro',
-    icon: '💰',
+    icon: CircleDollarSign,
     children: [
-      { label: 'Contas a Pagar', icon: '🧾', to: '/financeiro/contas-a-pagar' },
-      { label: 'Vendas', icon: '💳', to: '/financeiro/vendas' },
-      { label: 'Comissões', icon: '🪙', to: '/financeiro/comissoes' }
+      { label: 'Contas a pagar', icon: ReceiptText, to: '/financeiro/contas-a-pagar' },
+      { label: 'Vendas', icon: ShoppingCart, to: '/financeiro/vendas' },
+      { label: 'Comissões', icon: BadgePercent, to: '/financeiro/comissoes' }
     ]
   },
   {
     label: 'Cadastros',
-    icon: '🗂️',
+    icon: FolderKanban,
     children: [
-      { label: 'Usuários e permissões', icon: '🛡️', to: '/usuarios' },
-      { label: 'Tipos de agendamento', icon: '🗓️', to: '/cadastros/tipos-agendamento' },
-      { label: 'Categorias de produto', icon: '🏷️', to: '/cadastros/categorias-produto' },
-      { label: 'Fornecedores', icon: '🏭', to: '/cadastros/fornecedores' },
-      { label: 'Produtos e Serviços', icon: '📦', to: '/cadastros/produtos' },
-      { label: 'Procedimentos médicos', icon: '🩺', to: '/cadastros/procedimentos' },
-      { label: 'Formas de Pagamento', icon: '💲', to: '/cadastros/formas-pagamento' },
-      { label: 'Espécies', icon: '🧬', to: '/tabelas/especies' },
-      { label: 'Raças', icon: '🐕', to: '/tabelas/racas' },
-      { label: 'Status', icon: '✅', to: '/tabelas/status' }
+      { label: 'Usuários e permissões', icon: UserCog, to: '/usuarios' },
+      { label: 'Tipos de agendamento', icon: CalendarCog, to: '/cadastros/tipos-agendamento' },
+      { label: 'Categorias de produto', icon: Tags, to: '/cadastros/categorias-produto' },
+      { label: 'Fornecedores', icon: Truck, to: '/cadastros/fornecedores' },
+      { label: 'Produtos e serviços', icon: Package, to: '/cadastros/produtos' },
+      { label: 'Procedimentos médicos', icon: Stethoscope, to: '/cadastros/procedimentos' },
+      { label: 'Formas de pagamento', icon: CreditCard, to: '/cadastros/formas-pagamento' },
+      { label: 'Espécies', icon: Dna, to: '/tabelas/especies' },
+      { label: 'Raças', icon: Tags, to: '/tabelas/racas' },
+      { label: 'Status', icon: ClipboardList, to: '/tabelas/status' }
     ]
   },
   {
     label: 'Configurações',
-    icon: '⚙️',
-    children: [{ label: 'Clínica', icon: '🏥', to: '/configuracoes/clinica' }]
+    icon: Settings,
+    children: [{ label: 'Clínica', icon: Building2, to: '/configuracoes/clinica' }]
   }
 ]
 </script>
@@ -457,9 +503,12 @@ const menuItems = [
   overflow-x: hidden;
 }
 
+:global(:root) {
+  --sidebar-collapsed-width: 72px;
+  --sidebar-expanded-width: 256px;
+}
+
 .layout {
-  display: grid;
-  grid-template-columns: auto 1fr;
   min-height: 100vh;
   background: #f4f6fb;
   position: relative;
@@ -467,14 +516,20 @@ const menuItems = [
 
 .content {
   padding: 0 24px 24px;
+  margin-left: var(--sidebar-collapsed-width);
   min-width: 0;
   overflow-x: hidden;
+  transition: margin-left 0.2s ease;
+}
+
+.content.sidebar-expanded {
+  margin-left: var(--sidebar-expanded-width);
 }
 
 .topbar {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 40;
   height: 64px;
   background: #f4f6fb;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
@@ -693,7 +748,7 @@ const menuItems = [
   top: 0;
   left: 0;
   height: 100%;
-  width: min(300px, 86vw);
+  width: min(320px, 82vw);
   background: #f4f6fb;
   box-shadow: 4px 0 18px rgba(15, 23, 42, 0.22);
   transform: translateX(-100%);
@@ -761,12 +816,9 @@ const menuItems = [
 }
 
 @media (max-width: 900px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-
   .content {
     padding: 0 14px 18px;
+    margin-left: 0;
   }
 
   .topbar.mobile {

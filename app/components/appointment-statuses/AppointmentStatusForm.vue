@@ -7,28 +7,34 @@
     :show-require-mark="false"
     :disabled="loading || model.isSystem"
   >
-    <div class="grid">
-      <n-form-item label="Nome" path="name" required class="full-row">
-        <n-input v-model:value="model.name" placeholder="Ex: Aguardando Resultados, Em Cirurgia..." />
-      </n-form-item>
+    <n-card size="small" :bordered="false" class="form-card">
+      <template #header>Informações do status</template>
+      <div class="grid">
+        <n-form-item label="Nome" path="name" required class="full-row">
+          <n-input v-model:value="model.name" placeholder="Ex: Aguardando Resultados, Em Cirurgia..." />
+        </n-form-item>
 
-      <n-form-item label="Código (Único)" path="code" required class="full-row">
-        <n-input
-          v-model:value="model.code"
-          placeholder="Ex: WAITING_RESULTS"
-          style="text-transform: uppercase;"
-          :disabled="!!model.id"
-          @input="onCodeInput"
-        />
-      </n-form-item>
+        <n-form-item label="Código (Único)" path="code" required class="full-row">
+          <n-input
+            v-model:value="model.code"
+            placeholder="Ex: WAITING_RESULTS"
+            style="text-transform: uppercase;"
+            :disabled="!!model.id"
+            @input="onCodeInput"
+          />
+        </n-form-item>
 
-      <n-form-item v-if="model.isSystem" class="full-row">
-        <n-alert type="warning" :show-icon="false">
-          Este é um status do sistema e não pode ser editado nem removido.
-        </n-alert>
-      </n-form-item>
-    </div>
+        <n-form-item label="Tipo" class="full-row">
+          <n-input :value="model.isSystem ? 'Sistema' : 'Personalizado'" disabled />
+        </n-form-item>
 
+        <n-form-item v-if="model.isSystem" class="full-row">
+          <n-alert type="info" :show-icon="false">
+            Este é um status nativo do sistema e não pode ser editado.
+          </n-alert>
+        </n-form-item>
+      </div>
+    </n-card>
   </n-form>
 </template>
 
@@ -100,6 +106,11 @@ defineExpose({ submit })
   gap: 12px;
   grid-template-columns: 1fr;
   margin-top: 6px;
+}
+
+.form-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
 }
 
 .full-row {
