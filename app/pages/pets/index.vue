@@ -82,7 +82,7 @@
     <n-card v-else :bordered="false" size="small" class="filters-card mobile-filters-card">
       <div class="mobile-filter-top">
         <n-input v-model:value="filters.name" placeholder="Buscar pet ou microchip" clearable />
-        <n-button secondary strong class="mobile-filter-trigger" @click="showMobileFilters = true">🔎 Filtros</n-button>
+        <n-button secondary strong class="mobile-filter-trigger" @click="showMobileFilters = true"><span class="inline-icon-label"><AppIcon name="search" :size="16" :stroke-width="2" /><span>Filtros</span></span></n-button>
       </div>
     </n-card>
 
@@ -110,7 +110,7 @@
         <div class="card-actions" @click.stop>
           <n-button size="small" secondary type="primary" @click="openEdit(pet)">Ver ficha</n-button>
           <n-dropdown trigger="click" :options="actionOptions" @select="(key: string) => handleActionSelect(key, pet)">
-            <n-button size="small" quaternary class="menu-button">•••</n-button>
+            <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
           </n-dropdown>
         </div>
       </div>
@@ -413,7 +413,7 @@ const columns = [
                   class: 'menu-button',
                   onClick: (e) => e.stopPropagation()
                 },
-                { default: () => '•••' }
+                { default: () => '⋯' }
               )
           }
         )

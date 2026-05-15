@@ -2,7 +2,7 @@
   <div class="message" :class="message.role">
     <div v-if="message.role === 'user'" class="bubble user-bubble">{{ message.content }}</div>
     <div v-else class="assistant-wrap">
-      <span class="assistant-icon">✨</span>
+      <span class="assistant-icon"><AppIcon name="sparkles" :size="14" :stroke-width="2" /></span>
       <DashboardAiInsightCard v-if="message.response" :response="message.response" @run-action="$emit('runAction', $event)" />
       <div v-else class="bubble">{{ message.content }}</div>
     </div>

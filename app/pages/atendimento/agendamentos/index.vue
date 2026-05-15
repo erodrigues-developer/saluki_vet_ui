@@ -14,22 +14,22 @@
 
     <div v-if="!isMobile" class="summary-grid">
       <n-card size="small" :bordered="false" class="summary-card">
-        <p class="summary-icon">📅</p>
+        <p class="summary-icon"><AppIcon name="calendar-days" :size="14" :stroke-width="2" /></p>
         <p class="summary-label">Hoje</p>
         <strong class="summary-value">{{ summary.today }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card">
-        <p class="summary-icon">🕒</p>
+        <p class="summary-icon"><AppIcon name="clock" :size="14" :stroke-width="2" /></p>
         <p class="summary-label">Check-ins pendentes</p>
         <strong class="summary-value">{{ summary.awaitingCheckIn }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card summary-card-alert">
-        <p class="summary-icon">⚠️</p>
+        <p class="summary-icon"><AppIcon name="alert-triangle" :size="14" :stroke-width="2" /></p>
         <p class="summary-label">Em atraso</p>
         <strong class="summary-value">{{ summary.overdue }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card summary-card-danger">
-        <p class="summary-icon">🚨</p>
+        <p class="summary-icon"><AppIcon name="siren" :size="14" :stroke-width="2" /></p>
         <p class="summary-label">Urgentes</p>
         <strong class="summary-value">{{ summary.urgent }}</strong>
       </n-card>
@@ -72,7 +72,7 @@
     <n-card v-else :bordered="false" size="small" class="filters-card mobile-filters-card">
       <div class="mobile-filter-top">
         <n-input v-model:value="filters.search" placeholder="Buscar tutor, pet ou telefone" clearable />
-        <n-button secondary strong class="mobile-filter-trigger" @click="showMobileFilters = true">🔎 Filtros</n-button>
+        <n-button secondary strong class="mobile-filter-trigger" @click="showMobileFilters = true"><span class="inline-icon-label"><AppIcon name="search" :size="16" :stroke-width="2" /><span>Filtros</span></span></n-button>
       </div>
       <div v-if="activeFilterChips.length" class="mobile-filter-chips">
         <button v-for="chip in activeFilterChips" :key="chip.key" class="chip-btn" type="button" @click="removeFilterChip(chip.key)">
@@ -122,7 +122,7 @@
           <div class="card-actions">
             <n-button size="small" secondary type="primary" :disabled="row.status?.code === 'ARRIVED'" @click.stop="openCheckIn(row)">Check-in</n-button>
             <n-dropdown trigger="click" :options="actionOptionsFor()" @select="(key: string) => handleActionSelect(key, row)">
-              <n-button size="small" quaternary class="menu-button">•••</n-button>
+              <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
             </n-dropdown>
           </div>
         </div>
@@ -593,7 +593,7 @@ const columns = [
           quaternary: true,
           class: 'menu-button',
           onClick: (e) => e.stopPropagation()
-        }, { default: () => '•••' })
+        }, { default: () => '⋯' })
       })
     ])
   }

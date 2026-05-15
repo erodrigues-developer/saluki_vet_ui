@@ -3,7 +3,7 @@
     <NDrawerContent closable class="ai-assistant-shell ai-assistant-drawer" @close="openModel = false">
       <template #header>
         <div class="modal-head">
-          <h3 class="title">✨ Assistente inteligente</h3>
+          <h3 class="title"><span class="inline-icon-label"><AppIcon name="sparkles" :size="16" :stroke-width="2" /><span>Assistente inteligente</span></span></h3>
           <p class="subtitle">Insights operacionais baseados no dashboard atual.</p>
         </div>
       </template>
@@ -16,7 +16,7 @@
         </div>
 
         <button class="generate-btn" type="button" :disabled="loading" @click="$emit('generate')">
-          ✨ {{ loading ? 'Analisando indicadores...' : 'Gerar análise do dashboard' }}
+          <span class="inline-icon-label"><AppIcon name="sparkles" :size="14" :stroke-width="2" /><span>{{ loading ? 'Analisando indicadores...' : 'Gerar análise do dashboard' }}</span></span>
         </button>
 
         <DashboardAiSuggestedQuestions :questions="suggestedQuestions" @select="$emit('selectQuestion', $event)" />
@@ -52,7 +52,7 @@
   <NModal v-else v-model:show="openModel" preset="card" class="ai-assistant-shell ai-assistant-modal">
     <template #header>
       <div class="modal-head">
-        <h3 class="title">✨ Assistente inteligente</h3>
+        <h3 class="title"><span class="inline-icon-label"><AppIcon name="sparkles" :size="16" :stroke-width="2" /><span>Assistente inteligente</span></span></h3>
         <p class="subtitle">Insights operacionais baseados no dashboard atual.</p>
       </div>
     </template>
@@ -65,7 +65,7 @@
       </div>
 
       <button class="generate-btn" type="button" :disabled="loading" @click="$emit('generate')">
-        ✨ {{ loading ? 'Analisando indicadores...' : 'Gerar análise do dashboard' }}
+        <span class="inline-icon-label"><AppIcon name="sparkles" :size="14" :stroke-width="2" /><span>{{ loading ? 'Analisando indicadores...' : 'Gerar análise do dashboard' }}</span></span>
       </button>
 
       <DashboardAiSuggestedQuestions :questions="suggestedQuestions" @select="$emit('selectQuestion', $event)" />

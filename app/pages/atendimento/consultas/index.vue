@@ -84,7 +84,7 @@
     <n-card v-else :bordered="false" size="small" class="filters-card mobile-filters-card">
       <div class="mobile-filter-top">
         <n-input v-model:value="filters.search" placeholder="Buscar tutor, pet ou diagnóstico" clearable />
-        <n-button secondary strong class="mobile-filter-trigger" @click="showMobileFilters = true">🔎 Filtros</n-button>
+        <n-button secondary strong class="mobile-filter-trigger" @click="showMobileFilters = true"><span class="inline-icon-label"><AppIcon name="search" :size="16" :stroke-width="2" /><span>Filtros</span></span></n-button>
       </div>
       <div v-if="activeFilterChips.length" class="mobile-filter-chips">
         <button v-for="chip in activeFilterChips" :key="chip.key" class="chip-btn" type="button" @click="removeFilterChip(chip.key)">
@@ -123,7 +123,7 @@
           <div class="card-actions">
             <n-button size="small" secondary type="primary" @click.stop="openEdit(row)">Abrir consulta</n-button>
             <n-dropdown trigger="click" :options="actionOptionsFor(row)" @select="(key: string) => handleActionSelect(key, row)">
-              <n-button size="small" quaternary class="menu-button" @click.stop>•••</n-button>
+              <n-button size="small" quaternary class="menu-button" @click.stop><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
             </n-dropdown>
           </div>
         </div>
@@ -458,7 +458,7 @@ const columns = [
             quaternary: true,
             class: 'menu-button',
             onClick: (event: MouseEvent) => event.stopPropagation()
-          }, { default: () => '•••' })
+          }, { default: () => '⋯' })
         })
       ]
     })

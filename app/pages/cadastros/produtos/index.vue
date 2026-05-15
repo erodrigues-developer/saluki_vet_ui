@@ -83,7 +83,7 @@
             <div class="card-actions" @click.stop>
               <n-button size="small" secondary type="primary" @click="openEdit(item)">Ver item</n-button>
               <n-dropdown trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
-                <n-button size="small" quaternary class="menu-button">•••</n-button>
+                <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
               </n-dropdown>
             </div>
           </div>
@@ -366,7 +366,7 @@ const columns = [
           quaternary: true,
           class: 'menu-button',
           onClick: (e) => e.stopPropagation()
-        }, { default: () => '•••' })
+        }, { default: () => '⋯' })
       })
     ])
   }

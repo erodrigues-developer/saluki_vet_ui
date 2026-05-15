@@ -237,15 +237,15 @@
           </div>
           <div class="inline-actions">
             <button type="button" class="quick-action-card" @click="message.info('Fluxo de prescrição em evolução.')">
-              <span class="quick-action-icon">💊</span>
+              <span class="quick-action-icon"><AppIcon name="pill" :size="14" :stroke-width="2" /></span>
               <span><strong>Gerar prescrição</strong> — Criar prescrição vinculada ao atendimento.</span>
             </button>
             <button type="button" class="quick-action-card" @click="message.info('Fluxo de exames em evolução.')">
-              <span class="quick-action-icon">🧪</span>
+              <span class="quick-action-icon"><AppIcon name="flask" :size="14" :stroke-width="2" /></span>
               <span><strong>Solicitar exame</strong> — Registrar exames complementares.</span>
             </button>
             <button type="button" class="quick-action-card" @click="clinical.referInpatient = true">
-              <span class="quick-action-icon">🏥</span>
+              <span class="quick-action-icon"><AppIcon name="hospital" :size="14" :stroke-width="2" /></span>
               <span><strong>Encaminhar para internação</strong> — Abrir fluxo de internação.</span>
             </button>
           </div>

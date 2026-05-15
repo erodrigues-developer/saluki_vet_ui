@@ -45,4 +45,10 @@
   overflow: visible;
   box-sizing: border-box;
 }
+
+.inline-icon-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 </style>

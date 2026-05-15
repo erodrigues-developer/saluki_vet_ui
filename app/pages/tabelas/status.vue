@@ -66,7 +66,7 @@
             <div class="card-actions" @click.stop>
               <n-button size="small" secondary type="primary" @click="openEdit(item)">Ver status</n-button>
               <n-dropdown trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
-                <n-button size="small" quaternary class="menu-button">•••</n-button>
+                <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
               </n-dropdown>
             </div>
           </div>
@@ -247,7 +247,7 @@ const columns = [
     render: (row: AppointmentStatus) => h('div', { class: 'table-actions' }, [
       h(NButton, { size: 'small', secondary: true, type: 'primary', onClick: (e) => { e.stopPropagation(); openEdit(row) } }, { default: () => 'Ver status' }),
       h(NDropdown, { trigger: 'click', options: buildActionOptions(row), onSelect: (key: string) => handleActionSelect(key, row) }, {
-        default: () => h(NButton, { size: 'small', quaternary: true, class: 'menu-button', onClick: (e) => e.stopPropagation() }, { default: () => '•••' })
+        default: () => h(NButton, { size: 'small', quaternary: true, class: 'menu-button', onClick: (e) => e.stopPropagation() }, { default: () => '⋯' })
       })
     ])
   }

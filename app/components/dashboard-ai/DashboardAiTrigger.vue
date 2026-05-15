@@ -8,7 +8,7 @@
       title="Gerar insights sobre o dashboard"
       @click="$emit('open')"
     >
-      ✨ Analisar com IA
+      <span class="inline-icon-label"><AppIcon name="sparkles" :size="14" :stroke-width="2" /><span>Analisar com IA</span></span>
     </button>
 
     <button
@@ -18,7 +18,7 @@
       aria-label="Analisar dashboard com IA"
       @click="$emit('open')"
     >
-      ✨ IA
+      <span class="inline-icon-label"><AppIcon name="sparkles" :size="14" :stroke-width="2" /><span>IA</span></span>
     </button>
   </div>
 </template>

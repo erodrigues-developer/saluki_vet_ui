@@ -49,7 +49,7 @@
 
                   <div ref="notificationRef" class="notification-wrap">
                     <NBadge :value="notificationCount" :max="99" class="notification-badge">
-                      <NButton quaternary circle class="icon-btn" @click="notificationOpen = !notificationOpen">🔔</NButton>
+                      <NButton quaternary circle class="icon-btn" @click="notificationOpen = !notificationOpen"><AppIcon name="bell" :size="16" :stroke-width="2" /></NButton>
                     </NBadge>
                     <div v-if="notificationOpen" class="notification-panel">
                       <p class="panel-title">Notificações</p>
@@ -87,10 +87,10 @@
                   <span class="brand-name">SalukiVet</span>
                 </div>
                 <div class="mobile-actions">
-                  <NButton quaternary circle class="icon-btn" @click="mobileSearchOpen = true">🔎</NButton>
+                  <NButton quaternary circle class="icon-btn" @click="mobileSearchOpen = true"><AppIcon name="search" :size="16" :stroke-width="2" /></NButton>
                   <div ref="notificationRef" class="notification-wrap">
                     <NBadge :value="notificationCount" :max="99" class="notification-badge">
-                      <NButton quaternary circle class="icon-btn" @click="notificationOpen = !notificationOpen">🔔</NButton>
+                      <NButton quaternary circle class="icon-btn" @click="notificationOpen = !notificationOpen"><AppIcon name="bell" :size="16" :stroke-width="2" /></NButton>
                     </NBadge>
                     <div v-if="notificationOpen" class="notification-panel">
                       <p class="panel-title">Notificações</p>

@@ -76,7 +76,7 @@
     <n-card v-else :bordered="false" size="small" class="filters-card mobile-filters-card">
       <div class="mobile-filter-top">
         <n-input v-model:value="filters.search" placeholder="Buscar despesa ou fornecedor" clearable />
-        <n-button secondary strong class="mobile-filter-trigger" @click="showMobileFilters = true">🔎 Filtros</n-button>
+        <n-button secondary strong class="mobile-filter-trigger" @click="showMobileFilters = true"><span class="inline-icon-label"><AppIcon name="search" :size="16" :stroke-width="2" /><span>Filtros</span></span></n-button>
       </div>
     </n-card>
 
@@ -112,7 +112,7 @@
             <div class="card-actions">
               <n-button size="small" secondary type="primary" @click="openEditModal(row)">Ver conta</n-button>
               <n-dropdown trigger="click" :options="buildActionOptions(row)" @select="(key: string) => handleActionSelect(key, row)">
-                <n-button size="small" quaternary class="menu-button">•••</n-button>
+                <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
               </n-dropdown>
             </div>
           </div>
@@ -704,7 +704,7 @@ const columns = [
             onSelect: (key: string) => handleActionSelect(key, row),
           },
           {
-            default: () => h(NButton, { size: 'small', quaternary: true, class: 'menu-button' }, { default: () => '•••' }),
+            default: () => h(NButton, { size: 'small', quaternary: true, class: 'menu-button' }, { default: () => '⋯' }),
           },
         ),
       ]);

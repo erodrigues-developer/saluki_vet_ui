@@ -76,7 +76,7 @@
     <n-card v-else :bordered="false" size="small" class="filters-card mobile-filters-card">
       <div class="mobile-filter-top">
         <n-input v-model:value="filters.search" placeholder="Buscar por cliente ou vendedor" clearable />
-        <n-button secondary strong class="mobile-filter-trigger" @click="showMobileFilters = true">🔎 Filtros</n-button>
+        <n-button secondary strong class="mobile-filter-trigger" @click="showMobileFilters = true"><span class="inline-icon-label"><AppIcon name="search" :size="16" :stroke-width="2" /><span>Filtros</span></span></n-button>
       </div>
     </n-card>
 
@@ -103,7 +103,7 @@
             Receber
           </n-button>
           <n-dropdown trigger="click" :options="actionOptionsFor(row)" @select="(key: string) => handleActionSelect(key, row)">
-            <n-button size="small" quaternary class="menu-button" @click.stop>•••</n-button>
+            <n-button size="small" quaternary class="menu-button" @click.stop><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
           </n-dropdown>
         </div>
       </div>
@@ -443,7 +443,7 @@ const columns = [
                     class: 'menu-button',
                     onClick: (e: MouseEvent) => e.stopPropagation(),
                   },
-                  { default: () => '•••' },
+                  { default: () => '⋯' },
                 ),
             },
           ),
