@@ -540,6 +540,12 @@ const normalizeStepIndex = (value: unknown) => {
   return parsed - 1
 }
 
+const readQueryNumber = (key: string) => {
+  const raw = Array.isArray(route.query[key]) ? route.query[key][0] : route.query[key]
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
 const resolveInitialStepFromModel = () => {
   const hasComplaint = String(model.mainComplaint || '').trim().length > 0
   const hasAnamnesis = String(model.clinicalFindings || '').trim().length > 0
@@ -635,6 +641,30 @@ const loadConsultationFromRoute = async () => {
   } catch (error: any) {
     message.error(error?.data?.message || 'Erro ao carregar atendimento clínico')
   }
+}
+
+const applySchedulingContextFromRoute = () => {
+  const appointmentId = readQueryNumber('appointmentId')
+  const clientId = readQueryNumber('clientId')
+  const petId = readQueryNumber('petId')
+  const veterinarianId = readQueryNumber('veterinarianId')
+
+  if (!appointmentId && !clientId && !petId && !veterinarianId) return
+
+  if (appointmentId) {
+    model.appointmentId = appointmentId
+    handleAppointmentChange(appointmentId)
+  }
+
+  if (clientId) {
+    model.clientId = clientId
+    updatePetOptions()
+  }
+
+  if (petId) model.petId = petId
+  if (veterinarianId) model.veterinarianId = veterinarianId
+
+  appointmentPrefilledFeedback.value = true
 }
 
 const updatePetOptions = () => {
@@ -1123,6 +1153,7 @@ onMounted(async () => {
   mediaQuery.addEventListener('change', updateIsMobile)
   await loadLookups()
   await loadConsultationFromRoute()
+  if (!model.id) applySchedulingContextFromRoute()
 })
 
 onBeforeUnmount(() => {

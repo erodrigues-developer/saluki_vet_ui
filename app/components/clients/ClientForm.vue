@@ -231,7 +231,9 @@ const handleSubmit = async () => {
 }
 defineExpose({ submit: handleSubmit })
 
-const digitsOnly = (val: string) => (val || '').replace(/\D+/g, '')
+function digitsOnly(val: string) {
+  return (val || '').replace(/\D+/g, '')
+}
 
 const onPhoneInput = (val: string) => {
   model.phone = formatBrazilPhone(val)
@@ -241,7 +243,7 @@ const onMobileInput = (val: string) => {
   model.mobilePhone = formatBrazilPhone(val)
 }
 
-const formatDocument = (val: string) => {
+function formatDocument(val: string) {
   const digits = digitsOnly(val).slice(0, 14)
   if (digits.length <= 11) {
     return digits

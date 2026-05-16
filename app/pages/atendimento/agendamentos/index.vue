@@ -19,7 +19,71 @@
     </div>
 
     <template v-if="mode === 'agenda'">
-      <div class="agenda-workspace">
+      <div v-if="isMobile" class="agenda-mobile">
+        <n-card :bordered="false" class="agenda-mobile-controls">
+          <div class="mobile-period-row">
+            <n-button aria-label="Hoje" @click="goToToday">Hoje</n-button>
+            <n-button aria-label="Período anterior" quaternary circle class="period-icon-button" @click="goPrevious">
+              <AppIcon name="chevron-left" :size="16" :stroke-width="2" />
+            </n-button>
+            <n-date-picker
+              v-model:value="agendaSelectedDate"
+              type="date"
+              :clearable="false"
+              format="dd/MM/yyyy"
+              class="mobile-date-picker"
+              @update:value="handleAgendaDateSelect"
+            />
+            <n-button aria-label="Próximo período" quaternary circle class="period-icon-button" @click="goNext">
+              <AppIcon name="chevron-right" :size="16" :stroke-width="2" />
+            </n-button>
+          </div>
+          <div class="mobile-search-row">
+            <n-input v-model:value="agendaFilters.search" clearable placeholder="Buscar tutor, pet ou telefone" />
+            <n-button secondary @click="showMobileFilters = true">Filtros</n-button>
+          </div>
+        </n-card>
+
+        <n-card :bordered="false" class="mobile-timeline-card">
+          <div ref="mobileTimelineWrapRef" class="mobile-timeline-wrap">
+            <div class="mobile-timeline-grid">
+              <div class="mobile-timeline-rows">
+                <div v-for="slot in timeSlots" :key="`m-row-${slot}`" class="mobile-timeline-row">
+                  <div class="mobile-time-cell">{{ slot }}</div>
+                  <button
+                    type="button"
+                    class="mobile-slot-cell"
+                    :class="{ 'outside-hours': isOutsideOperatingHours(slot, agendaStartDate) }"
+                    @click="handleSlotClick({ date: agendaStartDate, veterinarianId: selectedVetIdSingle }, slot)"
+                  >
+                    <span class="mobile-slot-add">+ Agendar</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="mobile-events-layer">
+                <button
+                  v-for="event in mobileTimelineEvents"
+                  :key="`m-event-${event.id}`"
+                  type="button"
+                  class="event-block mobile-timeline-event"
+                  :class="eventClass(event)"
+                  :style="mobileEventPositionStyle(event)"
+                  @click.stop="openDetail(event)"
+                >
+                  <strong>{{ petNameMap[event.petId] || event.pet?.name || 'Pet' }}</strong>
+                  <span>{{ eventTypeLabel(event) }}</span>
+                  <small>{{ clientNameMap[event.clientId] || event.client?.name || 'Tutor' }} · {{ event.veterinarianId ? usersMap[event.veterinarianId] : 'Sem veterinário' }}</small>
+                </button>
+
+                <div v-if="showNowLine" class="mobile-now-line" :style="mobileNowLineStyle" />
+              </div>
+            </div>
+          </div>
+        </n-card>
+      </div>
+
+      <div v-else class="agenda-workspace">
         <n-card :bordered="false" class="agenda-filters-card">
           <div class="agenda-filters-scroll">
             <div class="agenda-sidebar-period">
@@ -78,26 +142,7 @@
         </n-card>
 
         <n-card :bordered="false" class="agenda-board-card">
-          <div v-if="isMobile" class="mobile-day-list">
-            <div class="mobile-day-nav">
-              <button v-for="day in visibleDays" :key="day.toISOString()" type="button" class="mobile-day-chip" :class="{ active: isSameCalendarDay(day, agendaStartDate) }" @click="openDay(day)">
-                {{ format(day, 'dd/MM') }}
-              </button>
-            </div>
-            <div v-for="slot in timeSlots" :key="`m-${slot}`" class="mobile-slot-row">
-              <p class="slot-hour">{{ slot }}</p>
-              <div v-if="mobileSlotEvents(slot).length" class="mobile-slot-events">
-                <button v-for="event in mobileSlotEvents(slot)" :key="event.id" type="button" class="event-block" :class="eventClass(event)" @click="openDetail(event)">
-                  <strong>{{ petNameMap[event.petId] || event.pet?.name || 'Pet' }}</strong>
-                  <span>{{ eventTypeLabel(event) }}</span>
-                  <small>{{ clientNameMap[event.clientId] || event.client?.name || 'Tutor' }} · {{ statusLabel(event) }}</small>
-                </button>
-              </div>
-              <button v-else type="button" class="free-slot" @click="openCreateFromSlot(agendaStartDate, slot, selectedVetIdSingle)">+ Agendar</button>
-            </div>
-          </div>
-
-          <div v-else ref="agendaGridWrapRef" class="agenda-grid-wrap">
+          <div ref="agendaGridWrapRef" class="agenda-grid-wrap">
             <div class="agenda-grid" :class="{ weekly: agendaInnerMode === 'seven' }" :style="gridStyle">
               <div class="sticky-cell corner" />
               <div v-for="header in gridHeaders" :key="header.key" class="sticky-cell header-cell">
@@ -148,7 +193,7 @@
         </n-card>
       </div>
 
-      <n-drawer v-model:show="showDetailDrawer" placement="right" width="420" :trap-focus="false">
+      <n-drawer v-model:show="showDetailDrawer" :placement="isMobile ? 'bottom' : 'right'" :width="isMobile ? undefined : 420" :height="isMobile ? '88vh' : undefined" :trap-focus="false">
         <n-drawer-content title="Detalhes do agendamento" closable>
           <div v-if="selectedAppointment" class="detail-content">
             <h3>{{ petNameMap[selectedAppointment.petId] || selectedAppointment.pet?.name || 'Pet' }}</h3>
@@ -170,6 +215,52 @@
           </div>
         </n-drawer-content>
       </n-drawer>
+
+      <n-drawer v-model:show="showMobileFilters" placement="bottom" height="86vh">
+        <n-drawer-content title="Filtros da agenda" closable>
+          <div class="mobile-filters-content">
+            <div class="filters-section">
+              <p class="filters-section-title">Data</p>
+              <n-calendar v-model:value="agendaSelectedDate" @update:value="handleAgendaDateSelect" />
+            </div>
+            <div class="filters-section">
+              <p class="filters-section-title">Filtros principais</p>
+              <div class="agenda-filters-grid">
+                <n-select
+                  v-model:value="agendaFilters.veterinarianIds"
+                  multiple
+                  clearable
+                  filterable
+                  :options="agendaVeterinarianOptions"
+                  placeholder="Veterinário"
+                />
+                <n-select v-model:value="agendaFilters.statusIds" multiple clearable :options="statusOptions" placeholder="Status" />
+                <n-select v-model:value="agendaFilters.triageRisk" multiple clearable :options="triageOptions" placeholder="Triagem/Prioridade" />
+                <n-select v-model:value="agendaFilters.appointmentTypeIds" multiple clearable :options="appointmentTypeOptions" placeholder="Tipo de atendimento" />
+              </div>
+            </div>
+            <div class="filters-section">
+              <p class="filters-section-title">Atalhos rápidos</p>
+              <div class="quick-actions-grid">
+                <button
+                  v-for="chip in quickFilterChips"
+                  :key="`m-${chip.key}`"
+                  type="button"
+                  class="quick-action-btn"
+                  :class="{ active: activeQuickChip === chip.key, wide: chip.wide }"
+                  @click="toggleQuickChip(chip.key)"
+                >
+                  {{ chip.label }}
+                </button>
+              </div>
+            </div>
+            <div class="mobile-filter-actions">
+              <n-button @click="clearAgendaFilters">Limpar filtros</n-button>
+              <n-button type="primary" @click="showMobileFilters = false">Aplicar filtros</n-button>
+            </div>
+          </div>
+        </n-drawer-content>
+      </n-drawer>
     </template>
 
     <template v-else-if="mode === 'list'">
@@ -185,6 +276,18 @@
             <n-button text class="btn-clear" @click="clearFilters">Limpar filtros</n-button>
             <n-button secondary strong class="btn-filter" @click="handleFilter">Filtrar</n-button>
           </div>
+        </div>
+      </n-card>
+
+      <n-card v-else :bordered="false" size="small" class="filters-card mobile-filters-card">
+        <div class="mobile-filter-top">
+          <n-input v-model:value="filters.search" placeholder="Buscar tutor, pet ou telefone" clearable @keyup.enter="applyMobileListFilters" />
+          <n-button secondary strong class="mobile-filter-trigger" @click="showMobileListFilters = true">
+            <span class="inline-icon-label">
+              <AppIcon name="search" :size="16" :stroke-width="2" />
+              <span>Filtros</span>
+            </span>
+          </n-button>
         </div>
       </n-card>
 
@@ -210,7 +313,46 @@
           <n-button tertiary type="primary" @click="fetchAppointments">Tentar novamente</n-button>
         </div>
         <div v-else-if="displayAppointments.length === 0" class="mobile-state">Nenhum resultado encontrado para os filtros aplicados.</div>
+        <template v-else>
+          <div v-for="row in displayAppointments" :key="`list-m-${row.id}`" class="entity-card">
+            <div class="card-top">
+              <p class="card-time">{{ format(new Date(row.startsAt), 'HH:mm') }}</p>
+              <span :class="['status-pill', getStatusMeta(row.status || statusesMap[row.statusId] || null).className]">{{ statusLabel(row) }}</span>
+            </div>
+            <p class="card-date">{{ format(new Date(row.startsAt), 'dd/MM/yyyy') }} · {{ eventTimeRange(row) }}</p>
+            <button type="button" class="card-main" @click="openDetail(row)">
+              <p class="card-title">{{ petNameMap[row.petId] || row.pet?.name || 'Pet' }}</p>
+              <p class="card-subtitle">Tutor: {{ clientNameMap[row.clientId] || row.client?.name || 'Tutor' }}</p>
+              <p class="card-subtitle">Vet: {{ row.veterinarianId ? usersMap[row.veterinarianId] : 'Sem veterinário' }}</p>
+              <p class="card-summary">{{ eventTypeLabel(row) }} · Triagem: {{ triageLabel(row.triageRisk || null) }}</p>
+            </button>
+            <div class="card-actions">
+              <n-button size="small" secondary type="primary" @click.stop="runPrimaryAction(row)">{{ primaryActionLabel(row) }}</n-button>
+              <n-dropdown trigger="click" :options="actionOptionsFor()" @select="(key: string) => handleActionSelect(key, row)">
+                <n-button size="small" quaternary class="menu-button" @click.stop>
+                  <AppIcon name="ellipsis" :size="16" :stroke-width="2" />
+                </n-button>
+              </n-dropdown>
+            </div>
+          </div>
+        </template>
       </div>
+
+      <n-drawer v-model:show="showMobileListFilters" placement="bottom" height="68%" :trap-focus="false">
+        <n-drawer-content title="Filtros" closable>
+          <div class="mobile-filters-panel">
+            <n-select v-model:value="filters.period" :options="periodOptions" placeholder="Período" clearable />
+            <n-date-picker v-if="filters.period === 'CUSTOM'" v-model:value="filters.date" type="date" clearable placeholder="Data personalizada" />
+            <n-select v-model:value="filters.veterinarianId" :options="veterinarianOptions" placeholder="Veterinário(a)" clearable />
+            <n-select v-model:value="filters.statusId" :options="statusOptions" placeholder="Status" clearable />
+            <n-select v-model:value="filters.triageRisk" :options="triageOptions" placeholder="Triagem" clearable />
+            <div class="mobile-filter-actions">
+              <n-button text class="btn-clear" @click="clearFilters">Limpar filtros</n-button>
+              <n-button type="primary" @click="applyMobileListFilters">Aplicar filtros</n-button>
+            </div>
+          </div>
+        </n-drawer-content>
+      </n-drawer>
     </template>
 
     <template v-else>
@@ -272,9 +414,53 @@
       <template #footer><div class="modal-actions"><n-button tertiary :disabled="quickSaving" @click="showQuickModal = false">Cancelar</n-button><n-button type="primary" :loading="quickSaving" @click="handleQuickSubmit">Criar ficha e agendar</n-button></div></template>
     </n-modal>
 
-    <n-modal v-model:show="showCheckInModal" preset="card" style="width: 520px">
-      <template #header><p class="eyebrow" style="margin: 0">Check-in</p></template>
-      <n-form :model="checkInForm" label-placement="top" :disabled="checkInSaving"><n-form-item label="Motivo / Queixa" required><n-input v-model:value="checkInForm.reason" type="textarea" :rows="4" /></n-form-item></n-form>
+    <n-modal v-model:show="showCheckInModal" preset="card" class="appointment-modal checkin-modal" style="width: 760px">
+      <template #header>
+        <div class="modal-head">
+          <h3 class="modal-title">Check-in</h3>
+          <p class="modal-subtitle">Registre queixa e triagem inicial para classificar a prioridade do atendimento.</p>
+        </div>
+      </template>
+      <n-form :model="checkInForm" label-placement="top" :disabled="checkInSaving">
+        <div class="quick-sections checkin-sections">
+          <section class="quick-section">
+            <h4 class="quick-section-title">Queixa</h4>
+            <n-form-item label="Motivo / Queixa" required>
+              <n-input v-model:value="checkInForm.reason" type="textarea" :rows="4" />
+            </n-form-item>
+          </section>
+
+          <section class="quick-section">
+            <h4 class="quick-section-title">Triagem rápida</h4>
+            <div class="checkin-triage-grid">
+              <n-form-item label="Risco da triagem" required class="full-row">
+                <n-select v-model:value="checkInForm.triageRisk" :options="checkInTriageOptions" placeholder="Selecione o risco" />
+              </n-form-item>
+              <n-form-item label="Peso (kg)">
+                <n-input-number v-model:value="checkInForm.weightKg" :min="0" :precision="2" style="width: 100%" />
+              </n-form-item>
+              <n-form-item label="Temperatura (°C)">
+                <n-input-number v-model:value="checkInForm.temperatureC" :min="0" :precision="1" style="width: 100%" />
+              </n-form-item>
+              <n-form-item label="Frequência cardíaca (bpm)">
+                <n-input-number v-model:value="checkInForm.heartRateBpm" :min="0" :precision="0" style="width: 100%" />
+              </n-form-item>
+              <n-form-item label="Frequência respiratória (irpm)">
+                <n-input-number v-model:value="checkInForm.respiratoryRateIpm" :min="0" :precision="0" style="width: 100%" />
+              </n-form-item>
+              <n-form-item label="Mucosas">
+                <n-input v-model:value="checkInForm.mucosaStatus" placeholder="Ex.: rosadas, pálidas..." />
+              </n-form-item>
+              <n-form-item label="Hidratação">
+                <n-input v-model:value="checkInForm.hydrationStatus" placeholder="Ex.: normohidratado..." />
+              </n-form-item>
+              <n-form-item label="Dor" class="full-row">
+                <n-input v-model:value="checkInForm.painStatus" placeholder="Ex.: dor moderada..." />
+              </n-form-item>
+            </div>
+          </section>
+        </div>
+      </n-form>
       <template #footer><div class="modal-actions"><n-button tertiary :disabled="checkInSaving" @click="showCheckInModal = false">Cancelar</n-button><n-button type="primary" :loading="checkInSaving" @click="handleCheckIn">Registrar chegada</n-button></div></template>
     </n-modal>
   </div>
@@ -321,8 +507,11 @@ const checkInTarget = ref<any | null>(null)
 const loadError = ref(false)
 const isMobile = ref(false)
 const showDetailDrawer = ref(false)
+const showMobileFilters = ref(false)
+const showMobileListFilters = ref(false)
 const selectedAppointment = ref<any | null>(null)
 const agendaGridWrapRef = ref<HTMLElement | null>(null)
+const mobileTimelineWrapRef = ref<HTMLElement | null>(null)
 const clinicBusinessHoursJson = ref<string | null>(null)
 const nowTs = ref(Date.now())
 let nowTickTimer: ReturnType<typeof setInterval> | null = null
@@ -396,7 +585,24 @@ const quickForm = reactive({
   appointment: { appointmentTypeId: null as number | null, veterinarianId: null as number | null, startsAt: Date.now(), reason: '' }
 })
 
-const checkInForm = reactive({ reason: '' })
+const checkInTriageOptions = [
+  { label: 'Verde', value: 'VERDE' },
+  { label: 'Amarela', value: 'AMARELA' },
+  { label: 'Vermelha', value: 'VERMELHA' },
+  { label: 'Emergência', value: 'EMERGENCY' }
+]
+
+const checkInForm = reactive({
+  reason: '',
+  triageRisk: null as string | null,
+  weightKg: null as number | null,
+  temperatureC: null as number | null,
+  heartRateBpm: null as number | null,
+  respiratoryRateIpm: null as number | null,
+  mucosaStatus: '',
+  hydrationStatus: '',
+  painStatus: ''
+})
 
 const onQuickMobilePhoneInput = (value: string) => {
   quickForm.client.mobilePhone = formatBrazilPhone(value)
@@ -452,7 +658,7 @@ const vetSelectionScope = computed<'all' | 'single' | 'multi'>(() => {
 })
 
 const visibleDays = computed(() => {
-  if (agendaInnerMode.value === 'day') return [agendaStartDate.value]
+  if (isMobile.value || agendaInnerMode.value === 'day') return [agendaStartDate.value]
   return Array.from({ length: 7 }, (_v, i) => addDays(agendaStartDate.value, i))
 })
 
@@ -507,6 +713,10 @@ const agendaFilteredAppointments = computed(() => {
     return true
   })
 })
+
+const mobileTimelineEvents = computed(() =>
+  getHeaderEventsWithLayout({ date: agendaStartDate.value, veterinarianId: null }),
+)
 
 const timeSlots = computed(() => {
   const slots: string[] = []
@@ -798,6 +1008,27 @@ const eventPositionStyle = (row: any) => {
     right: 'auto'
   }
 }
+const mobileEventPositionStyle = (row: any) => {
+  const start = new Date(row.startsAt)
+  const startMinutes = start.getHours() * 60 + start.getMinutes()
+  const duration = Math.max(15, getEventDurationMinutes(row))
+  const top = (startMinutes / 30) * SLOT_HEIGHT + 4
+  const height = (duration / 30) * SLOT_HEIGHT - 8
+  const lane = Number(row.__lane || 0)
+  const laneCount = Math.max(1, Number(row.__laneCount || 1))
+  const widthPercent = 100 / laneCount
+  const leftPercent = lane * widthPercent
+  const laneGapPx = laneCount > 1 ? 4 : 0
+  return {
+    top: `${top}px`,
+    height: `${Math.max(48, height)}px`,
+    minHeight: `${Math.max(48, height)}px`,
+    left: `calc(${leftPercent}% + 4px + ${laneGapPx}px)`,
+    width: `calc(${widthPercent}% - 10px - ${laneGapPx}px)`,
+    right: 'auto'
+  }
+}
+const mobileNowLineStyle = computed(() => ({ top: `${nowLineTop.value}px` }))
 
 const openDetail = (row: any) => {
   selectedAppointment.value = row
@@ -807,7 +1038,10 @@ const openDetail = (row: any) => {
 const primaryActionLabel = (row: any) => {
   const code = (row.status || statusesMap.value[row.statusId])?.code
   if (code === 'SCHEDULED' || code === 'CONFIRMED') return 'Check-in'
-  if (code === 'ARRIVED') return 'Iniciar triagem'
+  if (code === 'ARRIVED') {
+    const triageDone = !!row.triageRisk && !['PENDING', 'NOT_TRIAGED', ''].includes(String(row.triageRisk || '').toUpperCase())
+    return triageDone ? 'Iniciar atendimento' : 'Iniciar triagem'
+  }
   if (code === 'IN_TRIAGE') return 'Iniciar atendimento'
   if (code === 'IN_PROGRESS') return 'Ver atendimento'
   if (code === 'COMPLETED') return 'Ver prontuário'
@@ -816,7 +1050,22 @@ const primaryActionLabel = (row: any) => {
 const runPrimaryAction = (row: any) => {
   const action = primaryActionLabel(row)
   if (action === 'Check-in') openCheckIn(row)
+  else if (action === 'Iniciar triagem') openCheckIn(row)
+  else if (action === 'Iniciar atendimento') openClinicalCare(row)
+  else if (action === 'Ver detalhes' || action === 'Ver atendimento' || action === 'Ver prontuário') openDetail(row)
   else message.info('Ação contextual será integrada com o fluxo clínico.')
+}
+
+const openClinicalCare = (appointment: any) => {
+  navigateTo({
+    path: '/consultas/novo-atendimento',
+    query: {
+      appointmentId: String(appointment.id),
+      clientId: appointment.clientId ? String(appointment.clientId) : undefined,
+      petId: appointment.petId ? String(appointment.petId) : undefined,
+      veterinarianId: appointment.veterinarianId ? String(appointment.veterinarianId) : undefined
+    }
+  })
 }
 
 const toggleQuickChip = (key: string) => {
@@ -829,6 +1078,15 @@ const toggleQuickChip = (key: string) => {
     agendaInnerMode.value = 'day'
     agendaStartDate.value = addDays(new Date(), 1)
   }
+}
+
+const clearAgendaFilters = () => {
+  agendaFilters.veterinarianIds = []
+  agendaFilters.statusIds = []
+  agendaFilters.triageRisk = []
+  agendaFilters.appointmentTypeIds = []
+  agendaFilters.search = ''
+  activeQuickChip.value = null
 }
 
 const matchesPeriodFilter = (startsAt: string) => {
@@ -979,6 +1237,11 @@ const clearFilters = () => {
   fetchAppointments()
 }
 const handleFilter = () => { pagination.page = 1; fetchAppointments() }
+const applyMobileListFilters = () => {
+  pagination.page = 1
+  showMobileListFilters.value = false
+  fetchAppointments()
+}
 const handlePageChange = (p: number) => { pagination.page = p; fetchAppointments() }
 const handlePageSizeChange = (s: number) => { pagination.pageSize = s; pagination.page = 1; fetchAppointments() }
 
@@ -1105,15 +1368,39 @@ const handleQuickSubmit = async () => {
 const openCheckIn = (appointment: any) => {
   checkInTarget.value = appointment
   checkInForm.reason = appointment.reason || ''
+  checkInForm.triageRisk = appointment.triageRisk || null
+  checkInForm.weightKg = null
+  checkInForm.temperatureC = null
+  checkInForm.heartRateBpm = null
+  checkInForm.respiratoryRateIpm = null
+  checkInForm.mucosaStatus = ''
+  checkInForm.hydrationStatus = ''
+  checkInForm.painStatus = ''
   showCheckInModal.value = true
 }
 
 const handleCheckIn = async () => {
-  if (!checkInTarget.value || !checkInForm.reason.trim()) return
+  if (!checkInTarget.value || !checkInForm.reason.trim() || !checkInForm.triageRisk) {
+    message.warning('Informe motivo/queixa e risco da triagem.')
+    return
+  }
   checkInSaving.value = true
   try {
     const api = useApi()
-    await api(`/api/v1/appointments/${checkInTarget.value.id}/check-in`, { method: 'POST', body: { reason: checkInForm.reason } })
+    await api(`/api/v1/appointments/${checkInTarget.value.id}/check-in`, {
+      method: 'POST',
+      body: {
+        reason: checkInForm.reason,
+        triageRisk: checkInForm.triageRisk,
+        weightKg: checkInForm.weightKg,
+        temperatureC: checkInForm.temperatureC,
+        heartRateBpm: checkInForm.heartRateBpm,
+        respiratoryRateIpm: checkInForm.respiratoryRateIpm,
+        mucosaStatus: checkInForm.mucosaStatus,
+        hydrationStatus: checkInForm.hydrationStatus,
+        painStatus: checkInForm.painStatus
+      }
+    })
     showCheckInModal.value = false
     await fetchAppointments()
     await fetchAgendaAppointments()
@@ -1139,11 +1426,11 @@ const goToToday = () => {
   agendaSelectedDate.value = Date.now()
 }
 const goPrevious = () => {
-  agendaStartDate.value = addDays(agendaStartDate.value, agendaInnerMode.value === 'seven' ? -7 : -1)
+  agendaStartDate.value = addDays(agendaStartDate.value, !isMobile.value && agendaInnerMode.value === 'seven' ? -7 : -1)
   agendaSelectedDate.value = agendaStartDate.value.getTime()
 }
 const goNext = () => {
-  agendaStartDate.value = addDays(agendaStartDate.value, agendaInnerMode.value === 'seven' ? 7 : 1)
+  agendaStartDate.value = addDays(agendaStartDate.value, !isMobile.value && agendaInnerMode.value === 'seven' ? 7 : 1)
   agendaSelectedDate.value = agendaStartDate.value.getTime()
 }
 const handleAgendaDateSelect = (value: number | null) => {
@@ -1159,13 +1446,12 @@ const openDay = (day: Date) => {
 const scrollAgendaToCurrentTime = async () => {
   await nextTick()
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-  if (isMobile.value) return
-  const el = agendaGridWrapRef.value
+  const el = isMobile.value ? mobileTimelineWrapRef.value : agendaGridWrapRef.value
   if (!el) return
 
   const now = new Date()
   const slotHeight = 72
-  const headerHeight = 56
+  const headerHeight = isMobile.value ? 0 : 56
   const slotIndex = now.getHours() * 2 + Math.floor(now.getMinutes() / 30)
   const target = Math.max(0, headerHeight + slotIndex * slotHeight - el.clientHeight * 0.25)
   el.scrollTop = target
@@ -1173,6 +1459,10 @@ const scrollAgendaToCurrentTime = async () => {
 
 watch(mode, async (value) => {
   if (value === 'agenda') await scrollAgendaToCurrentTime()
+})
+
+watch([isMobile, mobileTimelineEvents, agendaStartDate], async () => {
+  if (isMobile.value && mode.value === 'agenda') await scrollAgendaToCurrentTime()
 })
 
 onMounted(async () => {
@@ -1225,6 +1515,321 @@ h1 { margin: 0; font-size: 22px; line-height: 1.15; }
   padding: 0;
 }
 .period-label { margin: 0; font-weight: 700; color: #0f172a; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agenda-mobile {
+  display: grid;
+  gap: 10px;
+}
+.agenda-mobile-controls {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+.agenda-mobile-controls :deep(.n-card__content) {
+  display: grid;
+  gap: 10px;
+  padding: 12px !important;
+}
+.mobile-period-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: 6px;
+}
+.mobile-mode-toggle :deep(.n-radio-group) {
+  width: 100%;
+}
+.mobile-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.mobile-date-picker {
+  min-width: 0;
+}
+.card-list {
+  display: grid;
+  gap: 8px;
+}
+.mobile-filters-card {
+  padding: 10px;
+}
+.mobile-filter-top {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mobile-filter-trigger {
+  height: 44px;
+}
+:deep(.mobile-filter-trigger.n-button) {
+  border: 1px solid #334155;
+  color: #1e293b;
+  background: #ffffff;
+}
+:deep(.mobile-filter-trigger.n-button:hover) {
+  border-color: #0f172a;
+  color: #0f172a;
+}
+.entity-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px dashed #e2e8f0;
+  padding-bottom: 8px;
+  min-width: 0;
+}
+.card-time {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 700;
+  color: #0f172a;
+}
+.card-top :deep(.status-pill) {
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+}
+.card-date {
+  margin: -6px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+.card-main {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  min-width: 0;
+}
+.card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-subtitle {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-summary {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-actions {
+  margin-top: 2px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+.card-actions :deep(.n-button) {
+  min-height: 36px;
+}
+.menu-button {
+  min-width: 40px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.mobile-timeline-card,
+.mobile-list-card,
+.mobile-empty-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+.mobile-timeline-card :deep(.n-card__content),
+.mobile-list-card :deep(.n-card__content),
+.mobile-empty-card :deep(.n-card__content) {
+  padding: 0 !important;
+}
+.mobile-agenda-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.mobile-time {
+  font-size: 12px;
+  color: #334155;
+}
+.mobile-status {
+  font-size: 11px;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  padding: 2px 7px;
+}
+.mobile-item-content {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 6px 0 0;
+}
+.mobile-item-content h4 {
+  margin: 0;
+  font-size: 15px;
+  color: #0f172a;
+}
+.mobile-item-content p {
+  margin: 1px 0 0;
+  font-size: 13px;
+  color: #334155;
+}
+.mobile-item-content small {
+  margin-top: 2px;
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+}
+.mobile-item-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+.mobile-timeline-wrap {
+  height: calc(100dvh - 420px);
+  min-height: 420px;
+  overflow: auto;
+  background: #fff;
+}
+.mobile-timeline-grid {
+  position: relative;
+  min-height: 3456px;
+}
+.mobile-timeline-rows {
+  position: relative;
+  z-index: 1;
+}
+.mobile-timeline-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  min-height: 72px;
+}
+.mobile-time-cell {
+  height: 72px;
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 12px;
+  color: #475569;
+  padding: 8px 4px;
+  box-sizing: border-box;
+}
+.mobile-slot-cell {
+  position: relative;
+  width: 100%;
+  height: 72px;
+  border: 0;
+  border-bottom: 1px solid #f1f5f9;
+  background: #fff;
+  text-align: left;
+  padding: 0;
+}
+.mobile-timeline-row:nth-child(odd) .mobile-slot-cell,
+.mobile-timeline-row:nth-child(odd) .mobile-time-cell {
+  border-bottom-color: #e2e8f0;
+}
+.mobile-slot-cell.outside-hours {
+  background: #f8fafc;
+}
+.mobile-slot-cell.outside-hours::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(-45deg, rgba(148, 163, 184, 0.08) 0, rgba(148, 163, 184, 0.08) 6px, transparent 6px, transparent 12px);
+}
+.mobile-slot-add {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  font-size: 10px;
+  color: #0c4a6e;
+  opacity: 0;
+}
+.mobile-slot-cell:active .mobile-slot-add,
+.mobile-slot-cell:focus-visible .mobile-slot-add {
+  opacity: 0.9;
+}
+.mobile-events-layer {
+  position: absolute;
+  inset: 0 0 0 54px;
+  z-index: 4;
+  pointer-events: none;
+}
+.mobile-timeline-event {
+  position: absolute;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  z-index: 4;
+  pointer-events: auto;
+}
+.mobile-now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ef4444;
+  z-index: 5;
+  pointer-events: none;
+}
+.mobile-empty-title {
+  margin: 12px 12px 0;
+  font-weight: 600;
+  color: #0f172a;
+}
+.mobile-empty-subtitle {
+  margin: 4px 12px 12px;
+  font-size: 13px;
+  color: #64748b;
+}
+.mobile-filters-content {
+  display: grid;
+  gap: 14px;
+}
+.mobile-filters-content :deep(.n-calendar) {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+.mobile-filter-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding-bottom: 8px;
+}
 .agenda-workspace {
   display: grid;
   grid-template-columns: 270px minmax(0, 1fr);
@@ -1469,6 +2074,13 @@ h1 { margin: 0; font-size: 22px; line-height: 1.15; }
 .event-block strong { font-size: 12px; line-height: 1.05; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .event-block span { font-size: 10.5px; line-height: 1.08; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .event-block small { font-size: 10px; line-height: 1.08; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mobile-events-layer .mobile-timeline-event {
+  position: absolute;
+  margin: 0;
+  z-index: 4;
+  pointer-events: auto;
+  box-sizing: border-box;
+}
 .event-title-row {
   display: flex;
   align-items: center;
@@ -1588,6 +2200,11 @@ h1 { margin: 0; font-size: 22px; line-height: 1.15; }
 .flow-placeholder p { margin: 0; color: #475569; }
 
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.checkin-triage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
 .quick-sections { display: flex; flex-direction: column; gap: 10px; }
 .quick-section { border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; padding: 12px; }
 .quick-section-title { margin: 0 0 8px; font-size: 16px; font-weight: 700; color: #334155; }
@@ -1602,25 +2219,27 @@ h1 { margin: 0; font-size: 22px; line-height: 1.15; }
 }
 
 @media (max-width: 768px) {
-  .agenda-workspace {
-    grid-template-columns: 1fr;
-    height: auto;
-    min-height: 0;
-    overflow: visible;
-  }
-  .agenda-filters-card,
-  .agenda-board-card {
-    overflow: visible;
-  }
-  .agenda-filters-scroll {
-    height: auto;
-    overflow: visible;
-  }
   .page-head { flex-direction: column; }
   h1 { font-size: 19px; }
   .head-actions { width: 100%; }
-  .head-actions :deep(.n-button) { width: 100%; }
+  .head-actions {
+    display: grid !important;
+    width: 100%;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .head-actions :deep(.n-button) { width: 100%; margin: 0 !important; }
   .quick-grid { grid-template-columns: 1fr; }
+  .checkin-triage-grid {
+    grid-template-columns: 1fr;
+  }
+  .mobile-empty-card :deep(.n-card__content) {
+    padding: 0 0 12px !important;
+  }
+  .mobile-empty-card :deep(.n-button) {
+    margin: 0 12px;
+    width: calc(100% - 24px);
+  }
 }
 </style>
 
