@@ -300,7 +300,7 @@ onBeforeUnmount(() => {
 
 h1 {
   margin: 4px 0 0;
-  font-size: 24px;
+  font-size: 22px;
 }
 
 .summary-grid {

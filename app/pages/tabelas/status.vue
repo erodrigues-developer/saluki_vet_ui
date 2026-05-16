@@ -353,7 +353,7 @@ onBeforeUnmount(() => {
 .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .head-copy { display: flex; flex-direction: column; gap: 4px; }
 .eyebrow { margin: 0; font-size: 12px; color: #6b7280; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-h1 { margin: 0; font-size: 30px; line-height: 1.1; }
+h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 .subhead { margin: 0; color: #64748b; font-size: 14px; }
 .mobile-head-cta { margin-top: -4px; }
 
@@ -412,7 +412,7 @@ h1 { margin: 0; font-size: 30px; line-height: 1.1; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
 @media (max-width: 768px) {
-  h1 { font-size: 26px; }
+  h1 { font-size: 19px; }
   .subhead { font-size: 13px; }
   .modal-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .modal-actions .n-button { min-height: 44px; width: 100%; }

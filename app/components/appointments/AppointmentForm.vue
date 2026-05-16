@@ -66,7 +66,13 @@
           />
         </n-form-item>
 
-        <n-form-item label="Data e hora inicial *" path="startsAt" required>
+        <n-form-item
+          label="Data e hora inicial *"
+          path="startsAt"
+          required
+          :validation-status="startsAtExternalError ? 'error' : undefined"
+          :feedback="startsAtExternalError || undefined"
+        >
           <n-date-picker
             v-model:value="model.startsAt"
             type="datetime"
@@ -164,6 +170,7 @@ const appointmentTypeOptions = ref<{label: string, value: number}[]>([])
 const statusOptions = ref<{label: string, value: number}[]>([])
 const veterinarianOptions = ref<{label: string, value: number}[]>([])
 const durationMinutes = ref<number | null>(30)
+const startsAtExternalError = ref('')
 const durationOptions = [
   { label: '15 min', value: 15 },
   { label: '30 min', value: 30 },
@@ -278,10 +285,9 @@ watch(
 )
 
 watch([() => model.startsAt, durationMinutes], ([startsAt, duration]) => {
+  if (startsAtExternalError.value) startsAtExternalError.value = ''
   if (!startsAt || !duration) return
-  if (!model.id || !model.endsAt) {
-    model.endsAt = startsAt + duration * 60 * 1000
-  }
+  model.endsAt = startsAt + duration * 60 * 1000
 })
 
 onMounted(() => {
@@ -320,7 +326,13 @@ const handleSubmit = async () => {
 }
 
 defineExpose({
-  submit: handleSubmit
+  submit: handleSubmit,
+  setStartsAtConflictError: (msg: string) => {
+    startsAtExternalError.value = msg
+  },
+  clearStartsAtConflictError: () => {
+    startsAtExternalError.value = ''
+  }
 })
 
 </script>

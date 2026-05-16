@@ -1158,7 +1158,7 @@ onBeforeUnmount(() => {
 
 h1 {
   margin: 4px 0 0;
-  font-size: 28px;
+  font-size: 22px;
   color: #0f172a;
 }
 

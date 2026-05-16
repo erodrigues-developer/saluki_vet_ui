@@ -467,7 +467,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .page { display: flex; flex-direction: column; gap: 16px; }
 .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-h1 { margin: 0; font-size: 30px; line-height: 1.1; }
+h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 .eyebrow { margin: 0; font-size: 12px; color: #6b7280; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .subhead { margin: 0; color: #64748b; font-size: 14px; }
 .head-cta { min-width: 170px; }
@@ -535,7 +535,7 @@ h1 { margin: 0; font-size: 30px; line-height: 1.1; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
 @media (max-width: 768px) {
   .page-head { flex-direction: column; align-items: stretch; }
-  h1 { font-size: 26px; }
+  h1 { font-size: 19px; }
   .head-cta { width: 100%; }
   .summary-grid, .summary-grid-mobile { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .modal-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

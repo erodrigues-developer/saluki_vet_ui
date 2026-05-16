@@ -494,7 +494,7 @@ onBeforeUnmount(() => {
   gap: 16px;
 }
 
-h1 { margin: 0; font-size: 30px; line-height: 1.1; }
+h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 
 .eyebrow {
   margin: 0;
@@ -692,7 +692,7 @@ h1 { margin: 0; font-size: 30px; line-height: 1.1; }
     align-items: stretch;
   }
 
-  h1 { font-size: 26px; }
+  h1 { font-size: 19px; }
 
   .head-cta {
     width: 100%;

@@ -623,7 +623,7 @@ onBeforeUnmount(() => {
 .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .head-copy { display: flex; flex-direction: column; gap: 4px; }
 .eyebrow { font-size: 12px; color: #6b7280; text-transform: uppercase; margin: 0; }
-h1 { margin: 0; font-size: 34px; line-height: 1.1; }
+h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 .subhead { margin: 0; color: #4b5563; font-size: 14px; }
 
 .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -726,7 +726,7 @@ h1 { margin: 0; font-size: 34px; line-height: 1.1; }
   .page-head { align-items: flex-start; flex-direction: column; gap: 8px; }
   .head-copy { gap: 2px; }
   .head-cta { width: 100%; }
-  h1 { font-size: 26px; }
+  h1 { font-size: 19px; }
   .subhead { font-size: 13px; }
 
   .card-list { display: flex; flex-direction: column; gap: 12px; }

@@ -731,7 +731,7 @@ const formatCurrency = (value) =>
 
 h1 {
   margin: 0;
-  font-size: 34px;
+  font-size: 22px;
   color: #092a3d;
 }
 
@@ -910,7 +910,7 @@ h3 {
 @media (max-width: 860px) {
   .hero { flex-direction: column; gap: 10px; }
   .mid-grid, .kpi-grid, .alert-grid { grid-template-columns: 1fr; }
-  h1 { font-size: 30px; }
+  h1 { font-size: 19px; }
   .page { padding: 24px 16px 52px; }
   .donut-wrapper {
     flex-direction: column;

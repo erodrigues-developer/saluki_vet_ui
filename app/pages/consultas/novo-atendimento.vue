@@ -1138,7 +1138,7 @@ onBeforeUnmount(() => {
 .clinical-page { display: flex; flex-direction: column; gap: 16px; }
 .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .eyebrow { margin: 0; text-transform: uppercase; font-size: 12px; color: #64748b; }
-h1 { margin: 0; font-size: 34px; line-height: 1.1; }
+h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 .subhead { margin: 4px 0 0; color: #475569; font-size: 14px; }
 .head-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .save-status { font-size: 12px; color: #64748b; align-self: center; }

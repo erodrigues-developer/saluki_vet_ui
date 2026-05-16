@@ -997,7 +997,7 @@ watch(activeDetailTab, async () => {
 
 .head-copy h1 {
   margin: 0;
-  font-size: 2rem;
+  font-size: 22px;
   color: #0f172a;
 }
 
@@ -1656,6 +1656,10 @@ watch(activeDetailTab, async () => {
     min-height: 42px;
     font-size: 15px;
     opacity: 1;
+  }
+
+  .head-copy h1 {
+    font-size: 19px;
   }
 
   .stats-grid {

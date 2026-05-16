@@ -650,6 +650,8 @@ const valueClass = (value?: string | null) => {
 
 h1 {
   margin: 0;
+  font-size: 22px;
+  line-height: 1.15;
 }
 
 .subhead {
@@ -1079,7 +1081,7 @@ h1 {
   }
 
   h1 {
-    font-size: 26px;
+    font-size: 19px;
     line-height: 1.1;
   }
 

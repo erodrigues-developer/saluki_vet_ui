@@ -406,24 +406,25 @@ const handleNavigate = () => {
   padding: 2px 4px 18px 0;
   min-height: 0;
   scrollbar-width: thin;
-  scrollbar-color: rgba(71, 85, 105, 0.24) transparent;
+  scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
 }
 
 .menu::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .menu::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--app-scrollbar-track);
 }
 
 .menu::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.22);
+  background: var(--app-scrollbar-thumb);
   border-radius: 999px;
+  border: 2px solid var(--app-scrollbar-track);
 }
 
 .menu:hover::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.34);
+  background: var(--app-scrollbar-thumb-hover);
 }
 .menu-group {
   display: grid;
