@@ -204,6 +204,8 @@
             <p>Data: {{ format(new Date(selectedAppointment.startsAt), 'dd/MM/yyyy') }}</p>
             <p>Horário: {{ eventTimeRange(selectedAppointment) }}</p>
             <p>Status: {{ statusLabel(selectedAppointment) }}</p>
+            <p>Check-in em: {{ selectedAppointment.arrivedAt ? format(new Date(selectedAppointment.arrivedAt), 'dd/MM/yyyy HH:mm') : '-' }}</p>
+            <p>Check-in por: {{ selectedAppointment.checkedInByUserId ? usersMap[selectedAppointment.checkedInByUserId] || `Usuário ${selectedAppointment.checkedInByUserId}` : '-' }}</p>
             <p>Triagem: {{ triageLabel(selectedAppointment.triageRisk) }}</p>
             <p>Motivo: {{ selectedAppointment.reason || '-' }}</p>
             <p>Observações: {{ selectedAppointment.notes || '-' }}</p>
@@ -513,6 +515,7 @@ const selectedAppointment = ref<any | null>(null)
 const agendaGridWrapRef = ref<HTMLElement | null>(null)
 const mobileTimelineWrapRef = ref<HTMLElement | null>(null)
 const clinicBusinessHoursJson = ref<string | null>(null)
+const clinicTimezone = ref('America/Sao_Paulo')
 const nowTs = ref(Date.now())
 let nowTickTimer: ReturnType<typeof setInterval> | null = null
 let mediaQuery: MediaQueryList | null = null
@@ -648,6 +651,47 @@ const getTriageMeta = (risk?: string | null) => {
   if (label === 'Vermelha') return { label, className: 'triage-red' }
   if (label === 'Emergência') return { label, className: 'triage-emergency' }
   return { label, className: 'triage-pending' }
+}
+
+const dateKeyInTimeZone = (date: Date, timeZone: string) => {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(date)
+  } catch {
+    return new Intl.DateTimeFormat('en-CA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(date)
+  }
+}
+
+const isSameBusinessDate = (dateA: Date, dateB: Date) => {
+  return dateKeyInTimeZone(dateA, clinicTimezone.value) === dateKeyInTimeZone(dateB, clinicTimezone.value)
+}
+
+const canCheckIn = (row: any) => {
+  const code = String((row.status || statusesMap.value[row.statusId])?.code || '').toUpperCase()
+  if (!['SCHEDULED', 'CONFIRMED'].includes(code)) return false
+  return isSameBusinessDate(new Date(row.startsAt), new Date())
+}
+
+const checkInBlockedReason = (row: any) => {
+  const code = String((row.status || statusesMap.value[row.statusId])?.code || '').toUpperCase()
+  if (code === 'CANCELED' || code === 'COMPLETED') {
+    return 'Não é possível fazer check-in em agendamento cancelado ou finalizado.'
+  }
+  if (!['SCHEDULED', 'CONFIRMED'].includes(code)) {
+    return 'Check-in disponível apenas para agendamentos agendados ou confirmados.'
+  }
+  if (!isSameBusinessDate(new Date(row.startsAt), new Date())) {
+    return 'Check-in permitido apenas no dia do agendamento.'
+  }
+  return ''
 }
 
 const selectedVetIdSingle = computed(() => agendaFilters.veterinarianIds.length === 1 ? agendaFilters.veterinarianIds[0] : null)
@@ -1033,6 +1077,7 @@ const mobileNowLineStyle = computed(() => ({ top: `${nowLineTop.value}px` }))
 const openDetail = (row: any) => {
   selectedAppointment.value = row
   showDetailDrawer.value = true
+  void syncSelectedAppointment(Number(row?.id))
 }
 
 const primaryActionLabel = (row: any) => {
@@ -1140,7 +1185,7 @@ const columns = [
   { title: () => h('span', { class: 'th-nowrap' }, 'Veterinário'), key: 'vet', width: 190, render: (row: any) => h('span', { class: 'cell-nowrap' }, row.veterinarianId ? usersMap.value[row.veterinarianId] : 'Não atribuído') },
   { title: () => h('span', { class: 'th-nowrap' }, 'Status'), key: 'status', width: 150, render: (row: any) => h('span', { class: ['status-pill', getStatusMeta(row.status || statusesMap.value[row.statusId] || null).className] }, statusLabel(row)) },
   { title: () => h('span', { class: 'th-nowrap' }, 'Triagem'), key: 'triageRisk', width: 140, render: (row: any) => h('span', { class: ['triage-pill', getTriageMeta(row.triageRisk || null).className] }, [h('span', { class: 'triage-dot' }), h('span', triageLabel(row.triageRisk || null))]) },
-  { title: () => h('span', { class: 'th-nowrap' }, 'Ações'), key: 'actions', width: 170, render: (row: any) => h('div', { class: 'actions', style: 'justify-content: flex-end;' }, [h(NButton, { size: 'small', secondary: true, type: 'primary', disabled: row.status?.code === 'ARRIVED', onClick: (e) => { e.stopPropagation(); openCheckIn(row) } }, { default: () => 'Check-in' }), h(NDropdown, { trigger: 'click', options: actionOptionsFor(), onSelect: (key: string) => handleActionSelect(key, row) }, { default: () => h(NButton, { size: 'small', quaternary: true, class: 'menu-button', onClick: (e) => e.stopPropagation() }, { default: () => '⋯' }) })]) }
+  { title: () => h('span', { class: 'th-nowrap' }, 'Ações'), key: 'actions', width: 170, render: (row: any) => h('div', { class: 'actions', style: 'justify-content: flex-end;' }, [h(NButton, { size: 'small', secondary: true, type: 'primary', disabled: !canCheckIn(row), title: checkInBlockedReason(row) || undefined, onClick: (e) => { e.stopPropagation(); openCheckIn(row) } }, { default: () => 'Check-in' }), h(NDropdown, { trigger: 'click', options: actionOptionsFor(), onSelect: (key: string) => handleActionSelect(key, row) }, { default: () => h(NButton, { size: 'small', quaternary: true, class: 'menu-button', onClick: (e) => e.stopPropagation() }, { default: () => '⋯' }) })]) }
 ]
 
 const loadLookups = async () => {
@@ -1183,8 +1228,10 @@ const loadClinicSettings = async () => {
     const api = useApi()
     const settings = await api<any>('/api/v1/clinic-settings')
     clinicBusinessHoursJson.value = settings?.businessHoursJson || null
+    clinicTimezone.value = settings?.timezone || 'America/Sao_Paulo'
   } catch {
     clinicBusinessHoursJson.value = null
+    clinicTimezone.value = 'America/Sao_Paulo'
   }
 }
 
@@ -1226,6 +1273,37 @@ const fetchAgendaAppointments = async () => {
   }
 }
 
+const syncSelectedAppointment = async (appointmentId?: number | null) => {
+  const selectedId = Number(appointmentId || selectedAppointment.value?.id || 0)
+  if (!selectedId) return
+
+  try {
+    const api = useApi()
+    const latest = await api<any>(`/api/v1/appointments/${selectedId}`)
+    selectedAppointment.value = latest
+    return
+  } catch {
+    // fallback local quando não conseguir buscar o item no backend
+  }
+
+  const fromAgenda = agendaAppointments.value.find((item: any) => Number(item.id) === selectedId)
+  if (fromAgenda) {
+    selectedAppointment.value = fromAgenda
+    return
+  }
+
+  const fromList = appointments.value.find((item: any) => Number(item.id) === selectedId)
+  if (fromList) {
+    selectedAppointment.value = fromList
+    return
+  }
+
+  if (Number(selectedAppointment.value?.id) === selectedId) {
+    selectedAppointment.value = null
+    showDetailDrawer.value = false
+  }
+}
+
 const clearFilters = () => {
   filters.search = ''
   filters.period = null
@@ -1254,6 +1332,7 @@ const handleSubmit = async (payload: AppointmentPayload) => {
     closeModal()
     await fetchAppointments()
     await fetchAgendaAppointments()
+    if (payload.id) await syncSelectedAppointment(Number(payload.id))
     message.success(payload.id ? 'Agendamento atualizado' : 'Agendamento criado')
   } catch (err: any) {
     const statusCode = Number(err?.statusCode || err?.data?.statusCode || 0)
@@ -1280,6 +1359,7 @@ const cancelAppointment = async (appointment: any) => {
   await api(`/api/v1/appointments/${appointment.id}`, { method: 'PATCH', body: { statusId: Number(canceledStatus.id) } })
   await fetchAppointments()
   await fetchAgendaAppointments()
+  await syncSelectedAppointment(Number(appointment.id))
 }
 
 const confirmDelete = (appointment: any) => {
@@ -1290,9 +1370,14 @@ const confirmDelete = (appointment: any) => {
     negativeText: 'Cancelar',
     onPositiveClick: async () => {
       const api = useApi()
+      const deletedId = Number(appointment.id)
       await api(`/api/v1/appointments/${appointment.id}`, { method: 'DELETE' })
       await fetchAppointments()
       await fetchAgendaAppointments()
+      if (Number(selectedAppointment.value?.id) === deletedId) {
+        selectedAppointment.value = null
+        showDetailDrawer.value = false
+      }
     }
   })
 }
@@ -1365,10 +1450,22 @@ const handleQuickSubmit = async () => {
   }
 }
 
-const openCheckIn = (appointment: any) => {
-  checkInTarget.value = appointment
-  checkInForm.reason = appointment.reason || ''
-  checkInForm.triageRisk = appointment.triageRisk || null
+const openCheckIn = async (appointment: any) => {
+  const api = useApi()
+  let latest = appointment
+  try {
+    latest = await api<any>(`/api/v1/appointments/${appointment.id}`)
+  } catch {
+    // Se não conseguir atualizar, segue com o estado local e backend valida no submit.
+  }
+
+  if (!canCheckIn(latest)) {
+    message.warning(checkInBlockedReason(latest))
+    return
+  }
+  checkInTarget.value = latest
+  checkInForm.reason = latest.reason || ''
+  checkInForm.triageRisk = latest.triageRisk || null
   checkInForm.weightKg = null
   checkInForm.temperatureC = null
   checkInForm.heartRateBpm = null
@@ -1387,6 +1484,7 @@ const handleCheckIn = async () => {
   checkInSaving.value = true
   try {
     const api = useApi()
+    const checkedInAppointmentId = Number(checkInTarget.value.id)
     await api(`/api/v1/appointments/${checkInTarget.value.id}/check-in`, {
       method: 'POST',
       body: {
@@ -1404,6 +1502,9 @@ const handleCheckIn = async () => {
     showCheckInModal.value = false
     await fetchAppointments()
     await fetchAgendaAppointments()
+    await syncSelectedAppointment(checkedInAppointmentId)
+  } catch (err: any) {
+    message.error(err?.data?.message || 'Não foi possível registrar check-in.')
   } finally {
     checkInSaving.value = false
   }

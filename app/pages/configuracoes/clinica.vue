@@ -31,6 +31,16 @@
               <n-input v-model:value="model.defaultCurrency" placeholder="BRL" />
             </n-form-item>
 
+            <n-form-item label="Timezone da Clínica" path="timezone">
+              <n-select
+                v-model:value="model.timezone"
+                :options="timezoneOptions"
+                filterable
+                tag
+                placeholder="Selecione ou digite um timezone IANA"
+              />
+            </n-form-item>
+
             <n-form-item label="URL da Logo" path="logoUrl" class="full-row">
               <n-input v-model:value="model.logoUrl" placeholder="https://..." />
             </n-form-item>
@@ -82,6 +92,7 @@ interface ClinicSettings {
   businessHoursJson?: string | null
   logoUrl?: string | null
   defaultCurrency: string
+  timezone: string
   notes?: string | null
 }
 
@@ -93,14 +104,46 @@ const formRef = ref<FormInst | null>(null)
 const model = reactive<ClinicSettings>({
   appointmentSlotDurationMinutes: 30,
   defaultCurrency: 'BRL',
+  timezone: 'America/Sao_Paulo',
   notes: '',
   logoUrl: '',
   businessHoursJson: ''
 })
 
+const buildTimezoneOptions = () => {
+  const fallback = [
+    'UTC',
+    'America/Sao_Paulo',
+    'America/New_York',
+    'America/Los_Angeles',
+    'Europe/London',
+    'Europe/Paris',
+    'Asia/Tokyo',
+    'Asia/Shanghai',
+    'Australia/Sydney',
+  ];
+  try {
+    const maybeIntl = Intl as Intl.DateTimeFormat & {
+      supportedValuesOf?: (key: string) => string[];
+    };
+    if (typeof maybeIntl.supportedValuesOf === 'function') {
+      const zones = maybeIntl.supportedValuesOf('timeZone');
+      return zones
+        .map((tz) => ({ label: tz, value: tz }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    }
+  } catch {
+    // fallback abaixo
+  }
+  return fallback.map((tz) => ({ label: tz, value: tz }));
+};
+
+const timezoneOptions = buildTimezoneOptions()
+
 const rules: FormRules = {
   appointmentSlotDurationMinutes: { type: 'number', required: true, message: 'Adicione a duração em minutos', trigger: ['blur', 'change'] },
   defaultCurrency: { required: true, message: 'Moeda é obrigatória', trigger: 'blur' },
+  timezone: { required: true, message: 'Timezone é obrigatório', trigger: ['blur', 'change'] },
   businessHoursJson: {
     validator: (_, value) => {
       if (!value) return true
@@ -124,6 +167,7 @@ const fetchSettings = async () => {
       id: data.id,
       appointmentSlotDurationMinutes: data.appointmentSlotDurationMinutes,
       defaultCurrency: data.defaultCurrency || 'BRL',
+      timezone: data.timezone || 'America/Sao_Paulo',
       notes: data.notes || '',
       logoUrl: data.logoUrl || '',
       businessHoursJson: data.businessHoursJson || ''
@@ -148,6 +192,7 @@ const handleSave = async () => {
       body: {
         appointmentSlotDurationMinutes: model.appointmentSlotDurationMinutes,
         defaultCurrency: model.defaultCurrency,
+        timezone: model.timezone || 'America/Sao_Paulo',
         notes: model.notes || null,
         logoUrl: model.logoUrl || null,
         businessHoursJson: model.businessHoursJson || null
