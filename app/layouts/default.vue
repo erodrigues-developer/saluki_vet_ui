@@ -181,6 +181,7 @@ import {
   ShoppingCart,
   Stethoscope,
   Tags,
+  TimerReset,
   Truck,
   UserCog,
   Users
@@ -349,6 +350,7 @@ const searchableItems = [
   { type: 'Financeiro', label: 'Comissões', meta: 'Financeiro', to: '/financeiro/comissoes' },
   { type: 'Fornecedores', label: 'Fornecedores', meta: 'Cadastros', to: '/cadastros/fornecedores' },
   { type: 'Agendamentos', label: 'Agendamentos', meta: 'Atendimentos', to: '/atendimento/agendamentos' },
+  { type: 'Configurações', label: 'Escalas e Disponibilidade', meta: 'Configurações', to: '/configuracoes/escalas-disponibilidade' },
   { type: 'Usuários', label: 'Usuários e permissões', meta: 'Cadastros', to: '/usuarios' }
 ]
 
@@ -490,7 +492,10 @@ const menuItems = [
   {
     label: 'Configurações',
     icon: Settings,
-    children: [{ label: 'Clínica', icon: Building2, to: '/configuracoes/clinica' }]
+    children: [
+      { label: 'Clínica', icon: Building2, to: '/configuracoes/clinica' },
+      { label: 'Escalas e Disponibilidade', icon: TimerReset, to: '/configuracoes/escalas-disponibilidade' },
+    ]
   }
 ]
 </script>

@@ -53,7 +53,12 @@
                   <button
                     type="button"
                     class="mobile-slot-cell"
-                    :class="{ 'outside-hours': isOutsideOperatingHours(slot, agendaStartDate) }"
+                    :class="{
+                      'outside-hours': isOutsideOperatingHours(slot, agendaStartDate),
+                      'outside-scale': isOutsideWeeklyAvailability({ date: agendaStartDate, veterinarianId: selectedVetIdSingle }, slot),
+                      'blocked-slot': !!findBlockAtSlot({ date: agendaStartDate, veterinarianId: selectedVetIdSingle }, slot),
+                      'absence-slot': !!findAbsenceAtDate({ date: agendaStartDate, veterinarianId: selectedVetIdSingle })
+                    }"
                     @click="handleSlotClick({ date: agendaStartDate, veterinarianId: selectedVetIdSingle }, slot)"
                   >
                     <span class="mobile-slot-add">+ Agendar</span>
@@ -72,6 +77,7 @@
                   @click.stop="openDetail(event)"
                 >
                   <strong>{{ petNameMap[event.petId] || event.pet?.name || 'Pet' }}</strong>
+                  <span v-if="isLateAppointment(event)" class="event-late-tag">Atrasado</span>
                   <span>{{ eventTypeLabel(event) }}</span>
                   <small>{{ clientNameMap[event.clientId] || event.client?.name || 'Tutor' }} · {{ event.veterinarianId ? usersMap[event.veterinarianId] : 'Sem veterinário' }}</small>
                 </button>
@@ -161,7 +167,13 @@
                   :key="`${header.key}-${slot}`"
                   type="button"
                   class="slot-cell"
-                  :class="{ covered: isSlotCovered(header, slot), 'outside-hours': isOutsideOperatingHours(slot, header.date) }"
+                  :class="{
+                    covered: isSlotCovered(header, slot),
+                    'outside-hours': isOutsideOperatingHours(slot, header.date),
+                    'outside-scale': isOutsideWeeklyAvailability(header, slot),
+                    'blocked-slot': !!findBlockAtSlot(header, slot),
+                    'absence-slot': !!findAbsenceAtDate(header)
+                  }"
                   @click="handleSlotClick(header, slot)"
                 >
                   <span v-if="slotEvents(header, slot).length === 0 && !isSlotCovered(header, slot)" class="slot-hover-label">+ Agendar</span>
@@ -178,6 +190,7 @@
                 >
                   <span class="event-title-row">
                     <strong>{{ petNameMap[event.petId] || event.pet?.name || 'Pet' }}</strong>
+                    <span v-if="isLateAppointment(event)" class="event-late-tag">Atrasado</span>
                     <span :class="['event-triage-dot', getTriageMeta(event.triageRisk || null).className]" :title="triageLabel(event.triageRisk)" />
                   </span>
                   <span>{{ eventTypeLabel(event) }}</span>
@@ -203,7 +216,7 @@
             <p>Veterinário: {{ selectedAppointment.veterinarianId ? usersMap[selectedAppointment.veterinarianId] : 'Não atribuído' }}</p>
             <p>Data: {{ format(new Date(selectedAppointment.startsAt), 'dd/MM/yyyy') }}</p>
             <p>Horário: {{ eventTimeRange(selectedAppointment) }}</p>
-            <p>Status: {{ statusLabel(selectedAppointment) }}</p>
+            <p>Status: {{ statusLabel(selectedAppointment) }}<span v-if="isLateAppointment(selectedAppointment)"> · Atrasado ({{ lateMinutes(selectedAppointment) }} min)</span></p>
             <p>Check-in em: {{ selectedAppointment.arrivedAt ? format(new Date(selectedAppointment.arrivedAt), 'dd/MM/yyyy HH:mm') : '-' }}</p>
             <p>Check-in por: {{ selectedAppointment.checkedInByUserId ? usersMap[selectedAppointment.checkedInByUserId] || `Usuário ${selectedAppointment.checkedInByUserId}` : '-' }}</p>
             <p>Triagem: {{ triageLabel(selectedAppointment.triageRisk) }}</p>
@@ -212,6 +225,13 @@
             <div class="detail-actions">
               <n-button type="primary" @click="runPrimaryAction(selectedAppointment)">{{ primaryActionLabel(selectedAppointment) }}</n-button>
               <n-button @click="openEdit(selectedAppointment)">Reagendar/Editar</n-button>
+              <n-button
+                :disabled="!canMarkNoShow(selectedAppointment)"
+                :title="noShowBlockedReason(selectedAppointment) || undefined"
+                @click="handleActionSelect('no_show', selectedAppointment)"
+              >
+                Não compareceu
+              </n-button>
               <n-button tertiary @click="showDetailDrawer = false">Fechar</n-button>
             </div>
           </div>
@@ -319,9 +339,16 @@
           <div v-for="row in displayAppointments" :key="`list-m-${row.id}`" class="entity-card">
             <div class="card-top">
               <p class="card-time">{{ format(new Date(row.startsAt), 'HH:mm') }}</p>
-              <span :class="['status-pill', getStatusMeta(row.status || statusesMap[row.statusId] || null).className]">{{ statusLabel(row) }}</span>
+              <span
+                :class="isLateAppointment(row)
+                  ? 'late-pill'
+                  : ['status-pill', getStatusMeta(row.status || statusesMap[row.statusId] || null).className]"
+              >
+                {{ isLateAppointment(row) ? 'Atrasado' : statusLabel(row) }}
+              </span>
             </div>
             <p class="card-date">{{ format(new Date(row.startsAt), 'dd/MM/yyyy') }} · {{ eventTimeRange(row) }}</p>
+            <p v-if="isLateAppointment(row)" class="card-late">Atrasado · {{ lateMinutes(row) }} min</p>
             <button type="button" class="card-main" @click="openDetail(row)">
               <p class="card-title">{{ petNameMap[row.petId] || row.pet?.name || 'Pet' }}</p>
               <p class="card-subtitle">Tutor: {{ clientNameMap[row.clientId] || row.client?.name || 'Tutor' }}</p>
@@ -330,7 +357,7 @@
             </button>
             <div class="card-actions">
               <n-button size="small" secondary type="primary" @click.stop="runPrimaryAction(row)">{{ primaryActionLabel(row) }}</n-button>
-              <n-dropdown trigger="click" :options="actionOptionsFor()" @select="(key: string) => handleActionSelect(key, row)">
+              <n-dropdown trigger="click" :options="actionOptionsFor(row)" @select="(key: string) => handleActionSelect(key, row)">
                 <n-button size="small" quaternary class="menu-button" @click.stop>
                   <AppIcon name="ellipsis" :size="16" :stroke-width="2" />
                 </n-button>
@@ -516,6 +543,10 @@ const agendaGridWrapRef = ref<HTMLElement | null>(null)
 const mobileTimelineWrapRef = ref<HTMLElement | null>(null)
 const clinicBusinessHoursJson = ref<string | null>(null)
 const clinicTimezone = ref('America/Sao_Paulo')
+const clinicCheckInToleranceMinutes = ref(10)
+const weeklyAvailabilityByVet = ref<Record<number, Record<number, { isAvailable: boolean; periods: Array<{ startTime: string; endTime: string }> }>>>({})
+const blocksByVetDate = ref<Record<string, Array<{ veterinarianId: number; date: string; startTime: string; endTime: string; reason: string; active: boolean }>>>({})
+const absencesByVet = ref<Record<number, Array<{ startDate: string; endDate: string; reason: string; active: boolean }>>>({})
 const nowTs = ref(Date.now())
 let nowTickTimer: ReturnType<typeof setInterval> | null = null
 let mediaQuery: MediaQueryList | null = null
@@ -633,7 +664,7 @@ const getStatusMeta = (status?: { code?: string, name?: string } | null) => {
   if (code === 'IN_PROGRESS' || name.toLowerCase() === 'em atendimento') return { label: 'Em atendimento', className: 'status-in-progress' }
   if (code === 'COMPLETED' || name.toLowerCase() === 'finalizado') return { label: 'Finalizado', className: 'status-completed' }
   if (code === 'CANCELED' || name.toLowerCase() === 'cancelado') return { label: 'Cancelado', className: 'status-canceled' }
-  if (code === 'NO_SHOW') return { label: 'Não compareceu', className: 'status-canceled' }
+  if (code === 'NO_SHOW' || code === 'NOSHOW') return { label: 'Não compareceu', className: 'status-canceled' }
   return { label: name || 'Pendente', className: 'status-default' }
 }
 const triageLabel = (risk?: string | null) => {
@@ -674,10 +705,52 @@ const isSameBusinessDate = (dateA: Date, dateB: Date) => {
   return dateKeyInTimeZone(dateA, clinicTimezone.value) === dateKeyInTimeZone(dateB, clinicTimezone.value)
 }
 
+const isLateAppointment = (row: any) => {
+  if (row?.derived && typeof row.derived.isLate === 'boolean') return row.derived.isLate
+  const code = String((row.status || statusesMap.value[row.statusId])?.code || '').toUpperCase()
+  if (!['SCHEDULED', 'CONFIRMED'].includes(code)) return false
+  const startsAt = new Date(row.startsAt).getTime()
+  if (!Number.isFinite(startsAt)) return false
+  const tolerance = Number(clinicCheckInToleranceMinutes.value || 0) * 60 * 1000
+  return Date.now() > startsAt + tolerance
+}
+
+const lateMinutes = (row: any) => {
+  if (Number.isFinite(Number(row?.derived?.lateByMinutes))) return Number(row.derived.lateByMinutes)
+  const startsAt = new Date(row.startsAt).getTime()
+  if (!Number.isFinite(startsAt)) return 0
+  const tolerance = Number(clinicCheckInToleranceMinutes.value || 0) * 60 * 1000
+  return Math.max(0, Math.floor((Date.now() - (startsAt + tolerance)) / 60000))
+}
+
 const canCheckIn = (row: any) => {
   const code = String((row.status || statusesMap.value[row.statusId])?.code || '').toUpperCase()
   if (!['SCHEDULED', 'CONFIRMED'].includes(code)) return false
   return isSameBusinessDate(new Date(row.startsAt), new Date())
+}
+
+const noShowCutoffTs = (row: any) => {
+  const startsAt = new Date(row?.startsAt).getTime()
+  if (!Number.isFinite(startsAt)) return Number.POSITIVE_INFINITY
+  return startsAt + Number(clinicCheckInToleranceMinutes.value || 0) * 60 * 1000
+}
+
+const canMarkNoShow = (row: any) => {
+  const code = String((row.status || statusesMap.value[row.statusId])?.code || '').toUpperCase()
+  if (!['SCHEDULED', 'CONFIRMED'].includes(code)) return false
+  return Date.now() > noShowCutoffTs(row)
+}
+
+const noShowBlockedReason = (row: any) => {
+  const code = String((row.status || statusesMap.value[row.statusId])?.code || '').toUpperCase()
+  if (!['SCHEDULED', 'CONFIRMED'].includes(code)) {
+    return 'Não compareceu só pode ser marcado para agendamentos agendados ou confirmados.'
+  }
+  if (!canMarkNoShow(row)) {
+    const cutoff = new Date(noShowCutoffTs(row))
+    return `Disponível após ${format(cutoff, 'HH:mm')} (tolerância de ${clinicCheckInToleranceMinutes.value} min).`
+  }
+  return ''
 }
 
 const checkInBlockedReason = (row: any) => {
@@ -741,8 +814,7 @@ const agendaFilteredAppointments = computed(() => {
     if (activeQuickChip.value === 'today' && !isSameDay(d, new Date())) return false
     if (activeQuickChip.value === 'tomorrow' && !isSameDay(d, addDays(new Date(), 1))) return false
     if (activeQuickChip.value === 'late') {
-      const code = (row.status || statusesMap.value[row.statusId])?.code
-      if (!(new Date(row.startsAt) < new Date() && ['SCHEDULED', 'CONFIRMED'].includes(code))) return false
+      if (!isLateAppointment(row)) return false
     }
     if (activeQuickChip.value === 'urgent' && !['VERMELHA', 'EMERGENCY', 'RED'].includes(row.triageRisk)) return false
     if (activeQuickChip.value === 'novet' && row.veterinarianId) return false
@@ -839,6 +911,7 @@ const slotToMinutes = (slot: string) => {
   const [hh, mm] = slot.split(':').map(Number)
   return hh * 60 + mm
 }
+const toDateKey = (date: Date) => format(date, 'yyyy-MM-dd')
 
 const dayAliases: Record<string, number> = {
   dom: 0, domingo: 0, sunday: 0, sun: 0,
@@ -890,6 +963,45 @@ const isOutsideOperatingHours = (slot: string, date: Date) => {
   const ranges = parsedBusinessHours.value[date.getDay()] || []
   if (!ranges.length) return true
   return !ranges.some(([start, end]) => minutes >= start && minutes < end)
+}
+
+const isOutsideWeeklyAvailability = (header: any, slot: string) => {
+  const veterinarianId = Number(header?.veterinarianId || 0)
+  if (!veterinarianId) return false
+  const byVet = weeklyAvailabilityByVet.value[veterinarianId]
+  if (!byVet) return false
+  const day = byVet[header.date.getDay()]
+  if (!day || !day.isAvailable) return true
+  const minutes = slotToMinutes(slot)
+  return !(day.periods || []).some((period) => {
+    const from = parseHourToMinutes(period.startTime)
+    const to = parseHourToMinutes(period.endTime)
+    if (from === null || to === null) return false
+    return minutes >= from && minutes < to
+  })
+}
+
+const findBlockAtSlot = (header: any, slot: string) => {
+  const veterinarianId = Number(header?.veterinarianId || 0)
+  if (!veterinarianId) return null
+  const key = `${veterinarianId}:${toDateKey(header.date)}`
+  const items = blocksByVetDate.value[key] || []
+  const start = slotToMinutes(slot)
+  const end = start + 30
+  return items.find((item) => {
+    if (!item.active) return false
+    const from = parseHourToMinutes(item.startTime)
+    const to = parseHourToMinutes(item.endTime)
+    if (from === null || to === null) return false
+    return start < to && end > from
+  }) || null
+}
+
+const findAbsenceAtDate = (header: any) => {
+  const veterinarianId = Number(header?.veterinarianId || 0)
+  if (!veterinarianId) return null
+  const day = toDateKey(header.date)
+  return (absencesByVet.value[veterinarianId] || []).find((item) => item.active && day >= item.startDate && day <= item.endDate) || null
 }
 
 const getHeaderEvents = (header: any) => {
@@ -987,14 +1099,22 @@ const isSlotCovered = (header: any, slot: string) => {
 
 const handleSlotClick = (header: any, slot: string) => {
   if (isSlotCovered(header, slot)) return
+  const absence = findAbsenceAtDate(header)
+  if (absence) {
+    message.warning(`Veterinário indisponível nesta data: ${absence.reason}.`)
+    return
+  }
+  const block = findBlockAtSlot(header, slot)
+  if (block) {
+    message.warning(`Este horário está bloqueado: ${block.reason}.`)
+    return
+  }
+  if (isOutsideWeeklyAvailability(header, slot)) {
+    message.warning('Este horário está fora da escala do veterinário.')
+    return
+  }
   if (isOutsideOperatingHours(slot, header.date)) {
-    dialog.warning({
-      title: 'Horário fora do funcionamento',
-      content: 'Este horário está fora do funcionamento da clínica, das 08:00 às 18:00. Deseja continuar mesmo assim?',
-      positiveText: 'Continuar',
-      negativeText: 'Cancelar',
-      onPositiveClick: () => openCreateFromSlot(header.date, slot, header.veterinarianId || null)
-    })
+    message.warning('Este horário está fora do horário da clínica.')
     return
   }
   openCreateFromSlot(header.date, slot, header.veterinarianId || null)
@@ -1021,7 +1141,11 @@ const eventTimeRange = (row: any) => {
   const end = new Date(start.getTime() + duration * 60000)
   return `${format(start, 'HH:mm')}–${format(end, 'HH:mm')}`
 }
-const eventClass = (row: any) => [getStatusMeta(row.status || statusesMap.value[row.statusId] || null).className, getTriageMeta(row.triageRisk || null).className]
+const eventClass = (row: any) => [
+  getStatusMeta(row.status || statusesMap.value[row.statusId] || null).className,
+  getTriageMeta(row.triageRisk || null).className,
+  isLateAppointment(row) ? 'event-late' : '',
+]
 const eventStyle = (row: any) => {
   const duration = Math.max(15, getEventDurationMinutes(row))
   const verticalGap = 8
@@ -1170,10 +1294,11 @@ const displayAppointments = computed(() => {
   })
 })
 
-const actionOptionsFor = () => [
+const actionOptionsFor = (row?: any) => [
   { label: 'Ver detalhes', key: 'view' },
   { label: 'Editar', key: 'edit' },
   { label: 'Reagendar', key: 'reschedule' },
+  ...(row ? [{ label: 'Não compareceu', key: 'no_show', disabled: !canMarkNoShow(row) }] : []),
   { label: 'Cancelar agendamento', key: 'cancel' },
   { label: 'Excluir', key: 'delete' }
 ]
@@ -1183,9 +1308,19 @@ const columns = [
   { title: () => h('span', { class: 'th-nowrap' }, 'Cliente / Pet'), key: 'clientPet', width: 280, render: (row: any) => h('div', [h('div', { class: 'cell-strong' }, clientNameMap.value[row.clientId] || 'Carregando...'), h('div', { class: 'cell-muted' }, `Pet: ${petNameMap.value[row.petId] || 'Carregando...'}`)]) },
   { title: () => h('span', { class: 'th-nowrap' }, 'Atendimento'), key: 'type', width: 220, render: (row: any) => h('span', { class: 'cell-nowrap' }, row.appointmentType?.name || typesMap.value[row.appointmentTypeId] || '-') },
   { title: () => h('span', { class: 'th-nowrap' }, 'Veterinário'), key: 'vet', width: 190, render: (row: any) => h('span', { class: 'cell-nowrap' }, row.veterinarianId ? usersMap.value[row.veterinarianId] : 'Não atribuído') },
-  { title: () => h('span', { class: 'th-nowrap' }, 'Status'), key: 'status', width: 150, render: (row: any) => h('span', { class: ['status-pill', getStatusMeta(row.status || statusesMap.value[row.statusId] || null).className] }, statusLabel(row)) },
+  {
+    title: () => h('span', { class: 'th-nowrap' }, 'Status'),
+    key: 'status',
+    width: 180,
+    render: (row: any) =>
+      h('div', { class: 'status-stack' }, [
+        isLateAppointment(row)
+          ? h('span', { class: 'late-pill', title: `${lateMinutes(row)} min de atraso` }, 'Atrasado')
+          : h('span', { class: ['status-pill', getStatusMeta(row.status || statusesMap.value[row.statusId] || null).className] }, statusLabel(row)),
+      ]),
+  },
   { title: () => h('span', { class: 'th-nowrap' }, 'Triagem'), key: 'triageRisk', width: 140, render: (row: any) => h('span', { class: ['triage-pill', getTriageMeta(row.triageRisk || null).className] }, [h('span', { class: 'triage-dot' }), h('span', triageLabel(row.triageRisk || null))]) },
-  { title: () => h('span', { class: 'th-nowrap' }, 'Ações'), key: 'actions', width: 170, render: (row: any) => h('div', { class: 'actions', style: 'justify-content: flex-end;' }, [h(NButton, { size: 'small', secondary: true, type: 'primary', disabled: !canCheckIn(row), title: checkInBlockedReason(row) || undefined, onClick: (e) => { e.stopPropagation(); openCheckIn(row) } }, { default: () => 'Check-in' }), h(NDropdown, { trigger: 'click', options: actionOptionsFor(), onSelect: (key: string) => handleActionSelect(key, row) }, { default: () => h(NButton, { size: 'small', quaternary: true, class: 'menu-button', onClick: (e) => e.stopPropagation() }, { default: () => '⋯' }) })]) }
+  { title: () => h('span', { class: 'th-nowrap' }, 'Ações'), key: 'actions', width: 170, render: (row: any) => h('div', { class: 'actions', style: 'justify-content: flex-end;' }, [h(NButton, { size: 'small', secondary: true, type: 'primary', disabled: !canCheckIn(row), title: checkInBlockedReason(row) || undefined, onClick: (e) => { e.stopPropagation(); openCheckIn(row) } }, { default: () => 'Check-in' }), h(NDropdown, { trigger: 'click', options: actionOptionsFor(row), onSelect: (key: string) => handleActionSelect(key, row) }, { default: () => h(NButton, { size: 'small', quaternary: true, class: 'menu-button', onClick: (e) => e.stopPropagation() }, { default: () => '⋯' }) })]) }
 ]
 
 const loadLookups = async () => {
@@ -1202,6 +1337,9 @@ const loadLookups = async () => {
   const statuses = toArray(statusesRes)
   const types = toArray(typesRes)
   const users = toArray(usersRes)
+  const veterinarians = users.filter((u: any) =>
+    Array.isArray(u?.roles) && u.roles.some((role: any) => String(role?.code || '').toUpperCase() === 'VET'),
+  )
   const clients = toArray(clientsRes)
   const pets = toArray(petsRes)
   const species = toArray(speciesRes)
@@ -1218,7 +1356,7 @@ const loadLookups = async () => {
   pets.forEach((p: any) => { petNameMap.value[p.id] = p.name })
   statusOptions.value = statuses.map((s: any) => ({ label: s.name, value: Number(s.id) }))
   appointmentTypeOptions.value = types.map((t: any) => ({ label: t.name, value: Number(t.id) }))
-  veterinarianOptions.value = users.map((u: any) => ({ label: u.name, value: Number(u.id) }))
+  veterinarianOptions.value = veterinarians.map((u: any) => ({ label: u.name, value: Number(u.id) }))
   speciesOptions.value = species.map((s: any) => ({ label: s.name, value: Number(s.id) }))
   breedOptions.value = breeds.map((b: any) => ({ label: b.name, value: Number(b.id) }))
 }
@@ -1229,10 +1367,54 @@ const loadClinicSettings = async () => {
     const settings = await api<any>('/api/v1/clinic-settings')
     clinicBusinessHoursJson.value = settings?.businessHoursJson || null
     clinicTimezone.value = settings?.timezone || 'America/Sao_Paulo'
+    clinicCheckInToleranceMinutes.value = Number(settings?.checkInToleranceMinutes ?? 10)
   } catch {
     clinicBusinessHoursJson.value = null
     clinicTimezone.value = 'America/Sao_Paulo'
+    clinicCheckInToleranceMinutes.value = 10
   }
+}
+
+const loadAvailabilityContext = async () => {
+  const api = useApi()
+  const weeklyMap: Record<number, Record<number, { isAvailable: boolean; periods: Array<{ startTime: string; endTime: string }> }>> = {}
+  const blockMap: Record<string, Array<{ veterinarianId: number; date: string; startTime: string; endTime: string; reason: string; active: boolean }>> = {}
+  const absenceMap: Record<number, Array<{ startDate: string; endDate: string; reason: string; active: boolean }>> = {}
+
+  for (const option of veterinarianOptions.value) {
+    const veterinarianId = Number(option.value)
+    const res = await api<any>('/api/v1/veterinarian-availability', { query: { veterinarianId } })
+    weeklyMap[veterinarianId] = {}
+    ;(Array.isArray(res?.weeklySchedule) ? res.weeklySchedule : []).forEach((row: any) => {
+      weeklyMap[veterinarianId][Number(row.weekday)] = {
+        isAvailable: Boolean(row.isAvailable),
+        periods: Array.isArray(row.periods) ? row.periods : [],
+      }
+    })
+    ;(Array.isArray(res?.oneTimeBlocks) ? res.oneTimeBlocks : []).forEach((row: any) => {
+      const date = String(row.date || '')
+      const key = `${veterinarianId}:${date}`
+      if (!blockMap[key]) blockMap[key] = []
+      blockMap[key].push({
+        veterinarianId,
+        date,
+        startTime: String(row.startTime || ''),
+        endTime: String(row.endTime || ''),
+        reason: String(row.reason || 'Bloqueio'),
+        active: row.active !== false,
+      })
+    })
+    absenceMap[veterinarianId] = (Array.isArray(res?.absences) ? res.absences : []).map((row: any) => ({
+      startDate: String(row.startDate || ''),
+      endDate: String(row.endDate || ''),
+      reason: String(row.reason || 'Ausência'),
+      active: row.active !== false,
+    }))
+  }
+
+  weeklyAvailabilityByVet.value = weeklyMap
+  blocksByVetDate.value = blockMap
+  absencesByVet.value = absenceMap
 }
 
 const triageWeight = (risk?: string | null) => {
@@ -1268,6 +1450,7 @@ const fetchAgendaAppointments = async () => {
     const res = await api<any>('/api/v1/appointments', { query: { page: 1, limit: 500 } })
     const items = toArray(res)
     agendaAppointments.value = [...items].sort((a: any, b: any) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
+    await loadAvailabilityContext()
   } catch (_err) {
     message.error('Erro ao carregar agenda operacional')
   }
@@ -1362,6 +1545,23 @@ const cancelAppointment = async (appointment: any) => {
   await syncSelectedAppointment(Number(appointment.id))
 }
 
+const markNoShow = async (appointment: any) => {
+  const noShowStatus = Object.values(statusesMap.value).find((s) => ['NO_SHOW', 'NOSHOW'].includes(String(s.code || '').toUpperCase()))
+  if (!noShowStatus?.id) {
+    message.error('Status Não compareceu não configurado.')
+    return
+  }
+  if (!canMarkNoShow(appointment)) {
+    message.warning(noShowBlockedReason(appointment))
+    return
+  }
+  const api = useApi()
+  await api(`/api/v1/appointments/${appointment.id}`, { method: 'PATCH', body: { statusId: Number(noShowStatus.id) } })
+  await fetchAppointments()
+  await fetchAgendaAppointments()
+  await syncSelectedAppointment(Number(appointment.id))
+}
+
 const confirmDelete = (appointment: any) => {
   dialog.warning({
     title: 'Confirmar exclusão',
@@ -1385,6 +1585,20 @@ const confirmDelete = (appointment: any) => {
 const handleActionSelect = (key: string, row: any) => {
   if (key === 'view') return openDetail(row)
   if (key === 'edit' || key === 'reschedule') return openEdit(row)
+  if (key === 'no_show') {
+    if (!canMarkNoShow(row)) {
+      message.warning(noShowBlockedReason(row))
+      return
+    }
+    dialog.warning({
+      title: 'Marcar não compareceu',
+      content: 'Confirmar marcação de não compareceu para este agendamento?',
+      positiveText: 'Confirmar falta',
+      negativeText: 'Voltar',
+      onPositiveClick: async () => { await markNoShow(row) }
+    })
+    return
+  }
   if (key === 'cancel') {
     dialog.warning({ title: 'Cancelar agendamento', content: 'Deseja cancelar este agendamento?', positiveText: 'Cancelar agendamento', negativeText: 'Voltar', onPositiveClick: async () => { await cancelAppointment(row) } })
     return
@@ -1707,6 +1921,12 @@ h1 { margin: 0; font-size: 22px; line-height: 1.15; }
   margin: -6px 0 0;
   font-size: 12px;
   color: #64748b;
+}
+.card-late {
+  margin: -4px 0 0;
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 700;
 }
 .card-main {
   border: 0;
@@ -2151,6 +2371,18 @@ h1 { margin: 0; font-size: 22px; line-height: 1.15; }
 .slot-cell.outside-hours:focus-visible {
   background: #f1f5f9;
 }
+.slot-cell.outside-scale,
+.mobile-slot-cell.outside-scale {
+  background: #f1f5f9;
+}
+.slot-cell.blocked-slot,
+.mobile-slot-cell.blocked-slot {
+  background: #eef2ff;
+}
+.slot-cell.absence-slot,
+.mobile-slot-cell.absence-slot {
+  background: #fee2e2;
+}
 .slot-cell:nth-child(odd) { border-bottom-color: #e2e8f0; }
 .slot-cell:hover,
 .slot-cell:focus-visible {
@@ -2235,6 +2467,8 @@ h1 { margin: 0; font-size: 22px; line-height: 1.15; }
 .th-nowrap { white-space: nowrap; display: inline-block; }
 
 :deep(.status-pill) { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.status-stack { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+:deep(.late-pill) { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 700; color: #a16207; background: #fef3c7; }
 :deep(.status-scheduled) { color: #1d4ed8; background: #dbeafe; border-left-color: #1d4ed8; }
 :deep(.status-confirmed) { color: #166534; background: #dcfce7; border-left-color: #166534; }
 :deep(.status-arrived) { color: #047857; background: #d1fae5; border-left-color: #047857; }
@@ -2291,6 +2525,22 @@ h1 { margin: 0; font-size: 22px; line-height: 1.15; }
   color: inherit;
   background: #f8fafc;
   border-left-color: #64748b;
+}
+.event-block.event-late {
+  box-shadow: inset 0 0 0 1px #fcd34d;
+  border-left-color: #f59e0b;
+  background: #fffbeb;
+}
+.event-late-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #a16207;
+  background: #fef3c7;
 }
 .event-triage-dot.triage-green { background: #22c55e; }
 .event-triage-dot.triage-yellow { background: #f59e0b; }

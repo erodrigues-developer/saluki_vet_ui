@@ -31,6 +31,17 @@
               <n-input v-model:value="model.defaultCurrency" placeholder="BRL" />
             </n-form-item>
 
+            <n-form-item label="Tolerância de atraso (min)" path="checkInToleranceMinutes">
+              <n-input-number
+                v-model:value="model.checkInToleranceMinutes"
+                :min="0"
+                :max="120"
+                :step="1"
+                placeholder="Ex: 10"
+                style="width: 100%"
+              />
+            </n-form-item>
+
             <n-form-item label="Timezone da Clínica" path="timezone">
               <n-select
                 v-model:value="model.timezone"
@@ -89,6 +100,7 @@ import type { FormInst, FormRules } from 'naive-ui'
 interface ClinicSettings {
   id?: number
   appointmentSlotDurationMinutes: number
+  checkInToleranceMinutes: number
   businessHoursJson?: string | null
   logoUrl?: string | null
   defaultCurrency: string
@@ -103,6 +115,7 @@ const formRef = ref<FormInst | null>(null)
 
 const model = reactive<ClinicSettings>({
   appointmentSlotDurationMinutes: 30,
+  checkInToleranceMinutes: 10,
   defaultCurrency: 'BRL',
   timezone: 'America/Sao_Paulo',
   notes: '',
@@ -142,6 +155,7 @@ const timezoneOptions = buildTimezoneOptions()
 
 const rules: FormRules = {
   appointmentSlotDurationMinutes: { type: 'number', required: true, message: 'Adicione a duração em minutos', trigger: ['blur', 'change'] },
+  checkInToleranceMinutes: { type: 'number', required: true, message: 'Informe a tolerância de atraso', trigger: ['blur', 'change'] },
   defaultCurrency: { required: true, message: 'Moeda é obrigatória', trigger: 'blur' },
   timezone: { required: true, message: 'Timezone é obrigatório', trigger: ['blur', 'change'] },
   businessHoursJson: {
@@ -166,6 +180,7 @@ const fetchSettings = async () => {
     Object.assign(model, {
       id: data.id,
       appointmentSlotDurationMinutes: data.appointmentSlotDurationMinutes,
+      checkInToleranceMinutes: Number((data as any).checkInToleranceMinutes ?? 10),
       defaultCurrency: data.defaultCurrency || 'BRL',
       timezone: data.timezone || 'America/Sao_Paulo',
       notes: data.notes || '',
@@ -191,6 +206,7 @@ const handleSave = async () => {
       method: 'PATCH',
       body: {
         appointmentSlotDurationMinutes: model.appointmentSlotDurationMinutes,
+        checkInToleranceMinutes: model.checkInToleranceMinutes,
         defaultCurrency: model.defaultCurrency,
         timezone: model.timezone || 'America/Sao_Paulo',
         notes: model.notes || null,
