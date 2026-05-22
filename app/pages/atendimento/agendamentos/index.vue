@@ -210,6 +210,7 @@
         <n-drawer-content title="Detalhes do agendamento" closable>
           <div v-if="selectedAppointment" class="detail-content">
             <h3>{{ petNameMap[selectedAppointment.petId] || selectedAppointment.pet?.name || 'Pet' }}</h3>
+            <p v-if="selectedAppointment.isFitIn"><span class="fit-in-pill">Encaixe</span></p>
             <p>{{ eventTypeLabel(selectedAppointment) }}</p>
             <p>Tutor: {{ clientNameMap[selectedAppointment.clientId] || selectedAppointment.client?.name || '-' }}</p>
             <p>Telefone: {{ selectedAppointment.client?.mobilePhone || selectedAppointment.client?.phone || '-' }}</p>
@@ -225,6 +226,16 @@
             <div class="detail-actions">
               <n-button type="primary" @click="runPrimaryAction(selectedAppointment)">{{ primaryActionLabel(selectedAppointment) }}</n-button>
               <n-button @click="openEdit(selectedAppointment)">Reagendar/Editar</n-button>
+              <n-button @click="handleActionSelect('cancel', selectedAppointment)">
+                Cancelar agendamento
+              </n-button>
+              <n-button
+                :disabled="!canConfirmAppointment(selectedAppointment)"
+                :title="confirmBlockedReason(selectedAppointment) || undefined"
+                @click="handleActionSelect('confirm', selectedAppointment)"
+              >
+                Confirmar agendamento
+              </n-button>
               <n-button
                 :disabled="!canMarkNoShow(selectedAppointment)"
                 :title="noShowBlockedReason(selectedAppointment) || undefined"
@@ -339,13 +350,16 @@
           <div v-for="row in displayAppointments" :key="`list-m-${row.id}`" class="entity-card">
             <div class="card-top">
               <p class="card-time">{{ format(new Date(row.startsAt), 'HH:mm') }}</p>
-              <span
-                :class="isLateAppointment(row)
-                  ? 'late-pill'
-                  : ['status-pill', getStatusMeta(row.status || statusesMap[row.statusId] || null).className]"
-              >
-                {{ isLateAppointment(row) ? 'Atrasado' : statusLabel(row) }}
-              </span>
+              <div class="status-stack">
+                <span
+                  :class="isLateAppointment(row)
+                    ? 'late-pill'
+                    : ['status-pill', getStatusMeta(row.status || statusesMap[row.statusId] || null).className]"
+                >
+                  {{ isLateAppointment(row) ? 'Atrasado' : statusLabel(row) }}
+                </span>
+                <span v-if="row.isFitIn" class="fit-in-pill">Encaixe</span>
+              </div>
             </div>
             <p class="card-date">{{ format(new Date(row.startsAt), 'dd/MM/yyyy') }} · {{ eventTimeRange(row) }}</p>
             <p v-if="isLateAppointment(row)" class="card-late">Atrasado · {{ lateMinutes(row) }} min</p>
@@ -396,6 +410,7 @@
       <template #header>
         <div class="modal-head">
           <h3 class="modal-title">{{ editingAppointment ? 'Editar agendamento' : 'Novo agendamento' }}</h3>
+          <span v-if="editingAppointment?.isFitIn" class="fit-in-pill">Encaixe</span>
           <p class="modal-subtitle">
             {{ editingAppointment ? 'Atualize os dados do atendimento, horário e observações.' : 'Preencha os dados para criar um novo atendimento na agenda.' }}
           </p>
@@ -411,7 +426,15 @@
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" @click="submitAppointmentForm">{{ editingAppointment ? 'Salvar alterações' : 'Agendar' }}</n-button>
+          <n-button
+            v-if="showFitInAction"
+            type="error"
+            :loading="saving"
+            @click="confirmCreateFitIn"
+          >
+            Criar encaixe
+          </n-button>
+          <n-button v-else type="primary" :loading="saving" @click="submitAppointmentForm">{{ editingAppointment ? 'Salvar alterações' : 'Agendar' }}</n-button>
         </div>
       </template>
     </n-modal>
@@ -524,6 +547,8 @@ const saving = ref(false)
 const showModal = ref(false)
 const showQuickModal = ref(false)
 const showCheckInModal = ref(false)
+const showFitInAction = ref(false)
+const pendingFitInPayload = ref<AppointmentPayload | null>(null)
 const editingAppointment = ref<AppointmentPayload | null>(null)
 const appointmentFormRef = ref<{
   submit: () => Promise<void>
@@ -656,7 +681,7 @@ const toArray = <T = any>(response: any): T[] => {
 }
 
 const getStatusMeta = (status?: { code?: string, name?: string } | null) => {
-  const code = status?.code || ''
+  const code = String(status?.code || '').toUpperCase()
   const name = (status?.name || '').trim()
   if (code === 'ARRIVED' || name.toLowerCase() === 'chegou') return { label: 'Chegou', className: 'status-arrived' }
   if (code === 'SCHEDULED' || name.toLowerCase() === 'agendado') return { label: 'Agendado', className: 'status-scheduled' }
@@ -664,7 +689,7 @@ const getStatusMeta = (status?: { code?: string, name?: string } | null) => {
   if (code === 'IN_PROGRESS' || name.toLowerCase() === 'em atendimento') return { label: 'Em atendimento', className: 'status-in-progress' }
   if (code === 'COMPLETED' || name.toLowerCase() === 'finalizado') return { label: 'Finalizado', className: 'status-completed' }
   if (code === 'CANCELED' || name.toLowerCase() === 'cancelado') return { label: 'Cancelado', className: 'status-canceled' }
-  if (code === 'NO_SHOW' || code === 'NOSHOW') return { label: 'Não compareceu', className: 'status-canceled' }
+  if (code === 'NO_SHOW' || code === 'NOSHOW') return { label: 'Não compareceu', className: 'status-no-show' }
   return { label: name || 'Pendente', className: 'status-default' }
 }
 const triageLabel = (risk?: string | null) => {
@@ -765,6 +790,16 @@ const checkInBlockedReason = (row: any) => {
     return 'Check-in permitido apenas no dia do agendamento.'
   }
   return ''
+}
+
+const canConfirmAppointment = (row: any) => {
+  const code = String((row.status || statusesMap.value[row.statusId])?.code || '').toUpperCase()
+  return code === 'SCHEDULED'
+}
+
+const confirmBlockedReason = (row: any) => {
+  if (canConfirmAppointment(row)) return ''
+  return 'Somente agendamentos com status Agendado podem ser confirmados.'
 }
 
 const selectedVetIdSingle = computed(() => agendaFilters.veterinarianIds.length === 1 ? agendaFilters.veterinarianIds[0] : null)
@@ -1144,6 +1179,7 @@ const eventTimeRange = (row: any) => {
 const eventClass = (row: any) => [
   getStatusMeta(row.status || statusesMap.value[row.statusId] || null).className,
   getTriageMeta(row.triageRisk || null).className,
+  row?.isFitIn ? 'event-fit-in' : '',
   isLateAppointment(row) ? 'event-late' : '',
 ]
 const eventStyle = (row: any) => {
@@ -1298,6 +1334,7 @@ const actionOptionsFor = (row?: any) => [
   { label: 'Ver detalhes', key: 'view' },
   { label: 'Editar', key: 'edit' },
   { label: 'Reagendar', key: 'reschedule' },
+  ...(row ? [{ label: 'Confirmar agendamento', key: 'confirm', disabled: !canConfirmAppointment(row) }] : []),
   ...(row ? [{ label: 'Não compareceu', key: 'no_show', disabled: !canMarkNoShow(row) }] : []),
   { label: 'Cancelar agendamento', key: 'cancel' },
   { label: 'Excluir', key: 'delete' }
@@ -1317,6 +1354,9 @@ const columns = [
         isLateAppointment(row)
           ? h('span', { class: 'late-pill', title: `${lateMinutes(row)} min de atraso` }, 'Atrasado')
           : h('span', { class: ['status-pill', getStatusMeta(row.status || statusesMap.value[row.statusId] || null).className] }, statusLabel(row)),
+        row?.isFitIn
+          ? h('span', { class: 'fit-in-pill', title: 'Agendamento criado como encaixe' }, 'Encaixe')
+          : null,
       ]),
   },
   { title: () => h('span', { class: 'th-nowrap' }, 'Triagem'), key: 'triageRisk', width: 140, render: (row: any) => h('span', { class: ['triage-pill', getTriageMeta(row.triageRisk || null).className] }, [h('span', { class: 'triage-dot' }), h('span', triageLabel(row.triageRisk || null))]) },
@@ -1506,24 +1546,30 @@ const applyMobileListFilters = () => {
 const handlePageChange = (p: number) => { pagination.page = p; fetchAppointments() }
 const handlePageSizeChange = (s: number) => { pagination.pageSize = s; pagination.page = 1; fetchAppointments() }
 
-const handleSubmit = async (payload: AppointmentPayload) => {
+const handleSubmit = async (payload: AppointmentPayload, forceFitIn = false) => {
   saving.value = true
   const api = useApi()
+  const payloadToSave = {
+    ...payload,
+    isFitIn: forceFitIn ? true : Boolean(payload?.isFitIn),
+  }
   try {
-    if (payload.id) await api(`/api/v1/appointments/${payload.id}`, { method: 'PATCH', body: payload })
-    else await api('/api/v1/appointments', { method: 'POST', body: payload })
+    if (payloadToSave.id) await api(`/api/v1/appointments/${payloadToSave.id}`, { method: 'PATCH', body: payloadToSave })
+    else await api('/api/v1/appointments', { method: 'POST', body: payloadToSave })
     closeModal()
     await fetchAppointments()
     await fetchAgendaAppointments()
-    if (payload.id) await syncSelectedAppointment(Number(payload.id))
-    message.success(payload.id ? 'Agendamento atualizado' : 'Agendamento criado')
+    if (payloadToSave.id) await syncSelectedAppointment(Number(payloadToSave.id))
+    message.success(payloadToSave.id ? 'Agendamento atualizado' : 'Agendamento criado')
   } catch (err: any) {
     const statusCode = Number(err?.statusCode || err?.data?.statusCode || 0)
-    if (statusCode === 409) {
+    if (statusCode === 409 && !forceFitIn) {
       const conflictMessage =
         err?.data?.message ||
         'Conflito de horário: já existe agendamento para este veterinário nesse período.'
       appointmentFormRef.value?.setStartsAtConflictError?.(conflictMessage)
+      pendingFitInPayload.value = payload
+      showFitInAction.value = true
       message.warning(
         conflictMessage,
       )
@@ -1535,11 +1581,36 @@ const handleSubmit = async (payload: AppointmentPayload) => {
   }
 }
 
+const confirmCreateFitIn = () => {
+  if (!pendingFitInPayload.value) return
+  dialog.warning({
+    title: 'Criar encaixe',
+    content: 'Tem certeza de que deseja criar como encaixe, permitindo sobreposição de horários?',
+    positiveText: 'Criar encaixe',
+    negativeText: 'Voltar',
+    onPositiveClick: async () => {
+      await handleSubmit(pendingFitInPayload.value as AppointmentPayload, true)
+    }
+  })
+}
+
 const cancelAppointment = async (appointment: any) => {
   const canceledStatus = Object.values(statusesMap.value).find((s) => s.code === 'CANCELED')
   if (!canceledStatus?.id) return
   const api = useApi()
   await api(`/api/v1/appointments/${appointment.id}`, { method: 'PATCH', body: { statusId: Number(canceledStatus.id) } })
+  await fetchAppointments()
+  await fetchAgendaAppointments()
+  await syncSelectedAppointment(Number(appointment.id))
+}
+
+const confirmAppointment = async (appointment: any) => {
+  if (!canConfirmAppointment(appointment)) {
+    message.warning(confirmBlockedReason(appointment))
+    return
+  }
+  const api = useApi()
+  await api(`/api/v1/appointments/${appointment.id}/confirm`, { method: 'POST' })
   await fetchAppointments()
   await fetchAgendaAppointments()
   await syncSelectedAppointment(Number(appointment.id))
@@ -1585,6 +1656,20 @@ const confirmDelete = (appointment: any) => {
 const handleActionSelect = (key: string, row: any) => {
   if (key === 'view') return openDetail(row)
   if (key === 'edit' || key === 'reschedule') return openEdit(row)
+  if (key === 'confirm') {
+    if (!canConfirmAppointment(row)) {
+      message.warning(confirmBlockedReason(row))
+      return
+    }
+    dialog.warning({
+      title: 'Confirmar agendamento',
+      content: 'Deseja confirmar este agendamento?',
+      positiveText: 'Confirmar agendamento',
+      negativeText: 'Voltar',
+      onPositiveClick: async () => { await confirmAppointment(row) }
+    })
+    return
+  }
   if (key === 'no_show') {
     if (!canMarkNoShow(row)) {
       message.warning(noShowBlockedReason(row))
@@ -1608,6 +1693,8 @@ const handleActionSelect = (key: string, row: any) => {
 
 const openCreate = () => {
   appointmentFormRef.value?.clearStartsAtConflictError?.()
+  showFitInAction.value = false
+  pendingFitInPayload.value = null
   editingAppointment.value = null
   showModal.value = true
 }
@@ -1726,11 +1813,15 @@ const handleCheckIn = async () => {
 
 const openEdit = (appointment: any) => {
   appointmentFormRef.value?.clearStartsAtConflictError?.()
+  showFitInAction.value = false
+  pendingFitInPayload.value = null
   editingAppointment.value = appointment
   showModal.value = true
 }
 const closeModal = () => {
   appointmentFormRef.value?.clearStartsAtConflictError?.()
+  showFitInAction.value = false
+  pendingFitInPayload.value = null
   showModal.value = false
 }
 const submitAppointmentForm = async () => { await appointmentFormRef.value?.submit() }
@@ -2199,7 +2290,14 @@ h1 { margin: 0; font-size: 22px; line-height: 1.15; }
   font-size: 12px !important;
 }
 .agenda-sidebar-period :deep(.n-calendar-header__extra) {
-  display: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.agenda-sidebar-period :deep(.n-calendar-header__extra .n-button-group .n-button) {
+  --n-height: 22px !important;
+  font-size: 11px;
+  padding: 0 6px;
 }
 .agenda-sidebar-period :deep(.n-calendar-dates) {
   height: calc(100% - 32px);
@@ -2469,12 +2567,13 @@ h1 { margin: 0; font-size: 22px; line-height: 1.15; }
 :deep(.status-pill) { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .status-stack { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 :deep(.late-pill) { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 700; color: #a16207; background: #fef3c7; }
-:deep(.status-scheduled) { color: #1d4ed8; background: #dbeafe; border-left-color: #1d4ed8; }
-:deep(.status-confirmed) { color: #166534; background: #dcfce7; border-left-color: #166534; }
-:deep(.status-arrived) { color: #047857; background: #d1fae5; border-left-color: #047857; }
-:deep(.status-in-progress) { color: #0c4a6e; background: #e0f2fe; border-left-color: #0284c7; }
-:deep(.status-completed) { color: #166534; background: #ecfdf5; border-left-color: #22c55e; }
+:deep(.status-scheduled) { color: #1e3a8a; background: #dbeafe; border-left-color: #2563eb; }
+:deep(.status-confirmed) { color: #3b0764; background: #f3e8ff; border-left-color: #9333ea; }
+:deep(.status-arrived) { color: #0f766e; background: #ccfbf1; border-left-color: #14b8a6; }
+:deep(.status-in-progress) { color: #9a3412; background: #ffedd5; border-left-color: #f97316; }
+:deep(.status-completed) { color: #1f2937; background: #e5e7eb; border-left-color: #6b7280; }
 :deep(.status-canceled) { color: #991b1b; background: #fee2e2; border-left-color: #ef4444; }
+:deep(.status-no-show) { color: #9f1239; background: #fce7f3; border-left-color: #ec4899; }
 :deep(.status-default) { color: #334155; background: #e2e8f0; border-left-color: #64748b; }
 
 :deep(.triage-pill) { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
@@ -2492,39 +2591,57 @@ h1 { margin: 0; font-size: 22px; line-height: 1.15; }
 .event-block.status-scheduled.triage-red,
 .event-block.status-scheduled.triage-emergency {
   color: inherit;
-  background: #f6f9ff;
+  background: #eff6ff;
   border-left-color: #2563eb;
 }
 .event-block.status-confirmed {
   color: inherit;
-  background: #f3fcf6;
-  border-left-color: #16a34a;
+  background: #faf5ff;
+  border-left-color: #9333ea;
 }
 .event-block.status-arrived {
   color: inherit;
-  background: #f0fdfa;
-  border-left-color: #0f766e;
+  background: #ccfbf1;
+  border-left-color: #14b8a6;
 }
 .event-block.status-in-progress {
   color: inherit;
-  background: #effcff;
-  border-left-color: #0891b2;
+  background: #ffedd5;
+  border-left-color: #f97316;
 }
 .event-block.status-completed {
   color: inherit;
-  background: #f8fafc;
-  border-left-color: #94a3b8;
+  background: #f3f4f6;
+  border-left-color: #6b7280;
 }
 .event-block.status-canceled {
   color: inherit;
-  background: #f8fafc;
-  border-left-color: #cbd5e1;
+  background: #fef2f2;
+  border-left-color: #ef4444;
   opacity: 0.78;
+}
+.event-block.status-no-show {
+  color: inherit;
+  background: #fce7f3;
+  border-left-color: #ec4899;
 }
 .event-block.status-default {
   color: inherit;
   background: #f8fafc;
   border-left-color: #64748b;
+}
+.event-block.status-arrived strong,
+.event-block.status-arrived span,
+.event-block.status-arrived small,
+.event-block.status-confirmed strong,
+.event-block.status-confirmed span,
+.event-block.status-confirmed small {
+  color: #0f172a;
+}
+.event-block.event-fit-in {
+  background: #fff1f2;
+  border-color: #fda4af;
+  border-left-color: #dc2626;
 }
 .event-block.event-late {
   box-shadow: inset 0 0 0 1px #fcd34d;
@@ -2564,12 +2681,54 @@ h1 { margin: 0; font-size: 22px; line-height: 1.15; }
 .modal-head { display: flex; flex-direction: column; gap: 4px; }
 .modal-title { margin: 0; font-size: 24px; color: #0f172a; font-weight: 700; }
 .modal-subtitle { margin: 0; font-size: 13px; color: #64748b; }
+.fit-in-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #b91c1c;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  width: fit-content;
+}
 
 @media (max-width: 1200px) {
   .agenda-workspace { grid-template-columns: 270px minmax(0, 1fr); }
 }
 
 @media (max-width: 768px) {
+  .mobile-filters-content {
+    justify-items: center;
+  }
+  .mobile-filters-content .filters-section,
+  .mobile-filters-content .agenda-filters-grid,
+  .mobile-filters-content .quick-actions-grid {
+    width: 100%;
+    max-width: 320px;
+  }
+  .mobile-filters-content :deep(.n-calendar) {
+    width: min(320px, calc(100vw - 56px));
+    height: min(320px, calc(100vw - 56px)) !important;
+    max-width: 100%;
+    max-height: 320px;
+  }
+  .mobile-filters-content :deep(.n-calendar-header) {
+    padding: 8px 10px !important;
+  }
+  .mobile-filters-content :deep(.n-calendar-header__extra .n-button-group .n-button) {
+    --n-height: 26px !important;
+    padding: 0 8px;
+  }
+  .mobile-filters-content :deep(.n-calendar-dates) {
+    width: 100%;
+  }
+  .mobile-filter-actions {
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto;
+  }
   .page-head { flex-direction: column; }
   h1 { font-size: 19px; }
   .head-actions { width: 100%; }

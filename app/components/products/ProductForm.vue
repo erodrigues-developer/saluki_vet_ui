@@ -1,12 +1,15 @@
 <template>
   <n-form ref="formRef" :model="model" :rules="rules" label-placement="top" :show-require-mark="false" :disabled="loading">
-    <div class="form-stack">
-      <n-card size="small" :bordered="false" class="form-card">
-        <template #header>Informações do item</template>
-        <div class="grid">
-          <n-form-item label="Ativo" path="isActive">
+    <div class="sections">
+      <section class="form-section">
+        <div class="section-head">
+          <h4 class="section-title">Informações do item</h4>
+          <div class="active-wrap">
+            <span class="active-label">Ativo</span>
             <n-switch v-model:value="model.isActive" />
-          </n-form-item>
+          </div>
+        </div>
+        <div class="section-grid">
 
           <n-form-item label="Tipo" path="isService" required>
             <n-radio-group v-model:value="model.isService" name="isServiceGroup">
@@ -19,7 +22,7 @@
             <n-input v-model:value="model.name" placeholder="Ex: Vacina V10, Consulta veterinária..." />
           </n-form-item>
 
-          <n-form-item label="SKU" path="sku">
+          <n-form-item v-if="!model.isService" label="SKU" path="sku">
             <n-input v-model:value="model.sku" placeholder="Opcional" />
           </n-form-item>
 
@@ -27,15 +30,21 @@
             <n-select v-model:value="model.productCategoryId" :options="categoryOptions" placeholder="Selecione" clearable />
           </n-form-item>
 
+          <n-form-item v-if="model.isService" label="Duração (minutos)" path="durationMinutes" required>
+            <n-input-number v-model:value="model.durationMinutes" :min="1" :step="5" :precision="0" placeholder="Ex: 45" style="width: 100%" />
+          </n-form-item>
+
           <n-form-item label="Descrição" path="notes" class="full-row">
             <n-input v-model:value="model.notes" type="textarea" :rows="2" placeholder="Descrição curta do item" />
           </n-form-item>
         </div>
-      </n-card>
+      </section>
 
-      <n-card size="small" :bordered="false" class="form-card">
-        <template #header>Preço</template>
-        <div class="grid">
+      <section class="form-section">
+        <div class="section-head">
+          <h4 class="section-title">Preço</h4>
+        </div>
+        <div class="section-grid">
           <n-form-item label="Preço de venda (R$)" path="salePrice" required>
             <n-input-number v-model:value="model.salePrice" :min="0" :step="1" :precision="2" placeholder="0,00" style="width: 100%" />
           </n-form-item>
@@ -48,12 +57,14 @@
             <n-input :value="marginLabel" disabled />
           </n-form-item>
         </div>
-      </n-card>
+      </section>
 
-      <n-card size="small" :bordered="false" class="form-card">
-        <template #header>Estoque</template>
+      <section class="form-section">
+        <div class="section-head">
+          <h4 class="section-title">Estoque</h4>
+        </div>
         <template v-if="!model.isService">
-          <div class="grid">
+          <div class="section-grid">
             <n-form-item label="Controlar estoque" path="trackStock">
               <n-switch v-model:value="model.trackStock" />
             </n-form-item>
@@ -82,7 +93,7 @@
           </div>
         </template>
         <p v-else class="service-stock-note">Serviços não possuem controle de estoque.</p>
-      </n-card>
+      </section>
     </div>
   </n-form>
 </template>
@@ -98,6 +109,7 @@ export interface Product {
   productCategoryId?: number | null
   sku?: string | null
   isService: boolean
+  durationMinutes?: number | null
   unit?: string | null
   salePrice: number
   costPrice?: number | null
@@ -131,6 +143,7 @@ const model = reactive<Product>({
   productCategoryId: null,
   sku: '',
   isService: false,
+  durationMinutes: null,
   unit: 'un',
   salePrice: 0,
   costPrice: null,
@@ -168,6 +181,17 @@ const rules: FormRules = {
       trigger: ['blur', 'change']
     }
   ],
+  durationMinutes: {
+    validator: () => {
+      if (!model.isService) return true
+      if (model.durationMinutes === null || model.durationMinutes === undefined) {
+        return new Error('Duração é obrigatória para serviços')
+      }
+      const value = Number(model.durationMinutes)
+      return (Number.isInteger(value) && value > 0) || new Error('Duração deve ser um número inteiro maior que zero')
+    },
+    trigger: ['blur', 'change']
+  },
   currentStock: {
     validator: () => {
       if (model.isService || !model.trackStock) return true
@@ -211,6 +235,7 @@ watch(
       productCategoryId: val?.productCategoryId ? Number(val.productCategoryId) : null,
       sku: val?.sku ?? '',
       isService: val?.isService ?? false,
+      durationMinutes: val?.durationMinutes !== undefined && val?.durationMinutes !== null ? Number(val.durationMinutes) : null,
       unit: val?.unit ?? 'un',
       salePrice: val?.salePrice !== undefined && val?.salePrice !== null ? Number(val.salePrice) : 0,
       costPrice: val?.costPrice !== undefined && val?.costPrice !== null ? Number(val.costPrice) : null,
@@ -230,12 +255,16 @@ watch(
   () => model.isService,
   (isService) => {
     if (isService) {
+      model.sku = null
       model.trackStock = false
       model.currentStock = null
       model.minimumStock = null
       model.unit = null
-    } else if (!model.unit) {
-      model.unit = 'un'
+    } else {
+      model.durationMinutes = null
+      if (!model.unit) {
+        model.unit = 'un'
+      }
     }
   }
 )
@@ -262,9 +291,10 @@ const submit = async () => {
 
   const payload: Product = {
     ...model,
-    sku: String(model.sku || '').trim() || null,
+    sku: model.isService ? null : String(model.sku || '').trim() || null,
     notes: String(model.notes || '').trim() || null,
     supplierName: String(model.supplierName || '').trim() || null,
+    durationMinutes: model.isService ? Number(model.durationMinutes ?? 0) : null,
     unit: model.isService || !model.trackStock ? null : String(model.unit || '').trim() || 'un',
     currentStock: model.isService || !model.trackStock ? null : Number(model.currentStock ?? 0),
     minimumStock: model.isService || !model.trackStock ? null : Number(model.minimumStock ?? 0)
@@ -277,18 +307,50 @@ defineExpose({ submit })
 </script>
 
 <style scoped>
-.form-stack {
+.sections {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.form-card {
+.form-section {
   border: 1px solid #e5e7eb;
   border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
 }
 
-.grid {
+.section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: #334155;
+}
+
+.active-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  margin-top: 1px;
+}
+
+.active-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.section-grid {
   display: grid;
   gap: 12px;
   grid-template-columns: 1fr 1fr;
@@ -305,7 +367,15 @@ defineExpose({ submit })
 }
 
 @media (max-width: 768px) {
-  .grid {
+  .form-section {
+    padding: 10px;
+  }
+
+  .section-title {
+    font-size: 15px;
+  }
+
+  .section-grid {
     grid-template-columns: 1fr;
   }
 }

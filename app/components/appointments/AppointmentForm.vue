@@ -145,6 +145,7 @@ export interface AppointmentPayload {
   statusId: number | null
   startsAt: number | null // Using timestamp for N-Date-Picker
   endsAt?: number | null
+  isFitIn?: boolean
   reason?: string
   notes?: string
 }
@@ -166,7 +167,7 @@ const message = useMessage()
 const clientOptions = ref<{label: string, value: number}[]>([])
 const petOptions = ref<{label: string, value: number}[]>([])
 const allPets = ref<any[]>([])
-const appointmentTypeOptions = ref<{label: string, value: number}[]>([])
+const appointmentTypeOptions = ref<Array<{label: string, value: number, durationMinutes?: number | null}>>([])
 const statusOptions = ref<{label: string, value: number}[]>([])
 const veterinarianOptions = ref<{label: string, value: number}[]>([])
 const durationMinutes = ref<number | null>(30)
@@ -194,6 +195,7 @@ const model = reactive<AppointmentPayload>({
   statusId: null,
   startsAt: null,
   endsAt: null,
+  isFitIn: false,
   reason: '',
   notes: ''
 })
@@ -229,7 +231,11 @@ const loadDependencies = async () => {
 
     clientOptions.value = clients.map((i: any) => ({ label: i.name, value: Number(i.id) }))
     allPets.value = pets
-    appointmentTypeOptions.value = appointmentTypes.map((i: any) => ({ label: i.name, value: Number(i.id) }))
+    appointmentTypeOptions.value = appointmentTypes.map((i: any) => ({
+      label: i.name,
+      value: Number(i.id),
+      durationMinutes: i.defaultDurationMinutes ?? i.durationMinutes ?? null
+    }))
     statusOptions.value = statuses.map((i: any) => ({ label: i.name, value: Number(i.id), code: i.code }))
     veterinarianOptions.value = users.map((i: any) => ({ label: i.name, value: Number(i.id) }))
 
@@ -270,6 +276,7 @@ watch(
       statusId: val?.statusId ? Number(val.statusId) : null,
       startsAt: val?.startsAt ? new Date(val.startsAt).getTime() : null,
       endsAt: val?.endsAt ? new Date(val.endsAt).getTime() : null,
+      isFitIn: Boolean(val?.isFitIn),
       reason: val?.reason ?? '',
       notes: val?.notes ?? ''
     })
@@ -289,6 +296,20 @@ watch([() => model.startsAt, durationMinutes], ([startsAt, duration]) => {
   if (!startsAt || !duration) return
   model.endsAt = startsAt + duration * 60 * 1000
 })
+
+watch(
+  () => model.appointmentTypeId,
+  (appointmentTypeId) => {
+    if (!appointmentTypeId) return
+    const selectedType = appointmentTypeOptions.value.find(
+      (option) => Number(option.value) === Number(appointmentTypeId),
+    )
+    const typeDuration = Number(selectedType?.durationMinutes ?? 0)
+    if (typeDuration > 0) {
+      durationMinutes.value = typeDuration
+    }
+  },
+)
 
 onMounted(() => {
   loadDependencies()
@@ -318,6 +339,7 @@ const handleSubmit = async () => {
       ...model,
       startsAt: model.startsAt ? new Date(model.startsAt).toISOString() : null,
       endsAt: model.endsAt ? new Date(model.endsAt).toISOString() : null,
+      isFitIn: Boolean(model.isFitIn),
     }
     emit('submit', payloadToEmit)
   } catch (err) {

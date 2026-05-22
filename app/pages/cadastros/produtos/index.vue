@@ -73,6 +73,7 @@
             <p class="card-subtitle"><span class="card-line-label">SKU:</span> <span :class="{ 'text-secondary': !item.sku?.trim() }">{{ formatSku(item.sku) }}</span></p>
             <p class="card-subtitle"><span class="card-line-label">Categoria:</span> {{ formatCategory(item) }}</p>
             <p class="card-subtitle"><span class="card-line-label">Tipo:</span> {{ item.isService ? 'Serviço' : 'Produto' }}</p>
+            <p class="card-subtitle"><span class="card-line-label">Duração:</span> {{ formatDuration(item) }}</p>
             <p class="card-subtitle"><span class="card-line-label">Preço:</span> {{ formatBRL(item.salePrice) }}</p>
             <p class="card-subtitle"><span class="card-line-label">Estoque:</span> {{ formatStock(item) }}</p>
             <p class="card-subtitle card-status">
@@ -269,6 +270,11 @@ const formatBRL = (value?: number | null) => new Intl.NumberFormat('pt-BR', { st
 const formatSku = (value?: string | null) => value?.trim() || 'Sem SKU'
 
 const formatCategory = (item: Product) => item.productCategory?.name || 'Sem categoria'
+const formatDuration = (item: Product) => {
+  if (!item.isService) return 'Não aplicável'
+  const duration = Number(item.durationMinutes ?? 0)
+  return duration > 0 ? `${duration} min` : '—'
+}
 
 const getStockState = (item: Product) => {
   if (item.isService || !item.trackStock) return 'na'
@@ -312,10 +318,7 @@ const columns = [
   {
     title: 'Item',
     key: 'name',
-    render: (row: Product) => h('div', { class: 'item-cell' }, [
-      h('p', { class: 'item-name' }, row.name),
-      ...(row.notes?.trim() ? [h('p', { class: 'item-subline' }, row.notes)] : [])
-    ])
+    render: (row: Product) => h('p', { class: 'item-name' }, row.name)
   },
   {
     title: 'SKU',
@@ -328,6 +331,7 @@ const columns = [
     key: 'isService',
     render: (row: Product) => h(NTag, { bordered: false, class: ['type-chip', typeTagClass(row)] }, { default: () => row.isService ? 'Serviço' : 'Produto' })
   },
+  { title: 'Duração', key: 'durationMinutes', render: (row: Product) => formatDuration(row) },
   { title: 'Preço de venda', key: 'salePrice', render: (row: Product) => formatBRL(Number(row.salePrice || 0)) },
   {
     title: 'Estoque',
@@ -693,7 +697,6 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 
 .item-cell { display: flex; flex-direction: column; gap: 4px; }
 .item-name { margin: 0; font-weight: 700; color: #0f172a; }
-.item-subline { margin: 0; font-size: 12px; color: #64748b; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .text-secondary { color: #94a3b8; font-weight: 400; }
 .stock-ok { color: #28663b; }
 .stock-warning { color: #a16207; }
@@ -710,8 +713,8 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
   display: inline-flex;
   align-items: center;
 }
-.type-product { background: #edf7ef !important; color: #28663b !important; border-color: #d5eadb !important; }
-.type-service { background: #eef2f7 !important; color: #334155 !important; border-color: #dbe2ea !important; }
+:deep(.type-product) { background: #f3e8ff !important; color: #7e22ce !important; border-color: #d8b4fe !important; }
+:deep(.type-service) { background: #eff6ff !important; color: #1d4ed8 !important; border-color: #bfdbfe !important; }
 
 .table-actions { display: flex; align-items: center; gap: 8px; }
 
@@ -745,17 +748,15 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 
 <style>
 :root .n-modal-container:has(.product-modal) .n-modal-body-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden !important;
 }
 
 :root .n-modal-container:has(.product-modal) .n-modal-body-wrapper > .n-scrollbar,
 :root .n-modal-container:has(.product-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container,
 :root .n-modal-container:has(.product-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container > .n-scrollbar-content {
-  width: 100%;
-  display: flex;
-  justify-content: center;
+  max-height: 100vh !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
 }
 
 .product-modal.n-card {
@@ -763,7 +764,7 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
   --n-padding-bottom: 0;
   --n-padding-left: 0;
   --n-padding-right: 0;
-  width: 900px !important;
+  width: 760px !important;
   max-width: calc(100vw - 24px) !important;
   max-height: calc(100vh - 48px) !important;
   max-height: calc(100dvh - 48px) !important;
@@ -801,6 +802,32 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
   z-index: 4;
 }
 
+.product-modal .modal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.product-modal .modal-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.product-modal .modal-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.product-modal .modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 @media (max-width: 768px) {
   .product-modal.n-card {
     width: 100% !important;
@@ -821,6 +848,18 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 
   .product-modal.n-card .n-card__footer {
     padding: 8px 12px;
+  }
+
+  .product-modal .modal-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .product-modal .modal-actions .n-button {
+    min-height: 44px;
+    width: 100%;
   }
 }
 </style>
