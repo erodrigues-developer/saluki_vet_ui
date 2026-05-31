@@ -337,6 +337,7 @@ const actionOptionsFor = (row: any) => {
   const options = [
     { label: 'Prontuário', key: 'open' },
     { label: 'Prescrição', key: 'prescription' },
+    { label: 'Imprimir prescrição', key: 'print-prescription' },
     { label: 'Editar', key: 'edit' },
     { label: 'Ver histórico', key: 'history' }
   ]
@@ -372,6 +373,11 @@ const handleActionSelect = (key: string, row: any) => {
         petId: String(row.petId)
       }
     })
+    return
+  }
+
+  if (key === 'print-prescription') {
+    navigateTo(`/atendimento/consultas/${row.id}/prescricao/imprimir`)
     return
   }
 
@@ -494,15 +500,27 @@ const loadLookups = async () => {
 const loadInpatientMap = async () => {
   const api = useApi()
   try {
-    const res = await api<any>('/api/v1/inpatient-records', {
-      query: {
-        status: 'ACTIVE',
-        page: 1,
-        limit: 500
-      }
-    })
+    const limit = 100
+    let page = 1
+    let total = 0
+    const records: any[] = []
 
-    const records = Array.isArray(res?.data) ? res.data : []
+    do {
+      const res = await api<any>('/api/v1/inpatient-records', {
+        query: {
+          status: 'ACTIVE',
+          page,
+          limit
+        }
+      })
+
+      const pageData = Array.isArray(res?.data) ? res.data : []
+      records.push(...pageData)
+
+      total = Number(res?.meta?.total || pageData.length)
+      page += 1
+    } while (records.length < total)
+
     const ids = records
       .map((record: any) => Number(record.consultationId))
       .filter((id: number) => Number.isFinite(id) && id > 0)

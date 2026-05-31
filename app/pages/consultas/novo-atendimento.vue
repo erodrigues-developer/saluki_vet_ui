@@ -4,7 +4,7 @@
       <div>
         <p class="eyebrow">Atendimento</p>
         <h1>Novo atendimento clínico</h1>
-        <p class="subhead">Registre a consulta com apoio de IA para organizar a queixa, sugerir anamnese e acelerar o prontuário.</p>
+        <p class="subhead">Registre a consulta com apoio de IA para conduzir a anamnese por conversa e organizar automaticamente o prontuário.</p>
       </div>
       <div class="head-actions">
         <span class="save-status">{{ saveStatusLabel }}</span>
@@ -42,12 +42,12 @@
           </template>
           <div class="grid">
             <n-form-item label="Atendimento relacionado">
-              <n-select v-model:value="model.appointmentId" :options="appointmentsOptions" placeholder="Selecione um agendamento anterior, se houver" clearable @update:value="handleAppointmentChange" />
+              <n-select v-model:value="model.appointmentId" :options="appointmentsOptions" placeholder="Vincular agendamento, retorno ou atendimento anterior" clearable @update:value="handleAppointmentChange" />
               <template #feedback>
                 <span class="field-help">Opcional. Vincule um agendamento anterior para preencher os dados automaticamente.</span>
               </template>
             </n-form-item>
-            <n-form-item label="Cliente" required>
+            <n-form-item label="Tutor" required>
               <n-select v-model:value="model.clientId" :options="clientOptions" placeholder="Selecione" filterable @update:value="handleClientChange" />
             </n-form-item>
             <n-form-item label="Paciente" required>
@@ -66,7 +66,7 @@
         <n-card v-show="currentStep === 1" :bordered="false" class="step-card">
           <template #header>
             <div class="step-head">
-              <h3>2. Triagem rápida</h3>
+              <h3>2. Triagem e sinais vitais</h3>
               <p>Registre sinais iniciais da consulta.</p>
             </div>
           </template>
@@ -76,6 +76,9 @@
             </n-form-item>
             <n-form-item label="Temperatura (°C)">
               <n-input-number v-model:value="model.temperatureC" :min="0" :precision="1" style="width: 100%" />
+            </n-form-item>
+            <n-form-item label="Prioridade clínica">
+              <n-select v-model:value="model.triageRisk" :options="triageRiskOptions" placeholder="Não triado" />
             </n-form-item>
           </div>
           <n-button tertiary type="info" size="small" @click="showOptionalVitals = !showOptionalVitals">
@@ -104,8 +107,8 @@
         <n-card v-show="currentStep === 2" :bordered="false" class="step-card ai-card">
           <template #header>
             <div class="step-head">
-              <h3>3. Queixa assistida por IA</h3>
-              <p>Dite a queixa do tutor. A IA organiza o relato e sugere a anamnese.</p>
+              <h3>3. Anamnese</h3>
+              <p>Conduza a conversa com o tutor. A transcrição original é preservada e a IA apresenta a anamnese sugerida em chat para revisão.</p>
             </div>
           </template>
 
@@ -123,83 +126,58 @@
                 <n-spin v-if="hasPendingSuggestion" :size="14" />
               </div>
               <p class="recording-helper">{{ aiHelperText }}</p>
+              <div class="inline-actions">
+                <n-button type="info" class="recording-cta" :disabled="(!model.id || !canUseAudioCapture) && !aiHasError" @click="handleMicrophoneAction">
+                  <template #icon>
+                    <svg viewBox="0 0 24 24" class="btn-mic-icon" aria-hidden="true">
+                      <path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0a7 7 0 0 1-6 6.92V20h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.08A7 7 0 0 1 5 11a1 1 0 1 1 2 0a5 5 0 1 0 10 0Z"/>
+                    </svg>
+                  </template>
+                  {{ aiHasError ? 'Tentar novamente' : (isRecording ? 'Parar gravação' : (hasExistingTranscript ? 'Incluir gravação' : 'Iniciar gravação')) }}
+                </n-button>
+                <n-button v-if="isRecording" tertiary @click="toggleRecordingPause">{{ isRecordingPaused ? 'Retomar' : 'Pausar' }}</n-button>
+              </div>
             </div>
           </div>
+          <article class="assist-block">
+            <p class="suggestion-label">Perguntas recomendadas</p>
+            <ul class="missing-list">
+              <li v-for="item in recommendedQuestions" :key="item">{{ item }}</li>
+            </ul>
+          </article>
 
-          <div v-if="showSuggestionReadyActions" class="inline-actions">
-            <n-button type="info" @click="applyOrganizedComplaint">Aplicar texto organizado</n-button>
-            <n-button tertiary type="info" :disabled="isRecording" @click="handleMicrophoneAction">Gravar novamente</n-button>
-            <n-button tertiary type="info" @click="showOriginalComparison = !showOriginalComparison">Comparar com original</n-button>
-            <n-button tertiary @click="showManualInput = true; focusManualEdit()">Editar manualmente</n-button>
-          </div>
-
-          <div v-else class="inline-actions">
-            <n-button type="info" class="recording-cta" :disabled="(!model.id || !canUseAudioCapture) && !aiHasError" @click="handleMicrophoneAction">
-              <template #icon>
-                <svg viewBox="0 0 24 24" class="btn-mic-icon" aria-hidden="true">
-                  <path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0a7 7 0 0 1-6 6.92V20h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.08A7 7 0 0 1 5 11a1 1 0 1 1 2 0a5 5 0 1 0 10 0Z"/>
-                </svg>
-              </template>
-              {{ aiHasError ? 'Tentar novamente' : (isRecording ? 'Parar gravação' : 'Iniciar gravação') }}
-            </n-button>
-            <n-button tertiary type="info" @click="showManualInput = !showManualInput">
-              {{ showManualInput ? 'Ocultar digitação manual' : 'Digitar manualmente' }}
-            </n-button>
-            <n-button v-if="isRecording" tertiary @click="toggleRecordingPause">{{ isRecordingPaused ? 'Retomar' : 'Pausar' }}</n-button>
-          </div>
-
-          <div v-if="showManualInput || model.mainComplaint || visibleSuggestion?.structuredPayload" class="manual-input-box">
-            <p class="textarea-label">{{ visibleSuggestion?.structuredPayload ? 'Texto transcrito/editável' : 'Queixa registrada' }}</p>
-            <n-input v-model:value="model.mainComplaint" type="textarea" :autosize="{ minRows: 4, maxRows: 8 }" placeholder="Ex.: tutor relata vômitos há dois dias, apatia e redução do apetite..." @update:value="onChiefComplaintChange" />
-            <div class="inline-actions">
-              <n-button type="info" tertiary :disabled="!model.id || !canAutoGenerate || hasPendingSuggestion" @click="triggerTextImprove">Melhorar texto com IA</n-button>
+          <div class="manual-input-box complaint-split">
+            <p class="textarea-label">Transcrição original da consulta</p>
+            <n-input
+              v-model:value="model.originalComplaint"
+              type="textarea"
+              :autosize="{ minRows: 4, maxRows: 8 }"
+              :readonly="isOriginalTranscriptReadonly"
+              placeholder="Disponível para digitação manual apenas antes da primeira gravação."
+              @update:value="onOriginalComplaintChange"
+            />
+            <div v-if="model.aiOrganizedComplaint" class="accepted-anamnesis-box">
+              <div class="accepted-anamnesis-head">
+                <div>
+                  <p class="textarea-label">Anamnese em uso no prontuário</p>
+                  <span>O texto sugerido foi aplicado e pode ser editado livremente pelo veterinário.</span>
+                </div>
+                <n-tag type="success" size="small" round>Texto utilizado</n-tag>
+              </div>
+              <n-input
+                :value="model.aiOrganizedComplaint"
+                type="textarea"
+                :autosize="{ minRows: 5, maxRows: 10 }"
+                placeholder="Edite a anamnese antes de avançar."
+                @update:value="onAiOrganizedComplaintChange"
+              />
             </div>
+            <div class="inline-actions" v-if="suggestedAnamnesisText && !model.anamnesisApproved">
+              <n-button tertiary type="info" @click="openAnamnesisChat">Revisar sugestão da IA</n-button>
+            </div>
+            <p class="field-help">Texto sugerido: <strong>{{ model.anamnesisApproved ? 'Utilizado no prontuário' : suggestedAnamnesisText ? 'Aguardando revisão no chat' : 'Aguardando IA' }}</strong></p>
           </div>
           <n-alert v-if="aiHasError" type="error" class="ai-error" :show-icon="false">{{ aiErrorMessage || 'Erro ao processar' }}</n-alert>
-          <div v-if="showOriginalComparison && visibleSuggestion?.structuredPayload" class="comparison-box">
-            <p><strong>Texto original:</strong> {{ visibleSuggestion.transcriptFinal || visibleSuggestion.transcriptDraft || 'Sem conteúdo original.' }}</p>
-            <p><strong>Texto organizado:</strong> {{ visibleSuggestion.structuredPayload.mainComplaint || visibleSuggestion.structuredPayload.summary || 'Sem organização.' }}</p>
-          </div>
-        </n-card>
-
-        <n-card v-show="currentStep === 3" :bordered="false" class="step-card">
-          <template #header>
-            <div class="step-head">
-              <h3>4. Anamnese sugerida</h3>
-              <p>Revise as sugestões antes de salvar no prontuário.</p>
-            </div>
-          </template>
-
-          <div v-if="hasPendingSuggestion" class="state-box">Organizando relato clínico...</div>
-          <template v-else-if="visibleSuggestion?.structuredPayload">
-            <p class="suggestions-summary">{{ appliedSuggestionsCount }} de {{ suggestionCards.length }} sugestões aplicadas</p>
-            <div class="suggestion-grid">
-              <article v-for="card in suggestionCards" :key="card.key" class="suggestion-item">
-                <div class="suggestion-item-head">
-                  <p class="suggestion-label">{{ card.label }}</p>
-                  <n-tag size="small" :type="suggestionTagType(suggestionStateMap[card.key])">{{ card.value ? suggestionStateMap[card.key] : 'Sem sugestões' }}</n-tag>
-                </div>
-                <p class="suggestion-value clamp-4">{{ card.value || card.emptyText }}</p>
-                <div v-if="card.value" class="suggestion-actions-inline">
-                  <n-button v-if="suggestionStateMap[card.key] !== 'Aplicado'" text size="small" class="suggestion-action-btn" @click="applySuggestionCard(card)">Aplicar</n-button>
-                  <n-button text size="small" class="suggestion-action-btn" @click="editSuggestionCard(card)">Editar</n-button>
-                  <n-button v-if="suggestionStateMap[card.key] === 'Aplicado'" text size="small" class="suggestion-action-btn" @click="undoSuggestionCard(card)">Desfazer</n-button>
-                  <n-button text size="small" class="suggestion-action-btn" @click="viewSuggestionCard(card)">Ver completo</n-button>
-                </div>
-                <div v-else class="suggestion-actions-inline">
-                  <n-button text size="small" class="suggestion-action-btn" @click="editSuggestionCard(card)">Editar manualmente</n-button>
-                </div>
-              </article>
-            </div>
-            <div class="inline-actions">
-              <n-button secondary type="primary" :disabled="allSuggestionsApplied" @click="applyVisibleSuggestions">{{ allSuggestionsApplied ? 'Tudo aplicado' : 'Aplicar todas' }}</n-button>
-              <n-button tertiary @click="reviewSuggestionsOneByOne">Revisar uma a uma</n-button>
-              <n-button tertiary @click="ignoreLatestSuggestion">Descartar</n-button>
-            </div>
-          </template>
-          <div v-else class="state-box">Ainda sem sugestões.</div>
-
-          <p class="responsibility-note">Revise as sugestões antes de salvar no prontuário.</p>
         </n-card>
         <n-modal v-model:show="suggestionModalVisible" preset="card" class="suggestion-modal" title="Texto completo" :mask-closable="true">
           <div class="suggestion-modal-body">
@@ -207,26 +185,160 @@
             <p>{{ suggestionModalContent || 'Sem conteúdo disponível.' }}</p>
           </div>
         </n-modal>
-
-        <n-card v-show="currentStep === 4" :bordered="false" class="step-card">
+        <n-modal v-model:show="prescriptionModalVisible" preset="card" class="prescription-modal" :mask-closable="false">
           <template #header>
-            <div class="step-head">
-              <h3>5. Diagnóstico e conduta</h3>
-              <p>Consolide hipóteses, plano e encaminhamentos.</p>
+            <div class="modal-head">
+              <h3 class="modal-title">Gerar prescrição</h3>
+              <p class="modal-subtitle">Revise o texto antes de gerar o documento para impressão.</p>
+            </div>
+          </template>
+          <div class="suggestion-modal-body prescription-modal-body">
+            <div class="prescription-sections">
+              <section class="prescription-form-section">
+                <div class="prescription-section-head">
+                  <h4 class="prescription-section-title">Receituário</h4>
+                </div>
+                <p class="suggestion-modal-label">Texto da prescrição</p>
+                <n-input
+                  v-model:value="prescriptionDraftContent"
+                  type="textarea"
+                  :autosize="{ minRows: 8, maxRows: 16 }"
+                  placeholder="Digite a prescrição..."
+                />
+              </section>
+
+              <section class="prescription-form-section">
+                <div class="prescription-section-head">
+                  <h4 class="prescription-section-title">Orientações</h4>
+                </div>
+                <p class="prescription-note">
+                  Revise dosagem, frequência, via e duração antes de gerar a versão para impressão.
+                </p>
+              </section>
+            </div>
+          </div>
+          <template #footer>
+            <div class="modal-actions">
+              <n-button tertiary @click="prescriptionModalVisible = false">Cancelar</n-button>
+              <n-button type="primary" :loading="creatingPrescription" @click="confirmGeneratePrescription">
+                Gerar e abrir prescrição
+              </n-button>
+            </div>
+          </template>
+        </n-modal>
+        <n-modal v-model:show="examRequestModalVisible" preset="card" class="prescription-modal" :mask-closable="false">
+          <template #header>
+            <div class="modal-head">
+              <h3 class="modal-title">Solicitar exames</h3>
+              <p class="modal-subtitle">Selecione os exames ativos para gerar o pedido de impressão.</p>
+            </div>
+          </template>
+          <div class="suggestion-modal-body prescription-modal-body">
+            <div class="prescription-sections">
+              <section class="prescription-form-section">
+                <div class="prescription-section-head">
+                  <h4 class="prescription-section-title">Exames disponíveis</h4>
+                  <n-button quaternary type="info" @click="openQuickExamCreateModal">Cadastro rápido de exame</n-button>
+                </div>
+                <n-input
+                  v-model:value="examRequestFilter"
+                  placeholder="Filtrar por nome ou categoria"
+                  clearable
+                  class="exam-filter-input"
+                />
+                <n-checkbox-group v-model:value="selectedExamTypeIds">
+                  <div class="exam-checkbox-list">
+                    <label v-for="item in filteredActiveExamTypes" :key="item.id" class="exam-checkbox-item">
+                      <n-checkbox :value="item.id">
+                        <span class="exam-checkbox-label">
+                          <strong>{{ item.name }}</strong>
+                          <small>{{ item.examCategory?.name || 'Sem categoria' }}</small>
+                        </span>
+                      </n-checkbox>
+                    </label>
+                    <p v-if="!filteredActiveExamTypes.length" class="field-help">Nenhum exame encontrado para o filtro aplicado.</p>
+                  </div>
+                </n-checkbox-group>
+              </section>
+              <section class="prescription-form-section">
+                <div class="prescription-section-head">
+                  <h4 class="prescription-section-title">Observações</h4>
+                </div>
+                <n-input
+                  v-model:value="examRequestNotes"
+                  type="textarea"
+                  :autosize="{ minRows: 4, maxRows: 8 }"
+                  placeholder="Ex.: jejum de 8h; coletar urina por cistocentese."
+                />
+              </section>
+            </div>
+          </div>
+          <template #footer>
+            <div class="modal-actions">
+              <n-button tertiary @click="examRequestModalVisible = false">Cancelar</n-button>
+              <n-button type="primary" :loading="creatingExamRequest" @click="confirmGenerateExamRequest">
+                Gerar pedido e abrir impressão
+              </n-button>
+            </div>
+          </template>
+        </n-modal>
+        <n-modal v-model:show="quickExamCreateModalVisible" preset="card" class="suggestion-modal" :mask-closable="false">
+          <template #header>
+            <div class="modal-head">
+              <h3 class="modal-title">Cadastro rápido de exame</h3>
+              <p class="modal-subtitle">Crie um exame e já deixe disponível na solicitação.</p>
+            </div>
+          </template>
+          <div class="suggestion-modal-body">
+            <div class="grid">
+              <n-form-item label="Nome do exame" required class="full-row">
+                <n-input v-model:value="quickExamForm.name" placeholder="Ex.: Hemograma completo" />
+              </n-form-item>
+              <n-form-item label="Categoria">
+                <n-select
+                  v-model:value="quickExamForm.examCategoryId"
+                  :options="examCategoryOptions"
+                  placeholder="Selecione"
+                  clearable
+                />
+              </n-form-item>
+              <n-form-item label="Preço padrão">
+                <n-input-number v-model:value="quickExamForm.defaultPrice" :min="0" :precision="2" style="width: 100%" />
+              </n-form-item>
+              <n-form-item label="Descrição" class="full-row">
+                <n-input v-model:value="quickExamForm.description" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" />
+              </n-form-item>
+            </div>
+          </div>
+          <template #footer>
+            <div class="modal-actions">
+              <n-button tertiary @click="quickExamCreateModalVisible = false">Cancelar</n-button>
+              <n-button type="primary" :loading="creatingQuickExamType" @click="confirmQuickExamCreate">Criar exame</n-button>
+            </div>
+          </template>
+        </n-modal>
+
+        <n-card v-show="currentStep === 3" :bordered="false" class="step-card">
+          <template #header>
+            <div class="step-head-row">
+              <div class="step-head">
+                <h3>4. Diagnóstico e conduta</h3>
+                <p>Consolide hipóteses, plano e encaminhamentos.</p>
+              </div>
+              <n-button v-if="model.consultiveSupportText" tertiary type="info" @click="openClinicalSupportChat">
+                Ver apoio clínico da IA
+              </n-button>
             </div>
           </template>
           <div class="grid">
-            <n-form-item label="Diagnóstico ou hipótese diagnóstica">
+            <n-form-item label="Diagnóstico ou hipótese diagnóstica" class="full-row">
               <n-input v-model:value="model.diagnosis" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" />
             </n-form-item>
-            <n-form-item label="Conduta">
+            <n-form-item label="Conduta" class="full-row">
               <n-input v-model:value="model.treatmentPlan" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" />
-            </n-form-item>
-            <n-form-item label="Prescrição" class="full-row">
-              <n-input v-model:value="clinical.prescription" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" />
-            </n-form-item>
-            <n-form-item label="Exames solicitados" class="full-row">
-              <n-input v-model:value="clinical.exams" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" />
+              <template #feedback>
+                <span v-if="treatmentPlanFromAi" class="field-help">Sugestão da IA aplicada. Revise antes de finalizar.</span>
+              </template>
             </n-form-item>
             <n-form-item label="Retorno recomendado">
               <n-input v-model:value="clinical.followUp" placeholder="Ex.: retorno em 5 dias" />
@@ -236,13 +348,13 @@
             </n-form-item>
           </div>
           <div class="inline-actions">
-            <button type="button" class="quick-action-card" @click="message.info('Fluxo de prescrição em evolução.')">
+            <button type="button" class="quick-action-card" @click="openPrescriptionPrint">
               <span class="quick-action-icon"><AppIcon name="pill" :size="14" :stroke-width="2" /></span>
-              <span><strong>Gerar prescrição</strong> — Criar prescrição vinculada ao atendimento.</span>
+              <span><strong>{{ prescriptionActionLabel }}</strong> — {{ prescriptionActionHint }}</span>
             </button>
-            <button type="button" class="quick-action-card" @click="message.info('Fluxo de exames em evolução.')">
+            <button type="button" class="quick-action-card" @click="openExamRequestPrint">
               <span class="quick-action-icon"><AppIcon name="flask" :size="14" :stroke-width="2" /></span>
-              <span><strong>Solicitar exame</strong> — Registrar exames complementares.</span>
+              <span><strong>{{ examRequestActionLabel }}</strong> — {{ examRequestActionHint }}</span>
             </button>
             <button type="button" class="quick-action-card" @click="clinical.referInpatient = true">
               <span class="quick-action-icon"><AppIcon name="hospital" :size="14" :stroke-width="2" /></span>
@@ -251,14 +363,22 @@
           </div>
         </n-card>
 
-        <n-card v-show="currentStep === 5" :bordered="false" class="step-card">
+        <n-card v-show="currentStep === 4" :bordered="false" class="step-card">
           <template #header>
             <div class="step-head">
-              <h3>6. Revisão</h3>
+              <h3>5. Revisão</h3>
               <p>Revise os dados antes da finalização.</p>
             </div>
           </template>
           <p class="muted">Revise os dados antes de finalizar. O atendimento será registrado no prontuário do paciente.</p>
+          <n-alert
+            v-if="hasPendingAppliedAiBlocks"
+            type="warning"
+            :show-icon="false"
+            class="ai-error"
+          >
+            Há sugestão de IA pendente. Revise no chat e utilize o texto sugerido antes de finalizar.
+          </n-alert>
           <div class="review-grid">
             <section class="review-block">
               <div class="review-block-head"><h4>Paciente</h4><button type="button" class="edit-link" @click="setCurrentStep(0)">Editar</button></div>
@@ -268,31 +388,32 @@
             </section>
             <section class="review-block">
               <div class="review-block-head"><h4>Relato clínico</h4><button type="button" class="edit-link" @click="setCurrentStep(2)">Editar</button></div>
-              <p><strong>Queixa organizada:</strong> {{ model.mainComplaint || 'Ainda não registrado' }}</p>
-              <p><strong>Anamnese:</strong> {{ model.clinicalFindings || 'Ainda não registrado' }}</p>
+              <p><strong>Relato original:</strong> {{ model.originalComplaint || 'Ainda não registrado' }}</p>
+              <p><strong>Queixa final:</strong> {{ model.mainComplaint || 'Ainda não registrado' }}</p>
+              <p><strong>Anamnese organizada:</strong> {{ model.aiOrganizedComplaint || 'Ainda não registrado' }}</p>
+              <p><strong>Texto sugerido:</strong> {{ model.anamnesisApproved ? 'Utilizado' : 'Pendente' }}</p>
             </section>
             <section class="review-block">
-              <div class="review-block-head"><h4>Conduta</h4><button type="button" class="edit-link" @click="setCurrentStep(4)">Editar</button></div>
+              <div class="review-block-head"><h4>Conduta</h4><button type="button" class="edit-link" @click="setCurrentStep(3)">Editar</button></div>
               <p><strong>Diagnóstico:</strong> {{ model.diagnosis || 'Ainda não registrado' }}</p>
               <p><strong>Conduta:</strong> {{ model.treatmentPlan || 'Ainda não registrado' }}</p>
-              <p><strong>Prescrição:</strong> {{ clinical.prescription || 'Ainda não registrado' }}</p>
+              <p><strong>Origem da conduta:</strong> {{ treatmentPlanFromAi ? 'IA revisada' : 'Manual' }}</p>
             </section>
             <section class="review-block">
-              <div class="review-block-head"><h4>Encaminhamentos</h4><button type="button" class="edit-link" @click="setCurrentStep(4)">Editar</button></div>
-              <p><strong>Exames:</strong> {{ clinical.exams || 'Não solicitado' }}</p>
+              <div class="review-block-head"><h4>Encaminhamentos</h4><button type="button" class="edit-link" @click="setCurrentStep(3)">Editar</button></div>
               <p><strong>Retorno:</strong> {{ clinical.followUp || 'Não definido' }}</p>
               <p><strong>Internação:</strong> {{ clinical.referInpatient ? 'Encaminhar para internação' : 'Sem encaminhamento' }}</p>
             </section>
           </div>
           <div class="inline-actions">
             <n-button tertiary @click="currentStep = 0">Voltar e editar</n-button>
-            <n-button type="primary" :loading="saving" @click="finalizeAttendance">Finalizar atendimento</n-button>
+            <n-button type="primary" :loading="saving" :disabled="hasPendingAppliedAiBlocks" @click="finalizeAttendance">Finalizar atendimento</n-button>
           </div>
         </n-card>
 
         <div v-if="currentStep < steps.length - 1" class="step-nav">
           <n-button :disabled="currentStep === 0" @click="goPrev">Voltar</n-button>
-          <n-button type="primary" :loading="saving" @click="saveAndContinue">Salvar e continuar</n-button>
+          <n-button type="primary" :loading="saving" :disabled="currentStep === 2 && !model.anamnesisApproved && !suggestedAnamnesisText" @click="saveAndContinue">Salvar e continuar</n-button>
         </div>
       </section>
 
@@ -302,17 +423,45 @@
           <p><strong>Tutor:</strong> {{ clientLabel }}</p>
           <p><strong>Paciente:</strong> {{ petLabel }}</p>
           <p><strong>Veterinário:</strong> {{ veterinarianLabel }}</p>
+          <p><strong>Peso:</strong> {{ model.weightKg || 'N/I' }} kg</p>
+          <p><strong>Temperatura:</strong> {{ model.temperatureC || 'N/I' }} °C</p>
+          <p><strong>Prioridade:</strong> {{ triageRiskLabel(model.triageRisk) }}</p>
           <p><strong>Status IA:</strong> {{ aiStatusLabel }}</p>
         </n-card>
       </aside>
     </div>
+
+    <AiChatFloating
+      :show="consultationAiChatVisible"
+      launcher
+      :is-mobile="isMobile"
+      :title="consultationAiTitle"
+      :subtitle="consultationAiSubtitle"
+      launcher-title="Abrir assistente da consulta"
+      :context-line="consultationAiContextLine"
+      :context-chips="consultationAiContextChips"
+      :messages="consultationConversation.messages.value"
+      :loading="consultationConversation.loading.value || savingAnamnesisApproval"
+      :question="consultationAiQuestion"
+      :placeholder="consultationAiPlaceholder"
+      :suggested-questions="consultationAiQuickQuestions"
+      :primary-action="consultationAiPrimaryAction"
+      @open="openConsultationChat"
+      @close="closeConsultationChat"
+      @send="sendConsultationAiQuestion"
+      @update:question="consultationAiQuestion = $event"
+      @select-question="sendConsultationAiQuickQuestion"
+      @primary-action="handleConsultationAiPrimaryAction"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import { format } from 'date-fns'
+import AiChatFloating from '~/components/ai/AiChatFloating.vue'
+import { useAiConversation } from '~/composables/useAiConversation'
 
 interface DictationStructuredPayload {
   summary?: string
@@ -327,6 +476,14 @@ interface DictationStructuredPayload {
   notes?: string | null
   weightKg?: number | null
   temperatureC?: number | null
+  keywords?: string[] | null
+}
+
+interface ActiveExamType {
+  id: number
+  name: string
+  examCategoryId?: number | null
+  examCategory?: { id: number; name: string } | null
 }
 
 const message = useMessage()
@@ -344,16 +501,52 @@ const appointmentPrefilledFeedback = ref(false)
 const suggestionModalVisible = ref(false)
 const suggestionModalTitle = ref('')
 const suggestionModalContent = ref('')
+const prescriptionModalVisible = ref(false)
+const prescriptionDraftContent = ref('')
+const creatingPrescription = ref(false)
+const examRequestModalVisible = ref(false)
+const creatingExamRequest = ref(false)
+const selectedExamTypeIds = ref<number[]>([])
+const examRequestNotes = ref('')
+const examRequestFilter = ref('')
+const hasExistingExamRequest = ref(false)
+const activeExamTypes = ref<ActiveExamType[]>([])
+const examCategoryOptions = ref<{ label: string; value: number }[]>([])
+const quickExamCreateModalVisible = ref(false)
+const creatingQuickExamType = ref(false)
+const quickExamForm = reactive({
+  name: '',
+  description: '',
+  examCategoryId: null as number | null,
+  defaultPrice: null as number | null,
+})
+const savingAnamnesisApproval = ref(false)
+const consultationAiChatVisible = ref(false)
+const consultationAiQuestion = ref('')
+const consultationAiMode = ref<'general' | 'anamnesis' | 'clinical-support'>('general')
+const suggestedAnamnesisText = ref('')
+const suggestedAnamnesisDictationId = ref<number | null>(null)
+const lastOpenedClinicalSupportText = ref('')
+const lastOpenedSuggestedAnamnesisText = ref('')
+const anamnesisQuickQuestions = [
+  'O que falta nessa anamnese?',
+  'Reescreva de forma mais objetiva.',
+  'Quais perguntas devo fazer ao tutor?',
+]
+const clinicalSupportQuickQuestions = [
+  'Quais hipóteses devo considerar?',
+  'Que exames complementares fazem sentido?',
+  'Há sinais de alerta?',
+]
 let mediaQuery: MediaQueryList | null = null
 const updateIsMobile = () => { isMobile.value = mediaQuery?.matches ?? false }
 
 const steps = [
-  { key: 'context', label: 'Contexto' },
-  { key: 'triage', label: 'Triagem rápida' },
-  { key: 'complaint', label: 'Queixa assistida por IA' },
-  { key: 'anamnesis', label: 'Anamnese sugerida' },
-  { key: 'diagnosis', label: 'Diagnóstico e conduta' },
-  { key: 'review', label: 'Revisão' }
+  { key: 'context', label: 'Paciente e contexto' },
+  { key: 'triage', label: 'Triagem e sinais vitais' },
+  { key: 'anamnesis', label: 'Anamnese' },
+  { key: 'diagnosis', label: 'Conduta clínica' },
+  { key: 'review', label: 'Revisão do prontuário' }
 ]
 
 const model = reactive<any>({
@@ -370,6 +563,18 @@ const model = reactive<any>({
   mucosaStatus: '',
   hydrationStatus: '',
   painStatus: '',
+  triageRisk: null,
+  originalComplaint: '',
+  aiOrganizedComplaint: '',
+  assistedAnamnesisSummary: '',
+  anamnesisApproved: false,
+  anamnesisApprovedAt: null,
+  anamnesisApprovedByUserId: null,
+  consultiveSupportText: '',
+  consultiveSupportGeneratedAt: null,
+  aiReviewAudit: [],
+  migratedFromLegacyFlow: false,
+  recordStatus: 'DRAFT',
   mainComplaint: '',
   clinicalFindings: '',
   diagnosis: '',
@@ -383,12 +588,80 @@ const clinical = reactive({
   followUp: '',
   referInpatient: false
 })
+const anamnesisAnswers = reactive<Record<string, string>>({
+  symptomStart: '',
+  symptomEvolution: '',
+  feeding24h: '',
+  hydrationIntake: '',
+  urineAndFeces: '',
+  medsGiven: '',
+  traumaHistory: '',
+  toxicExposure: ''
+})
+
+const consultationContextBase = () => ({
+  consultationId: model.id,
+  petId: model.petId,
+  clientId: model.clientId,
+  veterinarianId: model.veterinarianId,
+  pet: petLabel.value,
+  client: clientLabel.value,
+  veterinarian: veterinarianLabel.value,
+  weightKg: model.weightKg,
+  temperatureC: model.temperatureC,
+  triageRisk: model.triageRisk,
+})
+
+const consultationConversation = useAiConversation({
+  contextType: 'consultation',
+  contextId: () => model.id || 'draft',
+  title: 'Assistente da consulta',
+  metadata: () => ({ screen: 'consultation', consultationId: model.id }),
+  contextSnapshot: () => ({
+    ...consultationContextBase(),
+    screen: 'consultation',
+    currentStep: currentStep.value + 1,
+    mode: consultationAiMode.value,
+    originalTranscript: model.originalComplaint,
+    suggestedAnamnesis: suggestedAnamnesisText.value,
+    currentAnamnesis: model.aiOrganizedComplaint,
+    diagnosis: model.diagnosis,
+    treatmentPlan: model.treatmentPlan,
+    clinicalFindings: model.clinicalFindings,
+    consultiveSupportText: model.consultiveSupportText,
+    prescription: clinical.prescription,
+    exams: clinical.exams,
+    followUp: clinical.followUp,
+  }),
+})
+
+const triageRiskOptions = [
+  { label: 'Não triado', value: 'NOT_TRIAGED' },
+  { label: 'Verde', value: 'VERDE' },
+  { label: 'Amarela', value: 'AMARELA' },
+  { label: 'Vermelha', value: 'VERMELHA' },
+  { label: 'Emergência', value: 'EMERGENCY' }
+]
+
+const normalizeSuggestionText = (value: string) =>
+  String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const buildAutomaticMessageKey = (source: string, content: string) => {
+  let hash = 5381
+  for (const char of String(content || '').trim()) {
+    hash = ((hash << 5) + hash) ^ char.charCodeAt(0)
+  }
+  return `${source}:${model.id || 'draft'}:${(hash >>> 0).toString(36)}`
+}
 
 const clientOptions = ref<{ label: string; value: number }[]>([])
 const petOptions = ref<{ label: string; value: number }[]>([])
 const allPets = ref<any[]>([])
 const veterinarianOptions = ref<{ label: string; value: number }[]>([])
 const appointmentsOptions = ref<{ label: string; value: number; data: any }[]>([])
+const hasExistingPrescription = ref(false)
 
 const dictations = ref<any[]>([])
 const sendingDictation = ref(false)
@@ -398,10 +671,16 @@ const isRecording = ref(false)
 const isRecordingPaused = ref(false)
 const audioDurationSeconds = ref<number | null>(null)
 const aiInputDirty = ref(false)
+const isHydratingConsultation = ref(false)
+const lastSubmittedSuggestionText = ref('')
 const dismissedSuggestionId = ref<number | null>(null)
 const aiErrorMessage = ref('')
 const showOriginalComparison = ref(false)
 const suggestionStateMap = reactive<Record<string, 'Sugerido' | 'Aplicado' | 'Editado' | 'Ignorado'>>({})
+const blockDecisions = reactive<{ complaint: 'pending' | 'confirmed' | 'edited' | 'discarded'; anamnesis: 'pending' | 'confirmed' | 'edited' | 'discarded' }>({
+  complaint: 'pending',
+  anamnesis: 'pending'
+})
 let recordingStartedAt: number | null = null
 let mediaRecorder: MediaRecorder | null = null
 let mediaStream: MediaStream | null = null
@@ -413,23 +692,40 @@ let recordingTicker: ReturnType<typeof setInterval> | null = null
 
 const MIN_AUTOMATION_LENGTH = 18
 const aiHasError = computed(() => Boolean(aiErrorMessage.value))
-const cleanedMainComplaint = computed(() => String(model.mainComplaint || '').replace(/\s+/g, ' ').trim())
+const cleanedMainComplaint = computed(() =>
+  String(model.originalComplaint || model.mainComplaint || '')
+    .replace(/\s+/g, ' ')
+    .trim(),
+)
+const normalizedAutoSuggestionText = computed(() => normalizeSuggestionText(cleanedMainComplaint.value))
 const canUseAudioCapture = computed(() => process.client && typeof MediaRecorder !== 'undefined' && typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia)
 const hasPendingSuggestion = computed(() => sendingDictation.value || dictations.value.some((item) => ['PENDING', 'PROCESSING'].includes(item.status)))
 const canAutoGenerate = computed(() => Boolean(model.id) && (cleanedMainComplaint.value.length >= MIN_AUTOMATION_LENGTH || !!latestAudioBlob.value))
+const hasExistingTranscript = computed(() => String(model.originalComplaint || '').trim().length > 0)
+const hasPersistedAudio = computed(() => dictations.value.some((item) => Boolean(item.audioFileName)))
+const isOriginalTranscriptReadonly = computed(() => hasPersistedAudio.value || isRecording.value || hasPendingSuggestion.value)
 const latestCompletedDictation = computed(() => dictations.value.find((item) => item.status === 'COMPLETED') || null)
 const visibleSuggestion = computed(() => {
   if (!latestCompletedDictation.value) return null
   if (latestCompletedDictation.value.id === dismissedSuggestionId.value) return null
   return latestCompletedDictation.value
 })
-const showSuggestionReadyActions = computed(() => Boolean(visibleSuggestion.value?.structuredPayload) && !isRecording.value && !hasPendingSuggestion.value && !aiHasError.value)
+const showSuggestionReadyActions = computed(
+  () =>
+    Boolean(
+      String(visibleSuggestion.value?.transcriptFinal || '').trim() ||
+        visibleSuggestion.value?.structuredPayload,
+    ) &&
+    !isRecording.value &&
+    !hasPendingSuggestion.value &&
+    !aiHasError.value,
+)
 
 const aiStatusLabel = computed(() => {
   if (aiHasError.value) return 'Erro ao processar'
   if (isRecording.value) return 'Ouvindo...'
   if (hasPendingSuggestion.value) return 'Organizando relato clínico...'
-  if (visibleSuggestion.value?.structuredPayload) return 'Sugestão pronta'
+  if (showSuggestionReadyActions.value) return 'Sugestão pronta'
   return 'Pronto para gravar'
 })
 
@@ -438,7 +734,7 @@ const aiStatusTagType = computed<"success" | "warning" | "info" | "error">(() =>
   if (aiHasError.value) return 'warning'
   if (isRecording.value) return 'error'
   if (hasPendingSuggestion.value) return 'info'
-  if (visibleSuggestion.value?.structuredPayload) return 'success'
+  if (showSuggestionReadyActions.value) return 'success'
   return 'info'
 })
 
@@ -447,8 +743,8 @@ const aiHelperText = computed(() => {
   if (aiHasError.value) return 'Erro no processamento do ditado. Tente novamente.'
   if (isRecording.value) return 'Fale naturalmente.'
   if (hasPendingSuggestion.value) return 'A IA está transcrevendo e estruturando a queixa.'
-  if (visibleSuggestion.value?.structuredPayload) return 'Revise as sugestões antes de salvar no prontuário.'
-  return 'Dite a queixa do tutor. A IA irá transcrever, organizar e sugerir a anamnese.'
+  if (showSuggestionReadyActions.value) return 'Revise a anamnese sugerida no chat e utilize o texto se estiver correto.'
+  return 'Dite a conversa da anamnese. A IA irá transcrever e organizar o conteúdo.'
 })
 const saveStatusLabel = computed(() => {
   if (saveStatus.value === 'saving') return 'Salvando alterações...'
@@ -461,6 +757,69 @@ const recordingElapsedLabel = computed(() => {
   const mins = Math.floor(total / 60).toString().padStart(2, '0')
   const secs = (total % 60).toString().padStart(2, '0')
   return `${mins}:${secs}`
+})
+const prescriptionActionLabel = computed(() => hasExistingPrescription.value ? 'Abrir prescrição' : 'Gerar prescrição')
+const prescriptionActionHint = computed(() =>
+  hasExistingPrescription.value
+    ? 'Abrir documento de prescrição para impressão.'
+    : 'Abrir modal para gerar a prescrição.',
+)
+const examRequestActionLabel = computed(() => hasExistingExamRequest.value ? 'Abrir pedido de exames' : 'Solicitar exame')
+const examRequestActionHint = computed(() =>
+  hasExistingExamRequest.value
+    ? 'Abrir pedido de exames para impressão.'
+    : 'Selecionar exames e gerar pedido para impressão.',
+)
+const normalizeSearchText = (value: unknown) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+
+const filteredActiveExamTypes = computed(() => {
+  const query = normalizeSearchText(examRequestFilter.value)
+  if (!query) return activeExamTypes.value
+  return activeExamTypes.value.filter((item) => {
+    const name = normalizeSearchText(item.name)
+    const category = normalizeSearchText(item.examCategory?.name)
+    return name.includes(query) || category.includes(query)
+  })
+})
+
+const consultationAiTitle = computed(() => {
+  if (consultationAiMode.value === 'anamnesis') return 'Anamnese sugerida pela IA'
+  if (consultationAiMode.value === 'clinical-support') return 'Apoio clínico da IA'
+  return 'Assistente da consulta'
+})
+const consultationAiSubtitle = computed(() => {
+  if (consultationAiMode.value === 'anamnesis') return 'Revise antes de utilizar no prontuário.'
+  if (consultationAiMode.value === 'clinical-support') return 'Consulta auxiliar para o raciocínio clínico.'
+  return 'Conversa com histórico persistente da consulta.'
+})
+const consultationAiContextLine = computed(() => {
+  const step = steps[currentStep.value]?.label || 'Consulta'
+  return `Consulta em atendimento · ${step}`
+})
+const consultationAiContextChips = computed(() => {
+  if (consultationAiMode.value === 'anamnesis') return ['Anamnese', 'Transcrição', 'Prontuário']
+  if (consultationAiMode.value === 'clinical-support') return ['Consultivo', 'Diagnóstico', 'Conduta']
+  return ['Consulta', 'Histórico', 'Prontuário']
+})
+const consultationAiPlaceholder = computed(() => {
+  if (consultationAiMode.value === 'anamnesis') return 'Pergunte algo sobre a anamnese sugerida...'
+  if (consultationAiMode.value === 'clinical-support') return 'Pergunte algo sobre hipóteses, riscos ou exames...'
+  return 'Pergunte algo sobre esta consulta...'
+})
+const consultationAiQuickQuestions = computed(() => {
+  if (consultationAiMode.value === 'anamnesis') return anamnesisQuickQuestions
+  if (consultationAiMode.value === 'clinical-support') return clinicalSupportQuickQuestions
+  return ['Resuma a consulta até agora.', 'Quais pontos precisam de revisão?', 'O que devo priorizar agora?']
+})
+const consultationAiPrimaryAction = computed(() => {
+  if (consultationAiMode.value !== 'anamnesis') return null
+  if (!String(suggestedAnamnesisText.value || '').trim() || model.anamnesisApproved) return null
+  return { label: 'Utilizar texto sugerido', disabled: !model.id }
 })
 
 const suggestionCards = computed(() => {
@@ -504,6 +863,100 @@ const suggestionCards = computed(() => {
 })
 const appliedSuggestionsCount = computed(() => suggestionCards.value.filter((card) => suggestionStateMap[card.key] === 'Aplicado').length)
 const allSuggestionsApplied = computed(() => suggestionCards.value.length > 0 && appliedSuggestionsCount.value === suggestionCards.value.length)
+const extractedClinicalPoints = computed(() => {
+  const payload: DictationStructuredPayload | undefined = visibleSuggestion.value?.structuredPayload
+  const keywords = Array.isArray(payload?.keywords) ? payload?.keywords || [] : []
+  const base = [payload?.mainComplaint, payload?.clinicalFindings, payload?.assessment]
+    .filter(Boolean)
+    .join(' ')
+    .split(/[.,;:\n]/)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 8)
+    .slice(0, 5)
+  return Array.from(new Set([...(keywords || []), ...base])).slice(0, 8)
+})
+const extractedClinicalSigns = computed(() => {
+  const blockedTerms = ['neurologico', 'gastrointestinal', 'oftalmico', 'suspeita']
+  return extractedClinicalPoints.value
+    .map((item) => String(item || '').trim())
+    .filter((item) => item.length >= 3)
+    .filter((item) => !blockedTerms.some((term) => item.toLowerCase().includes(term)))
+    .slice(0, 8)
+})
+const extractedClinicalSystems = computed(() => {
+  const text = [
+    String(model.originalComplaint || ''),
+    String(model.aiOrganizedComplaint || ''),
+    String(visibleSuggestion.value?.structuredPayload?.assessment || ''),
+    String(visibleSuggestion.value?.structuredPayload?.keywords?.join(' ') || '')
+  ]
+    .join(' ')
+    .toLowerCase()
+  const systems: string[] = []
+  if (/(vomit|vomito|diarre|gastro)/.test(text)) systems.push('Gastrointestinal')
+  if (/(ataxia|equilibr|convuls|neurolog)/.test(text)) systems.push('Neurológico')
+  if (/(olho|ocular|cegueira|visao|oftalm)/.test(text)) systems.push('Oftálmico')
+  if (/(febre|prostr|sistemic)/.test(text)) systems.push('Sistêmico')
+  return systems
+})
+const missingClinicalData = computed(() => {
+  const missing: string[] = []
+  const source = String(model.originalComplaint || model.aiOrganizedComplaint || '').toLowerCase()
+  if (!String(anamnesisAnswers.symptomStart || '').trim()) missing.push('Início e duração dos sintomas')
+  if (!String(anamnesisAnswers.symptomEvolution || '').trim()) missing.push('Evolução dos sintomas')
+  if (/vomit|vomito/.test(source) && !String(anamnesisAnswers.symptomEvolution || '').trim()) missing.push('Frequência e aspecto dos vômitos')
+  if (!String(anamnesisAnswers.feeding24h || '').trim()) missing.push('Alimentação nas últimas 24h')
+  if (!String(anamnesisAnswers.hydrationIntake || '').trim()) missing.push('Ingestão de água')
+  if (!String(anamnesisAnswers.urineAndFeces || '').trim()) missing.push('Urina e fezes')
+  if (!String(anamnesisAnswers.medsGiven || '').trim()) missing.push('Medicamentos administrados')
+  if (/ataxia|locomo|equilibr|olho|cegueira/.test(source) && !String(anamnesisAnswers.traumaHistory || '').trim()) missing.push('Histórico de trauma/queda')
+  if (!String(anamnesisAnswers.toxicExposure || '').trim()) missing.push('Contato com tóxicos')
+  if (!String(clinical.followUp || '').trim()) missing.push('Retorno recomendado')
+  return Array.from(new Set(missing))
+})
+const anamnesisMissingFields = computed(() => {
+  const source = String(model.originalComplaint || model.aiOrganizedComplaint || '').toLowerCase()
+  const fields: Array<{ key: string; label: string; placeholder: string }> = [
+    { key: 'symptomStart', label: 'Início dos sintomas', placeholder: 'Ex.: começou ontem à noite.' },
+    { key: 'symptomEvolution', label: 'Evolução dos sintomas', placeholder: 'Ex.: piorou durante a madrugada.' },
+    { key: 'feeding24h', label: 'Alimentação nas últimas 24h', placeholder: 'Ex.: não come desde ontem.' },
+    { key: 'hydrationIntake', label: 'Ingestão de água', placeholder: 'Ex.: bebendo pouca água.' },
+    { key: 'urineAndFeces', label: 'Urina e fezes', placeholder: 'Ex.: urinou pouco e sem evacuação hoje.' },
+    { key: 'medsGiven', label: 'Medicamentos administrados', placeholder: 'Ex.: tutor nega medicação prévia.' }
+  ]
+  if (/ataxia|locomo|equilibr|olho|cegueira/.test(source)) {
+    fields.push({ key: 'traumaHistory', label: 'Histórico de trauma/queda', placeholder: 'Ex.: tutor nega queda ou atropelamento.' })
+  }
+  fields.push({ key: 'toxicExposure', label: 'Contato com tóxicos', placeholder: 'Ex.: sem contato conhecido com venenos/químicos.' })
+  return fields
+})
+const recommendedQuestions = computed(() => {
+  return [
+    'Qual o motivo da consulta?',
+    'Quando os sintomas começaram?',
+    'Como os sintomas evoluíram desde o início?',
+    'Está se alimentando normalmente?',
+    'Está bebendo água normalmente?',
+    'Está urinando e defecando normalmente?',
+    'Teve contato com tóxicos, produto químico ou alimento diferente?'
+  ]
+})
+const treatmentPlanFromAi = computed(() => {
+  const aiText = String(visibleSuggestion.value?.structuredPayload?.treatmentPlan || visibleSuggestion.value?.structuredPayload?.plan || '').trim().toLowerCase()
+  const current = String(model.treatmentPlan || '').trim().toLowerCase()
+  return Boolean(aiText && current && current.includes(aiText.slice(0, Math.min(30, aiText.length))))
+})
+const hasPendingAppliedAiBlocks = computed(() => {
+  return Boolean(String(suggestedAnamnesisText.value || model.aiOrganizedComplaint || '').trim().length > 0 && !model.anamnesisApproved)
+})
+const triageRiskLabel = (value: string | null | undefined) => {
+  const code = String(value || 'NOT_TRIAGED').toUpperCase()
+  if (code === 'VERDE') return 'Verde'
+  if (code === 'AMARELA') return 'Amarela'
+  if (code === 'VERMELHA') return 'Vermelha'
+  if (code === 'EMERGENCY') return 'Emergência'
+  return 'Não triado'
+}
 
 const clientLabel = computed(() => clientOptions.value.find((c) => c.value === model.clientId)?.label || 'Não informado')
 const petLabel = computed(() => petOptions.value.find((p) => p.value === model.petId)?.label || 'Não informado')
@@ -547,14 +1000,12 @@ const readQueryNumber = (key: string) => {
 }
 
 const resolveInitialStepFromModel = () => {
-  const hasComplaint = String(model.mainComplaint || '').trim().length > 0
-  const hasAnamnesis = String(model.clinicalFindings || '').trim().length > 0
+  const hasAnamnesis = String(model.aiOrganizedComplaint || model.originalComplaint || '').trim().length > 0
   const hasDiagnosis = String(model.diagnosis || '').trim().length > 0 || String(model.treatmentPlan || '').trim().length > 0
 
-  if (!hasComplaint) return 2
-  if (hasComplaint && !hasAnamnesis) return 3
-  if (hasAnamnesis && !hasDiagnosis) return 4
-  return 5
+  if (!hasAnamnesis) return 2
+  if (hasAnamnesis && !hasDiagnosis) return 3
+  return 4
 }
 
 const hasAnyText = (value: unknown) => String(value || '').trim().length > 0
@@ -576,7 +1027,7 @@ const hydrateCompletedStepsFromModel = (activeStep: number) => {
     return hasAnyText(value)
   })
   const hasComplaint = hasAnyText(model.mainComplaint)
-  const hasAnamnesis = hasAnyText(model.clinicalFindings) || Boolean(visibleSuggestion.value?.structuredPayload)
+  const hasAnamnesis = hasAnyText(model.aiOrganizedComplaint) || hasAnyText(model.originalComplaint)
   const hasConduct = [
     model.diagnosis,
     model.treatmentPlan,
@@ -587,10 +1038,9 @@ const hydrateCompletedStepsFromModel = (activeStep: number) => {
 
   if (hasCoreContext) done.add(0)
   if (hasTriage) done.add(1)
-  if (hasComplaint) done.add(2)
-  if (hasAnamnesis) done.add(3)
-  if (hasConduct) done.add(4)
-  if (hasCoreContext && hasComplaint && hasConduct) done.add(5)
+  if (hasComplaint || hasAnamnesis) done.add(2)
+  if (hasConduct) done.add(3)
+  if (hasCoreContext && (hasComplaint || hasAnamnesis) && hasConduct) done.add(4)
 
   for (let idx = 0; idx < activeStep; idx += 1) done.add(idx)
   completedSteps.value = done
@@ -608,6 +1058,14 @@ const hydrateClinicalNotesFromModel = () => {
   clinical.exams = getLineValue('Exames')
   clinical.followUp = getLineValue('Retorno')
   clinical.referInpatient = /Encaminhar para internação:\s*Sim/i.test(notes)
+  anamnesisAnswers.symptomStart = getLineValue('Anamnese - Início dos sintomas')
+  anamnesisAnswers.symptomEvolution = getLineValue('Anamnese - Evolução dos sintomas')
+  anamnesisAnswers.feeding24h = getLineValue('Anamnese - Alimentação 24h')
+  anamnesisAnswers.hydrationIntake = getLineValue('Anamnese - Ingestão de água')
+  anamnesisAnswers.urineAndFeces = getLineValue('Anamnese - Urina e fezes')
+  anamnesisAnswers.medsGiven = getLineValue('Anamnese - Medicamentos')
+  anamnesisAnswers.traumaHistory = getLineValue('Anamnese - Trauma/queda')
+  anamnesisAnswers.toxicExposure = getLineValue('Anamnese - Contato com tóxicos')
 }
 
 const loadConsultationFromRoute = async () => {
@@ -620,6 +1078,7 @@ const loadConsultationFromRoute = async () => {
   }
 
   try {
+    isHydratingConsultation.value = true
     const api = useApi()
     const consultation = await api<any>(`/api/v1/consultations/${consultationId}`)
     Object.assign(model, {
@@ -631,6 +1090,11 @@ const loadConsultationFromRoute = async () => {
       veterinarianId: consultation.veterinarianId ? Number(consultation.veterinarianId) : null,
       visitDate: consultation.visitDate ? new Date(consultation.visitDate).getTime() : Date.now()
     })
+    const auditList = Array.isArray(consultation.aiReviewAudit) ? consultation.aiReviewAudit : []
+    const anamnesisAudit = auditList.find((item: any) => item?.blockType === 'anamnesis')
+    model.anamnesisApproved = Boolean(
+      consultation.anamnesisApproved || anamnesisAudit?.action === 'confirmed',
+    )
     updatePetOptions()
     hydrateClinicalNotesFromModel()
     await loadDictations()
@@ -638,8 +1102,14 @@ const loadConsultationFromRoute = async () => {
     const requestedStep = normalizeStepIndex(Array.isArray(route.query.step) ? route.query.step[0] : route.query.step)
     currentStep.value = requestedStep ?? resolveInitialStepFromModel()
     hydrateCompletedStepsFromModel(currentStep.value)
+    aiInputDirty.value = false
+    if (!lastSubmittedSuggestionText.value) {
+      lastSubmittedSuggestionText.value = normalizeSuggestionText(model.originalComplaint || model.mainComplaint)
+    }
   } catch (error: any) {
     message.error(error?.data?.message || 'Erro ao carregar atendimento clínico')
+  } finally {
+    isHydratingConsultation.value = false
   }
 }
 
@@ -692,31 +1162,158 @@ const handleAppointmentChange = (value: number | null) => {
   model.petId = Number(appointment.petId)
   if (appointment.veterinarianId) model.veterinarianId = Number(appointment.veterinarianId)
   model.visitDate = new Date(appointment.startsAt).getTime()
+  if (appointment.reason && !model.originalComplaint) model.originalComplaint = appointment.reason
   if (appointment.reason && !model.mainComplaint) model.mainComplaint = appointment.reason
   appointmentPrefilledFeedback.value = true
 }
 
 const validateCore = () => {
   if (!model.clientId || !model.petId || !model.veterinarianId || !model.visitDate) {
-    message.warning('Preencha cliente, paciente, veterinário e data/hora.')
+    message.warning('Preencha tutor, paciente, veterinário e data/hora.')
     return false
   }
   return true
 }
 
+const blockDecisionLabel = (value: 'pending' | 'confirmed' | 'edited' | 'discarded') => {
+  if (value === 'confirmed') return 'Confirmado'
+  if (value === 'edited') return 'Editado'
+  if (value === 'discarded') return 'Descartado'
+  return 'Pendente'
+}
+
+const validatedStateLabel = (value: 'pending' | 'confirmed' | 'edited' | 'discarded') => {
+  if (value === 'confirmed') return 'confirmada'
+  if (value === 'edited') return 'editada'
+  if (value === 'discarded') return 'descartada'
+  return 'pendente'
+}
+
+const confirmComplaintBlock = () => {
+  model.mainComplaint = String(model.aiOrganizedComplaint || model.mainComplaint || model.originalComplaint || '').trim()
+  blockDecisions.complaint = model.aiOrganizedComplaint ? 'confirmed' : 'edited'
+  message.success('Bloco de queixa confirmado.')
+}
+
+const discardComplaintBlock = () => {
+  model.aiOrganizedComplaint = ''
+  if (String(model.originalComplaint || '').trim()) model.mainComplaint = model.originalComplaint
+  blockDecisions.complaint = 'discarded'
+  message.info('Sugestão de queixa da IA descartada.')
+}
+
+const confirmAnamnesisBlock = () => {
+  model.clinicalFindings = String(model.assistedAnamnesisSummary || model.clinicalFindings || '').trim()
+  blockDecisions.anamnesis = model.assistedAnamnesisSummary ? 'confirmed' : 'edited'
+  message.success('Resumo de anamnese confirmado.')
+}
+
+const markAnamnesisAsEdited = () => {
+  if (blockDecisions.anamnesis !== 'confirmed') blockDecisions.anamnesis = 'edited'
+}
+
+const refreshAnamnesisSummaryFromAnswers = () => {
+  const source = String(model.assistedAnamnesisSummary || '').trim()
+  const segments = [
+    source,
+    anamnesisAnswers.symptomStart ? `Início: ${anamnesisAnswers.symptomStart}.` : '',
+    anamnesisAnswers.symptomEvolution ? `Evolução: ${anamnesisAnswers.symptomEvolution}.` : '',
+    anamnesisAnswers.feeding24h ? `Alimentação: ${anamnesisAnswers.feeding24h}.` : '',
+    anamnesisAnswers.hydrationIntake ? `Ingestão hídrica: ${anamnesisAnswers.hydrationIntake}.` : '',
+    anamnesisAnswers.urineAndFeces ? `Urina/fezes: ${anamnesisAnswers.urineAndFeces}.` : '',
+    anamnesisAnswers.medsGiven ? `Medicamentos prévios: ${anamnesisAnswers.medsGiven}.` : '',
+    anamnesisAnswers.traumaHistory ? `Trauma/queda: ${anamnesisAnswers.traumaHistory}.` : '',
+    anamnesisAnswers.toxicExposure ? `Contato com tóxicos: ${anamnesisAnswers.toxicExposure}.` : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (!segments) {
+    message.warning('Preencha ao menos uma resposta de anamnese para atualizar o resumo.')
+    return
+  }
+  model.assistedAnamnesisSummary = segments
+  model.clinicalFindings = segments
+  blockDecisions.anamnesis = 'edited'
+  message.success('Resumo da anamnese atualizado com as respostas coletadas.')
+}
+
+const discardAnamnesisBlock = () => {
+  model.assistedAnamnesisSummary = ''
+  blockDecisions.anamnesis = 'discarded'
+  message.info('Resumo assistido da anamnese descartado.')
+}
+
+const buildAiReviewAudit = () => {
+  const now = new Date().toISOString()
+  return [
+    {
+      blockType: 'anamnesis',
+      aiSuggestedText: String(model.aiOrganizedComplaint || '').trim() || null,
+      finalText: String(model.mainComplaint || '').trim() || null,
+      action: model.anamnesisApproved ? 'confirmed' : 'pending',
+      timestamp: now
+    }
+  ]
+}
+
 const syncExtraNotes = () => {
+  const unmanagedNotes = String(model.notes || '')
+    .split('\n')
+    .filter((line) =>
+      !/^Prescrição:/i.test(line) &&
+      !/^Exames:/i.test(line) &&
+      !/^Retorno:/i.test(line) &&
+      !/^Encaminhar para internação:/i.test(line) &&
+      !/^Prioridade clínica:/i.test(line) &&
+      !/^Anamnese - /i.test(line),
+    )
+    .join('\n')
+    .trim()
+
   const lines = [
     clinical.prescription ? `Prescrição: ${clinical.prescription}` : '',
     clinical.exams ? `Exames: ${clinical.exams}` : '',
     clinical.followUp ? `Retorno: ${clinical.followUp}` : '',
-    clinical.referInpatient ? 'Encaminhar para internação: Sim' : ''
+    clinical.referInpatient ? 'Encaminhar para internação: Sim' : '',
+    model.triageRisk && model.triageRisk !== 'NOT_TRIAGED' ? `Prioridade clínica: ${triageRiskLabel(model.triageRisk)}` : '',
+    anamnesisAnswers.symptomStart ? `Anamnese - Início dos sintomas: ${anamnesisAnswers.symptomStart}` : '',
+    anamnesisAnswers.symptomEvolution ? `Anamnese - Evolução dos sintomas: ${anamnesisAnswers.symptomEvolution}` : '',
+    anamnesisAnswers.feeding24h ? `Anamnese - Alimentação 24h: ${anamnesisAnswers.feeding24h}` : '',
+    anamnesisAnswers.hydrationIntake ? `Anamnese - Ingestão de água: ${anamnesisAnswers.hydrationIntake}` : '',
+    anamnesisAnswers.urineAndFeces ? `Anamnese - Urina e fezes: ${anamnesisAnswers.urineAndFeces}` : '',
+    anamnesisAnswers.medsGiven ? `Anamnese - Medicamentos: ${anamnesisAnswers.medsGiven}` : '',
+    anamnesisAnswers.traumaHistory ? `Anamnese - Trauma/queda: ${anamnesisAnswers.traumaHistory}` : '',
+    anamnesisAnswers.toxicExposure ? `Anamnese - Contato com tóxicos: ${anamnesisAnswers.toxicExposure}` : ''
   ].filter(Boolean)
 
-  model.notes = [String(model.notes || '').trim(), ...lines].filter(Boolean).join('\n')
+  model.notes = [unmanagedNotes, ...lines].filter(Boolean).join('\n')
+  model.aiReviewAudit = buildAiReviewAudit()
 }
 
-const persist = async () => {
+const persist = async ({ finalize = false }: { finalize?: boolean } = {}) => {
   if (!validateCore()) return false
+  if (finalize) {
+    const hasComplaint = String(model.aiOrganizedComplaint || model.originalComplaint || '').trim().length > 0
+    const hasClinical = String(model.treatmentPlan || model.notes || '').trim().length > 0
+    if (!hasComplaint) {
+      message.warning('Informe a queixa principal ou relato clínico antes de finalizar.')
+      currentStep.value = 2
+      return false
+    }
+    if (!hasClinical) {
+      message.warning('Informe a conduta clínica antes de finalizar.')
+      currentStep.value = 4
+      return false
+    }
+    if (String(model.aiOrganizedComplaint || '').trim() && !model.anamnesisApproved) {
+      message.warning('Utilize ou revise o texto sugerido antes de finalizar o atendimento.')
+      currentStep.value = 2
+      return false
+    }
+  }
   syncExtraNotes()
 
   saveStatus.value = 'saving'
@@ -725,11 +1322,14 @@ const persist = async () => {
   try {
     const payload = {
       ...model,
-      visitDate: model.visitDate ? new Date(model.visitDate).toISOString() : null
+      visitDate: model.visitDate ? new Date(model.visitDate).toISOString() : null,
+      recordStatus: finalize ? 'FINALIZED' : 'DRAFT'
     }
 
     if (model.id) {
-      const updated = await api<any>(`/api/v1/consultations/${model.id}`, { method: 'PATCH', body: payload })
+      const endpoint = finalize ? `/api/v1/consultations/${model.id}/finalize` : `/api/v1/consultations/${model.id}`
+      const method = finalize ? 'POST' : 'PATCH'
+      const updated = await api<any>(endpoint, { method, body: payload })
       Object.assign(model, updated)
     } else {
       const created = await api<any>('/api/v1/consultations', { method: 'POST', body: payload })
@@ -753,6 +1353,11 @@ const saveDraft = async () => {
 }
 
 const saveAndContinue = async () => {
+  if (currentStep.value === 2 && !model.anamnesisApproved) {
+    message.warning('Revise a sugestão da IA e utilize o texto sugerido para avançar.')
+    if (suggestedAnamnesisText.value) openAnamnesisChat()
+    return
+  }
   const ok = await persist()
   if (!ok) return
   completedSteps.value.add(currentStep.value)
@@ -760,7 +1365,7 @@ const saveAndContinue = async () => {
 }
 
 const finalizeAttendance = async () => {
-  const ok = await persist()
+  const ok = await persist({ finalize: true })
   if (!ok) return
   message.success('Atendimento finalizado com sucesso')
   await navigateTo('/atendimento/consultas')
@@ -817,19 +1422,24 @@ const hydrateDraftFromLatestSuggestion = () => {
   if (!latest) return
 
   const payload: DictationStructuredPayload | undefined = latest.structuredPayload
-  const fallbackComplaint = payload?.mainComplaint || payload?.summary || latest.transcriptFinal || latest.transcriptDraft
+  const organizedAnamnesis = latest.transcriptFinal || payload?.mainComplaint || payload?.subjective || payload?.summary || ''
+  lastSubmittedSuggestionText.value = normalizeSuggestionText(latest.transcriptDraft || latest.transcriptFinal || '')
+  aiInputDirty.value = false
 
-  if (!String(model.mainComplaint || '').trim() && fallbackComplaint) {
-    model.mainComplaint = fallbackComplaint
+  if (!String(model.originalComplaint || '').trim() && latest.transcriptDraft) {
+    model.originalComplaint = latest.transcriptDraft
+    model.migratedFromLegacyFlow = true
   }
-  if (!String(model.clinicalFindings || '').trim() && payload?.clinicalFindings) {
-    model.clinicalFindings = payload.clinicalFindings
-  }
-  if (!String(model.diagnosis || '').trim() && payload?.diagnosis) {
-    model.diagnosis = payload.diagnosis
-  }
-  if (!String(model.treatmentPlan || '').trim() && (payload?.treatmentPlan || payload?.plan)) {
-    model.treatmentPlan = payload?.treatmentPlan || payload?.plan || ''
+  if (organizedAnamnesis) {
+    const normalizedSuggestion = String(organizedAnamnesis).trim()
+    suggestedAnamnesisText.value = normalizedSuggestion
+    suggestedAnamnesisDictationId.value = Number(latest.id)
+    if (String(model.aiOrganizedComplaint || '').trim() !== normalizedSuggestion) {
+      model.anamnesisApproved = false
+      model.anamnesisApprovedAt = null
+      model.anamnesisApprovedByUserId = null
+      if (currentStep.value === 2) openAnamnesisChat()
+    }
   }
   suggestionCards.value.forEach((card) => {
     if (!card.value) {
@@ -893,7 +1503,7 @@ const startSpeechRecognitionSession = () => {
       const result = event.results[index]
       if (result?.isFinal) chunk += `${result[0]?.transcript || ''} `
     }
-    if (chunk.trim()) onChiefComplaintChange(`${model.mainComplaint || ''} ${chunk}`.replace(/\s+/g, ' ').trim())
+    if (chunk.trim()) onOriginalComplaintChange(`${model.originalComplaint || ''} ${chunk}`.replace(/\s+/g, ' ').trim())
   }
   speechRecognition.onerror = () => {
     message.warning('Reconhecimento de fala indisponível. Continue digitando ou finalize o áudio para transcrição no backend.')
@@ -977,22 +1587,195 @@ const handleMicrophoneAction = async () => {
   await startRecording()
 }
 
-const onChiefComplaintChange = (value: string) => {
-  model.mainComplaint = value
+const onOriginalComplaintChange = (value: string) => {
+  if (isOriginalTranscriptReadonly.value) return
+  model.originalComplaint = value
+  if (isHydratingConsultation.value) return
+  const normalizedValue = normalizeSuggestionText(value)
+  if (normalizedValue === lastSubmittedSuggestionText.value) {
+    aiInputDirty.value = false
+    return
+  }
   aiInputDirty.value = true
   dismissedSuggestionId.value = null
   if (!isRecording.value) scheduleAutoSuggestion()
 }
 
+const onAiOrganizedComplaintChange = (value: string) => {
+  model.aiOrganizedComplaint = value
+  model.mainComplaint = value
+  model.assistedAnamnesisSummary = value
+  model.clinicalFindings = value
+  aiInputDirty.value = true
+  dismissedSuggestionId.value = null
+}
+
+const openConsultationChat = async () => {
+  if (!model.id) {
+    message.warning('Salve a consulta antes de abrir o assistente com histórico persistente.')
+    return
+  }
+  await consultationConversation.ensureConversation()
+  consultationAiChatVisible.value = true
+}
+
+const closeConsultationChat = () => {
+  consultationAiChatVisible.value = false
+}
+
+const openAnamnesisChat = async () => {
+  if (!String(suggestedAnamnesisText.value || '').trim()) {
+    message.info('A IA ainda não gerou uma anamnese sugerida.')
+    return
+  }
+  consultationAiMode.value = 'anamnesis'
+  await openConsultationChat()
+  if (!consultationAiChatVisible.value) return
+  const suggestion = String(suggestedAnamnesisText.value || '').trim()
+  const formattedSuggestionMessage = `Organizei a anamnese a partir da transcrição. Revise o texto abaixo e utilize somente se estiver clinicamente correto.\n\n${suggestion}`
+  const idempotencyKey = buildAutomaticMessageKey(
+    'dictation-suggestion',
+    formattedSuggestionMessage,
+  )
+  const hasPersistedSuggestionMessage = consultationConversation.messages.value.some(
+    (item) => {
+      const source = String(item.metadata?.source || '').trim().toLowerCase()
+      const content = String(item.content || '').trim()
+      return (
+        item.metadata?.idempotencyKey === idempotencyKey ||
+        (source === 'dictation-suggestion' &&
+          content === formattedSuggestionMessage)
+      )
+    },
+  )
+
+  if (
+    lastOpenedSuggestedAnamnesisText.value !== suggestion &&
+    !hasPersistedSuggestionMessage
+  ) {
+    await consultationConversation.addAssistantMessage(
+      formattedSuggestionMessage,
+      {
+        source: 'dictation-suggestion',
+        step: 3,
+        suggestedAnamnesisDictationId: suggestedAnamnesisDictationId.value,
+        idempotencyKey,
+      },
+    )
+  }
+  lastOpenedSuggestedAnamnesisText.value = suggestion
+}
+
+const openClinicalSupportChat = async () => {
+  if (!String(model.consultiveSupportText || '').trim()) {
+    message.info('O apoio clínico ainda não está disponível.')
+    return
+  }
+  consultationAiMode.value = 'clinical-support'
+  await openConsultationChat()
+  if (!consultationAiChatVisible.value) return
+  const support = String(model.consultiveSupportText || '').trim()
+  const formattedSupportMessage = `Preparei um apoio consultivo a partir da anamnese utilizada. Use como referência clínica, sem aplicação automática no prontuário.\n\n${support}`
+  const idempotencyKey = buildAutomaticMessageKey(
+    'clinical-support',
+    formattedSupportMessage,
+  )
+  const hasPersistedClinicalSupportMessage = consultationConversation.messages.value.some((item) => {
+    const source = String(item.metadata?.source || '').trim().toLowerCase()
+    const content = String(item.content || '').trim()
+    return (
+      item.metadata?.idempotencyKey === idempotencyKey ||
+      (source === 'clinical-support' && content === formattedSupportMessage)
+    )
+  })
+
+  if (lastOpenedClinicalSupportText.value !== support && !hasPersistedClinicalSupportMessage) {
+    await consultationConversation.addAssistantMessage(
+      formattedSupportMessage,
+      {
+        source: 'clinical-support',
+        step: 4,
+        html: false,
+        idempotencyKey,
+      },
+    )
+  }
+  lastOpenedClinicalSupportText.value = support
+}
+
+const sendConsultationAiQuestion = async () => {
+  const question = consultationAiQuestion.value.trim()
+  if (!question) return
+  if (!model.id) {
+    message.warning('Salve a consulta antes de conversar com a IA.')
+    return
+  }
+  consultationAiQuestion.value = ''
+  await consultationConversation.sendUserMessage(question)
+}
+
+const sendConsultationAiQuickQuestion = async (question: string) => {
+  if (!model.id) {
+    message.warning('Salve a consulta antes de conversar com a IA.')
+    return
+  }
+  await consultationConversation.sendUserMessage(question)
+}
+
+const handleConsultationAiPrimaryAction = async () => {
+  if (consultationAiMode.value === 'anamnesis') await useSuggestedAnamnesis()
+}
+
+const useSuggestedAnamnesis = async () => {
+  const suggestion = String(suggestedAnamnesisText.value || '').trim()
+  if (!suggestion) {
+    message.warning('A anamnese sugerida precisa ter conteúdo para uso no prontuário.')
+    return
+  }
+  if (!model.id) {
+    message.warning('Salve a consulta antes de utilizar a anamnese sugerida.')
+    return
+  }
+  try {
+    savingAnamnesisApproval.value = true
+    model.aiOrganizedComplaint = suggestion
+    model.mainComplaint = suggestion
+    model.assistedAnamnesisSummary = suggestion
+    model.clinicalFindings = suggestion
+    const api = useApi()
+    const updated = await api<any>(`/api/v1/consultations/${model.id}/anamnesis/approve`, {
+      method: 'POST',
+      body: {
+        anamnesisText: suggestion,
+      },
+    })
+    Object.assign(model, updated)
+    await consultationConversation.registerAction('use_suggested_anamnesis', 'Texto sugerido utilizado no prontuário.', {
+      consultationId: model.id,
+      suggestedAnamnesisDictationId: suggestedAnamnesisDictationId.value,
+    })
+    message.success('Texto sugerido utilizado no prontuário.')
+  } catch (error: any) {
+    message.error(error?.data?.message || 'Erro ao utilizar texto sugerido')
+  } finally {
+    savingAnamnesisApproval.value = false
+  }
+}
+
 const submitDictation = async ({ silent = true }: { silent?: boolean } = {}) => {
   if (!model.id || !canAutoGenerate.value || hasPendingSuggestion.value) return
+  const draftText = normalizedAutoSuggestionText.value
+  if (!latestAudioBlob.value && draftText === lastSubmittedSuggestionText.value) {
+    aiInputDirty.value = false
+    return
+  }
   clearAutoSuggestionTimer()
   sendingDictation.value = true
   try {
     aiErrorMessage.value = ''
     const api = useApi()
     const formData = new FormData()
-    if (cleanedMainComplaint.value) formData.append('transcriptDraft', cleanedMainComplaint.value)
+    if (draftText) formData.append('transcriptDraft', draftText)
     formData.append('captureSource', latestAudioBlob.value ? 'BROWSER_AUDIO' : 'MANUAL_TEXT')
     formData.append('language', 'pt-BR')
     if (audioDurationSeconds.value) formData.append('audioDurationSeconds', String(audioDurationSeconds.value))
@@ -1000,6 +1783,7 @@ const submitDictation = async ({ silent = true }: { silent?: boolean } = {}) => 
 
     await api(`/api/v1/consultations/${model.id}/dictations`, { method: 'POST', body: formData })
     aiInputDirty.value = false
+    lastSubmittedSuggestionText.value = draftText
     discardAudioCapture()
     if (!silent) message.success('Sugestão automática atualizada')
     await loadDictations()
@@ -1014,6 +1798,10 @@ const submitDictation = async ({ silent = true }: { silent?: boolean } = {}) => 
 const scheduleAutoSuggestion = (delay = 1100) => {
   clearAutoSuggestionTimer()
   if (!canAutoGenerate.value || hasPendingSuggestion.value || !aiInputDirty.value) return
+  if (!latestAudioBlob.value && normalizedAutoSuggestionText.value === lastSubmittedSuggestionText.value) {
+    aiInputDirty.value = false
+    return
+  }
   autoSuggestionTimer = setTimeout(() => {
     void submitDictation()
   }, delay)
@@ -1049,8 +1837,19 @@ const applyVisibleSuggestions = () => {
     return
   }
 
-  if (payload.mainComplaint) model.mainComplaint = payload.mainComplaint
-  if (payload.clinicalFindings) model.clinicalFindings = payload.clinicalFindings
+  if (payload.mainComplaint) {
+    model.aiOrganizedComplaint = payload.mainComplaint
+    model.mainComplaint = payload.mainComplaint
+    blockDecisions.complaint = 'pending'
+  }
+  if (payload.subjective || payload.clinicalFindings) {
+    model.assistedAnamnesisSummary = String(payload.subjective || payload.clinicalFindings || '')
+    model.clinicalFindings = model.assistedAnamnesisSummary
+    blockDecisions.anamnesis = 'pending'
+  }
+  if (!String(model.originalComplaint || '').trim() && visibleSuggestion.value?.transcriptDraft) {
+    model.originalComplaint = visibleSuggestion.value.transcriptDraft
+  }
   if (payload.diagnosis) model.diagnosis = payload.diagnosis
   if (payload.treatmentPlan) model.treatmentPlan = payload.treatmentPlan
   if (payload.notes) model.notes = payload.notes
@@ -1083,7 +1882,9 @@ const applyOrganizedComplaint = () => {
     message.warning('Sem texto organizado para aplicar.')
     return
   }
+  model.aiOrganizedComplaint = organized
   model.mainComplaint = organized
+  blockDecisions.complaint = 'pending'
   message.success('Texto organizado aplicado.')
 }
 
@@ -1147,12 +1948,283 @@ const viewSuggestionCard = (card: { key: string; label: string }) => {
   suggestionModalVisible.value = true
 }
 
+const refreshPrescriptionStatus = async () => {
+  if (!model.id) {
+    hasExistingPrescription.value = false
+    return
+  }
+
+  try {
+    const api = useApi()
+    const response = await api<any>('/api/v1/prescriptions', {
+      query: { consultationId: model.id }
+    })
+    const rows = Array.isArray(response?.data) ? response.data : []
+    hasExistingPrescription.value = rows.length > 0
+
+    // Mantém o textarea do step 4 sincronizado com a última prescrição salva.
+    const latestContent = String(rows[0]?.content || '').trim()
+    if (latestContent) {
+      clinical.prescription = latestContent
+    }
+  } catch (_error) {
+    hasExistingPrescription.value = false
+  }
+}
+
+const fetchExamSupportData = async () => {
+  const api = useApi()
+  try {
+    const [examTypesRes, categoriesRes] = await Promise.all([
+      api<any>('/api/v1/exam-types', {
+        query: { page: 1, limit: 100, isActive: true, sortBy: 'name', sortDirection: 'asc' },
+      }),
+      api<any>('/api/v1/exam-categories', { query: { page: 1, limit: 100, isActive: true } }),
+    ])
+    const rows = Array.isArray(examTypesRes?.data) ? examTypesRes.data : []
+    activeExamTypes.value = rows.map((item: any) => ({
+      id: Number(item.id),
+      name: item.name,
+      examCategoryId: item.examCategoryId ? Number(item.examCategoryId) : null,
+      examCategory: item.examCategory || null,
+    }))
+    const categories = Array.isArray(categoriesRes?.data) ? categoriesRes.data : []
+    examCategoryOptions.value = categories.map((item: any) => ({
+      label: item.name,
+      value: Number(item.id),
+    }))
+  } catch (_error) {
+    message.error('Não foi possível carregar exames ativos.')
+  }
+}
+
+const refreshExamRequestStatus = async () => {
+  if (!model.id) {
+    hasExistingExamRequest.value = false
+    return
+  }
+  try {
+    const api = useApi()
+    const response = await api<any>('/api/v1/exam-requests', {
+      query: { consultationId: model.id },
+    })
+    hasExistingExamRequest.value = Array.isArray(response?.data) && response.data.length > 0
+  } catch (_error) {
+    hasExistingExamRequest.value = false
+  }
+}
+
+const openPrescriptionPrint = () => {
+  if (!model.id) {
+    message.warning('Salve a consulta antes de abrir a prescrição.')
+    return
+  }
+  const prescriptionPath = `/atendimento/consultas/${model.id}/prescricao/imprimir`
+  if (hasExistingPrescription.value && process.client) {
+    window.open(prescriptionPath, '_blank', 'noopener,noreferrer')
+    return
+  }
+  openPrescriptionGenerateModal()
+}
+
+const openExamRequestPrint = () => {
+  if (!model.id) {
+    message.warning('Salve a consulta antes de solicitar exames.')
+    return
+  }
+  const examRequestPath = `/atendimento/consultas/${model.id}/exames/imprimir`
+  if (hasExistingExamRequest.value && process.client) {
+    window.open(examRequestPath, '_blank', 'noopener,noreferrer')
+    return
+  }
+  openExamRequestModal()
+}
+
+const openExamRequestModal = async () => {
+  await fetchExamSupportData()
+  const selectedNames = String(clinical.exams || '')
+    .split(';')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+  selectedExamTypeIds.value = activeExamTypes.value
+    .filter((item) => selectedNames.includes(item.name.trim().toLowerCase()))
+    .map((item) => item.id)
+  examRequestNotes.value = ''
+  examRequestFilter.value = ''
+  examRequestModalVisible.value = true
+}
+
+const openQuickExamCreateModal = async () => {
+  if (!examCategoryOptions.value.length) await fetchExamSupportData()
+  quickExamForm.name = ''
+  quickExamForm.description = ''
+  quickExamForm.defaultPrice = null
+  quickExamForm.examCategoryId = null
+  quickExamCreateModalVisible.value = true
+}
+
+const confirmQuickExamCreate = async () => {
+  const name = String(quickExamForm.name || '').trim()
+  if (!name) {
+    message.warning('Informe o nome do exame.')
+    return
+  }
+  creatingQuickExamType.value = true
+  try {
+    const api = useApi()
+    await api('/api/v1/exam-types', {
+      method: 'POST',
+      body: {
+        name,
+        description: String(quickExamForm.description || '').trim() || null,
+        examCategoryId: quickExamForm.examCategoryId || null,
+        defaultPrice: quickExamForm.defaultPrice ?? null,
+        isActive: true,
+      },
+    })
+    quickExamCreateModalVisible.value = false
+    await fetchExamSupportData()
+    message.success('Exame criado com sucesso.')
+  } catch (error: any) {
+    message.error(error?.data?.message || 'Erro ao criar exame.')
+  } finally {
+    creatingQuickExamType.value = false
+  }
+}
+
+const openPrescriptionGenerateModal = () => {
+  prescriptionDraftContent.value = String(clinical.prescription || '').trim()
+  prescriptionModalVisible.value = true
+}
+
+const confirmGeneratePrescription = async () => {
+  if (!model.id || !model.petId) {
+    message.warning('Salve a consulta com paciente vinculado antes de gerar a prescrição.')
+    return
+  }
+
+  const prescriptionPath = `/atendimento/consultas/${model.id}/prescricao/imprimir`
+  const content = String(prescriptionDraftContent.value || '').trim()
+  if (!content) {
+    message.warning('Preencha o campo de prescrição antes de gerar o documento.')
+    currentStep.value = 3
+    return
+  }
+
+  try {
+    creatingPrescription.value = true
+    const api = useApi()
+    await api('/api/v1/prescriptions', {
+      method: 'POST',
+      body: {
+        consultationId: model.id,
+        petId: model.petId,
+        veterinarianId: model.veterinarianId || undefined,
+        content,
+        prescribedAt: new Date().toISOString()
+      }
+    })
+
+    clinical.prescription = content
+    hasExistingPrescription.value = true
+    prescriptionModalVisible.value = false
+    if (process.client) {
+      window.open(prescriptionPath, '_blank', 'noopener,noreferrer')
+      return
+    }
+    await navigateTo(prescriptionPath)
+  } catch (error: any) {
+    message.error(error?.data?.message || 'Erro ao gerar a prescrição.')
+  } finally {
+    creatingPrescription.value = false
+  }
+}
+
+const confirmGenerateExamRequest = async () => {
+  if (!model.id || !model.petId) {
+    message.warning('Salve a consulta com paciente vinculado antes de gerar o pedido.')
+    return
+  }
+  const selectedIds = selectedExamTypeIds.value.map((id) => Number(id)).filter(Boolean)
+  if (!selectedIds.length) {
+    message.warning('Selecione ao menos um exame para gerar o pedido.')
+    return
+  }
+
+  const examRequestPath = `/atendimento/consultas/${model.id}/exames/imprimir`
+
+  try {
+    creatingExamRequest.value = true
+    const api = useApi()
+    await api('/api/v1/exam-requests', {
+      method: 'POST',
+      body: {
+        consultationId: model.id,
+        petId: model.petId,
+        examTypeIds: selectedIds,
+        notes: String(examRequestNotes.value || '').trim() || null,
+        requestedAt: new Date().toISOString(),
+      },
+    })
+
+    const selectedNames = activeExamTypes.value
+      .filter((item) => selectedIds.includes(item.id))
+      .map((item) => item.name)
+    clinical.exams = selectedNames.join('; ')
+    hasExistingExamRequest.value = true
+    examRequestModalVisible.value = false
+    if (process.client) {
+      window.open(examRequestPath, '_blank', 'noopener,noreferrer')
+      return
+    }
+    await navigateTo(examRequestPath)
+  } catch (error: any) {
+    message.error(error?.data?.message || 'Erro ao gerar o pedido de exames.')
+  } finally {
+    creatingExamRequest.value = false
+  }
+}
+
+watch(
+  [currentStep, suggestedAnamnesisText, () => model.anamnesisApproved],
+  ([step, suggestion, approved]) => {
+    if (step !== 2 || approved) return
+    if (!String(suggestion || '').trim()) return
+    if (consultationAiChatVisible.value && consultationAiMode.value === 'anamnesis') return
+    openAnamnesisChat()
+  },
+  { flush: 'post' },
+)
+
+watch(
+  [currentStep, () => model.consultiveSupportText],
+  ([step, supportText]) => {
+    const normalizedSupport = String(supportText || '').trim()
+    if (step !== 3 || !normalizedSupport) return
+    if (lastOpenedClinicalSupportText.value === normalizedSupport) return
+    openClinicalSupportChat()
+  },
+  { flush: 'post' },
+)
+
+watch(
+  () => model.id,
+  () => {
+    void refreshPrescriptionStatus()
+    void refreshExamRequestStatus()
+  },
+  { immediate: true },
+)
+
 onMounted(async () => {
   mediaQuery = window.matchMedia('(max-width: 900px)')
   updateIsMobile()
   mediaQuery.addEventListener('change', updateIsMobile)
   await loadLookups()
   await loadConsultationFromRoute()
+  await refreshPrescriptionStatus()
+  await refreshExamRequestStatus()
+  await fetchExamSupportData()
   if (!model.id) applySchedulingContextFromRoute()
 })
 
@@ -1178,6 +2250,7 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 .layout.mobile { grid-template-columns: 1fr; }
 .steps-panel, .content-panel, .side-panel { min-width: 0; }
 .side-panel { position: sticky; top: 14px; align-self: start; }
+.side-panel .mini-card + .mini-card { margin-top: 12px; }
 
 .steps-panel {
   background: #fff;
@@ -1216,6 +2289,22 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 }
 
 .step-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; }
+.step-head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.consultive-text {
+  margin: 0;
+  color: #0f172a;
+  line-height: 1.5;
+}
+.consultive-text :deep(p) { margin: 0 0 8px; }
+.consultive-text :deep(p:last-child) { margin-bottom: 0; }
+.consultive-text :deep(ol),
+.consultive-text :deep(ul) {
+  margin: 0;
+  padding-left: 20px;
+}
+.consultive-text :deep(li) { margin: 0 0 10px; }
+.consultive-text :deep(li:last-child) { margin-bottom: 0; }
+.consultive-text :deep(strong) { color: #0f172a; font-weight: 700; }
 .ai-card { border-color: #e5e7eb; background: #fff; }
 .step-head h3 { margin: 0; font-size: 20px; color: #0f172a; }
 .step-head p { margin: 4px 0 0; font-size: 13px; color: #64748b; }
@@ -1232,6 +2321,7 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
   background: #f7f8ff;
   border-radius: 12px;
   padding: 14px;
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -1272,9 +2362,89 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
   background: #fff;
   padding: 10px;
 }
+.complaint-split { display: flex; flex-direction: column; gap: 8px; }
 .textarea-label { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: #334155; }
+.accepted-anamnesis-box {
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  background: #f0fdf4;
+  padding: 10px;
+}
+.accepted-anamnesis-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.accepted-anamnesis-head span {
+  display: block;
+  color: #166534;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.accepted-anamnesis-box :deep(.n-input) {
+  background: #fff;
+}
+.accepted-anamnesis-box :deep(textarea) {
+  margin: 0;
+  color: #0f172a;
+  line-height: 1.45;
+}
 .muted { font-size: 12px; color: #64748b; }
 .inline-actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+.exam-checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+  padding-right: 2px;
+}
+.exam-filter-input {
+  margin-bottom: 10px;
+}
+.exam-checkbox-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fff;
+}
+.exam-checkbox-label {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.exam-checkbox-label small {
+  color: #64748b;
+  font-size: 12px;
+}
+.assist-block {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+  margin-bottom: 10px;
+}
+.anamnesis-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 6px;
+}
+.anamnesis-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.anamnesis-field-label {
+  margin: 0;
+  font-size: 12px;
+  color: #334155;
+  font-weight: 600;
+}
+.tags-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.missing-list { margin: 6px 0 0; padding-left: 18px; color: #334155; line-height: 1.45; }
 
 .suggestions-summary { margin: 0 0 10px; font-size: 12px; color: #334155; }
 .suggestion-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -1296,6 +2466,59 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 .suggestion-modal { max-width: 640px; }
 .suggestion-modal-body { display: flex; flex-direction: column; gap: 8px; }
 .suggestion-modal-label { margin: 0; font-size: 12px; color: #64748b; }
+.prescription-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.prescription-form-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
+}
+.prescription-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.prescription-section-title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: #334155;
+}
+.prescription-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #475569;
+}
+.modal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.modal-title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+  color: #0f172a;
+  font-weight: 700;
+}
+.modal-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
 .ai-error { margin-top: 10px; }
 .comparison-box {
   margin-top: 10px;
@@ -1331,6 +2554,20 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
   align-items: flex-start;
   gap: 8px;
   color: #1e293b;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+.quick-action-card:hover {
+  background: #f8fbff;
+  border-color: #bfdbfe;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12);
+}
+.quick-action-card:active {
+  transform: translateY(1px);
+}
+.quick-action-card:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
 }
 .quick-action-icon { font-size: 16px; line-height: 1; }
 
@@ -1341,7 +2578,6 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 .mini-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; }
 .mini-card h4 { margin: 0 0 10px; font-size: 15px; }
 .mini-card p { margin: 0 0 8px; font-size: 13px; color: #334155; }
-
 :deep(.n-input), :deep(.n-base-selection), :deep(.n-date-picker), :deep(.n-input-number) { min-height: 40px; }
 
 @keyframes pulse-dot {
@@ -1357,5 +2593,107 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
   .grid, .suggestion-grid { grid-template-columns: 1fr; }
   .review-grid { grid-template-columns: 1fr; }
   .recording-hero { flex-direction: column; align-items: flex-start; }
+}
+
+@media (max-width: 768px) {
+  .prescription-form-section {
+    padding: 10px;
+  }
+
+  .prescription-section-title {
+    font-size: 15px;
+  }
+}
+</style>
+
+<style>
+:root .n-modal-container:has(.prescription-modal) .n-modal-body-wrapper {
+  overflow: hidden !important;
+}
+
+:root .n-modal-container:has(.prescription-modal) .n-modal-body-wrapper > .n-scrollbar,
+:root .n-modal-container:has(.prescription-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container,
+:root .n-modal-container:has(.prescription-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container > .n-scrollbar-content {
+  max-height: 100vh !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
+}
+
+.prescription-modal.n-card {
+  --n-padding-top: 0;
+  --n-padding-bottom: 0;
+  --n-padding-left: 0;
+  --n-padding-right: 0;
+  width: 760px !important;
+  max-width: calc(100vw - 24px) !important;
+  max-height: calc(100vh - 48px) !important;
+  max-height: calc(100dvh - 48px) !important;
+  margin: 0 auto !important;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.prescription-modal.n-card .n-card-header {
+  flex: 0 0 auto;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 16px 20px 12px;
+  z-index: 4;
+}
+
+.prescription-modal.n-card .n-card__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none !important;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 16px 20px;
+  scroll-padding-bottom: 88px;
+}
+
+.prescription-modal.n-card .n-card__footer {
+  flex: 0 0 auto;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -6px 14px rgba(15, 23, 42, 0.05);
+  padding: 10px 16px;
+  z-index: 4;
+}
+
+@media (max-width: 768px) {
+  .prescription-modal.n-card {
+    width: 100% !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100vh - 48px) !important;
+    max-height: calc(100dvh - 48px) !important;
+  }
+
+  .prescription-modal.n-card .n-card-header {
+    padding: 14px 14px 10px;
+  }
+
+  .prescription-modal.n-card .n-card__content {
+    padding: 10px 12px 16px;
+    scroll-padding-bottom: 96px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .prescription-modal.n-card .n-card__footer {
+    padding: 8px 12px;
+  }
+
+  .prescription-modal .modal-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .prescription-modal .modal-actions .n-button {
+    min-height: 44px;
+    width: 100%;
+  }
 }
 </style>

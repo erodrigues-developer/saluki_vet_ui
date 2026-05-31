@@ -1,6 +1,6 @@
 <template>
   <section class="suggested">
-    <p class="title">Perguntas sugeridas</p>
+    <p class="title">Perguntas rápidas</p>
     <div class="chips">
       <button
         v-for="question in questions"
@@ -21,11 +21,14 @@ defineEmits<{ (e: 'select', question: string): void }>()
 </script>
 
 <style scoped>
+.suggested {
+  margin-bottom: 10px;
+}
+
 .title {
   margin: 0 0 8px;
   font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-weight: 700;
   color: #64748b;
 }
 

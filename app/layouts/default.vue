@@ -483,6 +483,7 @@ const menuItems = [
       { label: 'Fornecedores', icon: Truck, to: '/cadastros/fornecedores' },
       { label: 'Produtos e serviços', icon: Package, to: '/cadastros/produtos' },
       { label: 'Procedimentos médicos', icon: Stethoscope, to: '/cadastros/procedimentos' },
+      { label: 'Exames', icon: ClipboardList, to: '/cadastros/exames' },
       { label: 'Formas de pagamento', icon: CreditCard, to: '/cadastros/formas-pagamento' },
       { label: 'Espécies', icon: Dna, to: '/tabelas/especies' },
       { label: 'Raças', icon: Tags, to: '/tabelas/racas' },

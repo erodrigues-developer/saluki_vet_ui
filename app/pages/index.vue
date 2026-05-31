@@ -338,31 +338,39 @@
       </div>
     </section>
 
-    <DashboardAiAssistantDrawer
+    <AiChatFloating
       :show="aiOpen"
+      launcher
       :is-mobile="isMobile"
+      title="Assistente inteligente"
+      subtitle="Insights operacionais do dashboard atual."
+      launcher-title="Analisar com IA"
+      context-line="Dashboard operacional · Clínica aberta até 20h"
+      :context-chips="['Hoje', 'Financeiro', 'Estoque', 'Vacinas', 'Atendimentos']"
       :messages="aiMessages"
       :loading="aiLoading"
       :question="aiQuestion"
+      placeholder="Pergunte algo sobre os indicadores da clínica..."
+      :suggested-questions="suggestedQuestions"
+      :primary-action="{ label: aiLoading ? 'Analisando indicadores...' : 'Gerar análise do dashboard', disabled: aiLoading }"
+      @open="openAiAssistant"
       @close="aiOpen = false"
-      @generate="handleGenerateAnalysis"
+      @primary-action="handleGenerateAnalysis"
       @select-question="handleSuggestedQuestion"
       @update:question="aiQuestion = $event"
       @send="handleSendQuestion"
-      @run-action="handleRunAiAction"
     />
   </div>
 </template>
 
 <script setup>
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
-import { useMessage } from 'naive-ui'
 import DashboardAiTrigger from '~/components/dashboard-ai/DashboardAiTrigger.vue'
-import DashboardAiAssistantDrawer from '~/components/dashboard-ai/DashboardAiAssistantDrawer.vue'
-import { dashboardAiService } from '~/services/dashboardAiService'
+import AiChatFloating from '~/components/ai/AiChatFloating.vue'
+import { suggestedQuestions } from '~/mocks/dashboardAi.mock'
+import { useAiConversation } from '~/composables/useAiConversation'
 
 const router = useRouter()
-const message = useMessage()
 const dashboardData = ref(null)
 const financeLoading = ref(false)
 const financeError = ref(false)
@@ -373,11 +381,35 @@ const currentMonth = new Date().getMonth() + 1
 const currentYear = new Date().getFullYear()
 const isMobile = ref(false)
 const aiOpen = ref(false)
-const aiLoading = ref(false)
 const aiQuestion = ref('')
-const aiMessages = ref([])
 let mediaQuery = null
 let mediaQueryListener = null
+
+const dashboardContextSnapshot = () => ({
+  screen: 'dashboard',
+  clinicStatus: 'Aberto até 20h',
+  appointmentsToday: totalAppointments.value,
+  salesToday,
+  receivedToday,
+  avgTicket,
+  criticalStockCount: criticalStock.length,
+  criticalStock: criticalStock.slice(0, 5),
+  vaccines: vaccinesSummary,
+  finance: financeKpis.value,
+  openSalesCount: openSalesCount.value,
+  openSalesTotalPending: openSalesTotalPending.value
+})
+
+const dashboardConversation = useAiConversation({
+  contextType: 'dashboard.operational',
+  contextId: () => 'current',
+  title: 'Assistente inteligente',
+  initialAssistantMessage: 'Olá! Posso analisar os indicadores do dashboard e ajudar você a identificar riscos, oportunidades e prioridades operacionais.',
+  metadata: () => ({ screen: 'dashboard' }),
+  contextSnapshot: dashboardContextSnapshot,
+})
+const aiMessages = dashboardConversation.messages
+const aiLoading = dashboardConversation.loading
 
 const fetchPayablesDash = async () => {
   financeLoading.value = true
@@ -414,74 +446,24 @@ onBeforeUnmount(() => {
   mediaQuery?.removeListener?.(mediaQueryListener)
 })
 
-const ensureInitialAiMessage = () => {
-  if (aiMessages.value.length) return
-  aiMessages.value.push({
-    id: `m-${Date.now()}`,
-    role: 'assistant',
-    content:
-      'Olá! Posso analisar os indicadores do dashboard e ajudar você a entender a performance da clínica, identificar riscos e priorizar ações.',
-    createdAt: new Date()
-  })
-}
-
-const openAiAssistant = () => {
-  ensureInitialAiMessage()
+const openAiAssistant = async () => {
+  await dashboardConversation.ensureConversation()
   aiOpen.value = true
 }
 
-const addUserMessage = (content) => {
-  aiMessages.value.push({
-    id: `u-${Date.now()}-${Math.random()}`,
-    role: 'user',
-    content,
-    createdAt: new Date()
-  })
-}
-
-const addAssistantInsight = (response) => {
-  aiMessages.value.push({
-    id: `a-${Date.now()}-${Math.random()}`,
-    role: 'assistant',
-    response,
-    createdAt: new Date()
-  })
-}
-
 const handleGenerateAnalysis = async () => {
-  ensureInitialAiMessage()
-  aiLoading.value = true
-  const response = await dashboardAiService.generateAnalysis()
-  addAssistantInsight(response)
-  aiLoading.value = false
+  await dashboardConversation.sendUserMessage('Gerar análise do dashboard')
 }
 
 const handleSuggestedQuestion = async (question) => {
-  ensureInitialAiMessage()
-  addUserMessage(question)
-  aiLoading.value = true
-  const response = await dashboardAiService.askQuestion(question)
-  addAssistantInsight(response)
-  aiLoading.value = false
+  await dashboardConversation.sendUserMessage(question)
 }
 
 const handleSendQuestion = async () => {
   const question = aiQuestion.value.trim()
   if (!question || aiLoading.value) return
-  addUserMessage(question)
   aiQuestion.value = ''
-  aiLoading.value = true
-  const response = await dashboardAiService.askQuestion(question)
-  addAssistantInsight(response)
-  aiLoading.value = false
-}
-
-const handleRunAiAction = (action) => {
-  if (action?.route) {
-    goTo(action.route)
-    return
-  }
-  message.info('Esta ação será integrada na próxima etapa.')
+  await dashboardConversation.sendUserMessage(question)
 }
 
 const palette = {

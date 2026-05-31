@@ -1,24 +1,14 @@
 <template>
   <div>
     <button
-      v-if="!isMobile"
       class="ai-trigger"
+      :class="{ 'is-mobile': isMobile }"
       type="button"
       aria-label="Analisar dashboard com IA"
       title="Gerar insights sobre o dashboard"
       @click="$emit('open')"
     >
-      <span class="inline-icon-label"><AppIcon name="sparkles" :size="14" :stroke-width="2" /><span>Analisar com IA</span></span>
-    </button>
-
-    <button
-      v-else
-      class="ai-fab"
-      type="button"
-      aria-label="Analisar dashboard com IA"
-      @click="$emit('open')"
-    >
-      <span class="inline-icon-label"><AppIcon name="sparkles" :size="14" :stroke-width="2" /><span>IA</span></span>
+      <span class="inline-icon-label"><AppIcon name="sparkles" :size="14" :stroke-width="2" /><span>{{ isMobile ? 'IA' : 'Analisar com IA' }}</span></span>
     </button>
   </div>
 </template>
@@ -47,18 +37,7 @@ defineEmits<{ (e: 'open'): void }>()
   box-shadow: 0 4px 14px rgba(14, 58, 86, 0.14);
 }
 
-.ai-fab {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 35;
-  border: 0;
-  border-radius: 999px;
-  padding: 10px 14px;
-  background: #0e3a56;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  box-shadow: 0 8px 24px rgba(14, 58, 86, 0.32);
+.ai-trigger.is-mobile {
+  padding-inline: 10px;
 }
 </style>
