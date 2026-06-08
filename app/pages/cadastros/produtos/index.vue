@@ -279,7 +279,13 @@ const formatDuration = (item: Product) => {
 const getStockState = (item: Product) => {
   if (item.isService || !item.trackStock) return 'na'
   const stock = Number(item.currentStock ?? 0)
+  const minimumStock = Number(item.minimumStock ?? 0)
   if (stock <= 0) return 'out'
+  if (minimumStock > 0) {
+    if (stock <= minimumStock) return 'critical'
+    if (stock <= minimumStock * 2) return 'low'
+    return 'in_stock'
+  }
   if (stock <= 3) return 'critical'
   if (stock <= 10) return 'low'
   return 'in_stock'
@@ -304,7 +310,10 @@ const formatStock = (item: Product) => {
   const qty = Number(item.currentStock ?? 0)
   const unit = (item.unit || 'un').trim() || 'un'
   const state = getStockState(item)
-  return `${Math.floor(qty)} ${unit} · ${stockStateLabel(state)}`
+  const formattedQty = Number.isInteger(qty)
+    ? String(qty)
+    : qty.toFixed(3).replace(/\.?0+$/, '')
+  return `${formattedQty} ${unit} · ${stockStateLabel(state)}`
 }
 
 const typeTagClass = (item: Product) => item.isService ? 'type-service' : 'type-product'

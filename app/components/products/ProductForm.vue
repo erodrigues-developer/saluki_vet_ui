@@ -26,6 +26,34 @@
             <n-input v-model:value="model.sku" placeholder="Opcional" />
           </n-form-item>
 
+          <n-form-item v-if="!model.isService" label="Código de barras" path="barcode">
+            <n-input v-model:value="model.barcode" placeholder="Opcional" />
+          </n-form-item>
+
+          <n-form-item v-if="!model.isService" label="Imagem do produto" path="imgUrl" class="full-row">
+            <div class="image-upload-wrap">
+              <div v-if="model.imgUrl" class="image-preview-card">
+                <img :src="model.imgUrl" alt="Prévia do produto" class="image-preview" />
+              </div>
+              <div class="image-upload-actions">
+                <input
+                  ref="imageInputRef"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  class="hidden-file-input"
+                  @change="handleImageSelected"
+                />
+                <n-button secondary :loading="uploadingImage" :disabled="loading" @click="openImagePicker">
+                  {{ model.imgUrl ? 'Trocar imagem' : 'Enviar imagem' }}
+                </n-button>
+                <n-button v-if="model.imgUrl" tertiary :disabled="loading || uploadingImage" @click="clearImage">
+                  Remover imagem
+                </n-button>
+                <span class="image-upload-hint">PNG, JPG, WEBP ou GIF até 5 MB.</span>
+              </div>
+            </div>
+          </n-form-item>
+
           <n-form-item label="Categoria" path="productCategoryId">
             <n-select v-model:value="model.productCategoryId" :options="categoryOptions" placeholder="Selecione" clearable />
           </n-form-item>
@@ -75,11 +103,11 @@
 
             <template v-if="model.trackStock">
               <n-form-item label="Estoque atual" path="currentStock" required>
-                <n-input-number v-model:value="model.currentStock" :min="0" :step="1" :precision="0" placeholder="0" style="width: 100%" />
+                <n-input-number v-model:value="model.currentStock" :min="0" :step="0.001" :precision="3" placeholder="0,000" style="width: 100%" />
               </n-form-item>
 
               <n-form-item label="Estoque mínimo" path="minimumStock">
-                <n-input-number v-model:value="model.minimumStock" :min="0" :step="1" :precision="0" placeholder="0" style="width: 100%" />
+                <n-input-number v-model:value="model.minimumStock" :min="0" :step="0.001" :precision="3" placeholder="0,000" style="width: 100%" />
               </n-form-item>
 
               <n-form-item label="Unidade" path="unit" required>
@@ -108,6 +136,8 @@ export interface Product {
   name: string
   productCategoryId?: number | null
   sku?: string | null
+  barcode?: string | null
+  imgUrl?: string | null
   isService: boolean
   durationMinutes?: number | null
   unit?: string | null
@@ -134,14 +164,18 @@ const emit = defineEmits<{
 }>()
 
 const formRef = ref<FormInst | null>(null)
+const imageInputRef = ref<HTMLInputElement | null>(null)
 const message = useMessage()
 const categoryOptions = ref<{label: string, value: number}[]>([])
+const uploadingImage = ref(false)
 
 const model = reactive<Product>({
   id: undefined,
   name: '',
   productCategoryId: null,
   sku: '',
+  barcode: '',
+  imgUrl: '',
   isService: false,
   durationMinutes: null,
   unit: 'un',
@@ -234,6 +268,8 @@ watch(
       name: val?.name ?? '',
       productCategoryId: val?.productCategoryId ? Number(val.productCategoryId) : null,
       sku: val?.sku ?? '',
+      barcode: val?.barcode ?? '',
+      imgUrl: val?.imgUrl ?? '',
       isService: val?.isService ?? false,
       durationMinutes: val?.durationMinutes !== undefined && val?.durationMinutes !== null ? Number(val.durationMinutes) : null,
       unit: val?.unit ?? 'un',
@@ -256,6 +292,8 @@ watch(
   (isService) => {
     if (isService) {
       model.sku = null
+      model.barcode = null
+      model.imgUrl = null
       model.trackStock = false
       model.currentStock = null
       model.minimumStock = null
@@ -292,6 +330,8 @@ const submit = async () => {
   const payload: Product = {
     ...model,
     sku: model.isService ? null : String(model.sku || '').trim() || null,
+    barcode: model.isService ? null : String(model.barcode || '').trim() || null,
+    imgUrl: model.isService ? null : String(model.imgUrl || '').trim() || null,
     notes: String(model.notes || '').trim() || null,
     supplierName: String(model.supplierName || '').trim() || null,
     durationMinutes: model.isService ? Number(model.durationMinutes ?? 0) : null,
@@ -301,6 +341,57 @@ const submit = async () => {
   }
 
   emit('submit', payload)
+}
+
+const openImagePicker = () => {
+  imageInputRef.value?.click()
+}
+
+const clearImage = () => {
+  model.imgUrl = null
+  if (imageInputRef.value) {
+    imageInputRef.value.value = ''
+  }
+}
+
+const handleImageSelected = async (event: Event) => {
+  const input = event.target as HTMLInputElement | null
+  const file = input?.files?.[0]
+  if (!file) return
+
+  if (!file.type.startsWith('image/')) {
+    message.error('Selecione um arquivo de imagem válido.')
+    if (input) input.value = ''
+    return
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    message.error('A imagem deve ter no máximo 5 MB.')
+    if (input) input.value = ''
+    return
+  }
+
+  const api = useApi()
+  const formData = new FormData()
+  formData.append('file', file)
+
+  uploadingImage.value = true
+  try {
+    const response = await api<{ imgUrl: string }>('/api/v1/products/upload-image', {
+      method: 'POST',
+      body: formData
+    })
+    model.imgUrl = response.imgUrl
+    message.success('Imagem enviada.')
+  } catch (err: any) {
+    const apiMessage = Array.isArray(err?.data?.message)
+      ? err.data.message.join(', ')
+      : err?.data?.message
+    message.error(apiMessage || 'Erro ao enviar imagem')
+  } finally {
+    uploadingImage.value = false
+    if (input) input.value = ''
+  }
 }
 
 defineExpose({ submit })
@@ -364,6 +455,45 @@ defineExpose({ submit })
   margin: 2px 0 0;
   font-size: 13px;
   color: #64748b;
+}
+
+.image-upload-wrap {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.image-preview-card {
+  width: 120px;
+  height: 120px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+}
+
+.image-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.image-upload-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.image-upload-hint {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.hidden-file-input {
+  display: none;
 }
 
 @media (max-width: 768px) {

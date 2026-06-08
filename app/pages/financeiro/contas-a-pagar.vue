@@ -384,8 +384,9 @@ const supplierLoading = ref(false);
 
 const today = new Date();
 today.setHours(0, 0, 0, 0);
-const defaultDueDateTo = today.getTime();
-const defaultDueDateFrom = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).getTime();
+const THIRTY_DAYS_IN_MS = 30 * 24 * 60 * 60 * 1000;
+const defaultDueDateFrom = new Date(today.getTime() - THIRTY_DAYS_IN_MS).getTime();
+const defaultDueDateTo = new Date(today.getTime() + THIRTY_DAYS_IN_MS).getTime();
 
 const filters = reactive({
   search: '',
