@@ -282,34 +282,14 @@
             </div>
           </template>
         </n-modal>
-        <n-modal v-model:show="quickExamCreateModalVisible" preset="card" class="suggestion-modal" :mask-closable="false">
+        <n-modal v-model:show="quickExamCreateModalVisible" preset="card" class="exam-modal" style="width: 760px" :mask-closable="false">
           <template #header>
             <div class="modal-head">
-              <h3 class="modal-title">Cadastro rápido de exame</h3>
-              <p class="modal-subtitle">Crie um exame e já deixe disponível na solicitação.</p>
+              <h3 class="modal-title">Novo exame</h3>
+              <p class="modal-subtitle">Cadastre um tipo de exame para uso nos atendimentos.</p>
             </div>
           </template>
-          <div class="suggestion-modal-body">
-            <div class="grid">
-              <n-form-item label="Nome do exame" required class="full-row">
-                <n-input v-model:value="quickExamForm.name" placeholder="Ex.: Hemograma completo" />
-              </n-form-item>
-              <n-form-item label="Categoria">
-                <n-select
-                  v-model:value="quickExamForm.examCategoryId"
-                  :options="examCategoryOptions"
-                  placeholder="Selecione"
-                  clearable
-                />
-              </n-form-item>
-              <n-form-item label="Preço padrão">
-                <n-input-number v-model:value="quickExamForm.defaultPrice" :min="0" :precision="2" style="width: 100%" />
-              </n-form-item>
-              <n-form-item label="Descrição" class="full-row">
-                <n-input v-model:value="quickExamForm.description" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" />
-              </n-form-item>
-            </div>
-          </div>
+          <ExamForm ref="quickExamFormRef" :loading="creatingQuickExamType" @submit="handleQuickExamSubmit" />
           <template #footer>
             <div class="modal-actions">
               <n-button tertiary @click="quickExamCreateModalVisible = false">Cancelar</n-button>
@@ -346,6 +326,32 @@
             <n-form-item label="Encaminhar para internação">
               <n-switch v-model:value="clinical.referInpatient" />
             </n-form-item>
+            <template v-if="clinical.referInpatient">
+              <n-form-item label="Box/Leito" required>
+                <n-select
+                  v-model:value="inpatientReferral.boxId"
+                  :options="availableInpatientBoxOptions"
+                  placeholder="Selecione um leito disponível"
+                  filterable
+                />
+              </n-form-item>
+              <n-form-item label="Motivo clínico" required class="full-row">
+                <n-input
+                  v-model:value="inpatientReferral.reason"
+                  type="textarea"
+                  :autosize="{ minRows: 2, maxRows: 4 }"
+                  placeholder="Ex.: pós-operatório, fluidoterapia, observação neurológica..."
+                />
+              </n-form-item>
+              <n-form-item label="Observações" class="full-row">
+                <n-input
+                  v-model:value="inpatientReferral.notes"
+                  type="textarea"
+                  :autosize="{ minRows: 2, maxRows: 4 }"
+                  placeholder="Anotações iniciais para a equipe de plantão."
+                />
+              </n-form-item>
+            </template>
           </div>
           <div class="inline-actions">
             <button type="button" class="quick-action-card" @click="openPrescriptionPrint">
@@ -355,10 +361,6 @@
             <button type="button" class="quick-action-card" @click="openExamRequestPrint">
               <span class="quick-action-icon"><AppIcon name="flask" :size="14" :stroke-width="2" /></span>
               <span><strong>{{ examRequestActionLabel }}</strong> — {{ examRequestActionHint }}</span>
-            </button>
-            <button type="button" class="quick-action-card" @click="clinical.referInpatient = true">
-              <span class="quick-action-icon"><AppIcon name="hospital" :size="14" :stroke-width="2" /></span>
-              <span><strong>Encaminhar para internação</strong> — Abrir fluxo de internação.</span>
             </button>
           </div>
         </n-card>
@@ -403,6 +405,9 @@
               <div class="review-block-head"><h4>Encaminhamentos</h4><button type="button" class="edit-link" @click="setCurrentStep(3)">Editar</button></div>
               <p><strong>Retorno:</strong> {{ clinical.followUp || 'Não definido' }}</p>
               <p><strong>Internação:</strong> {{ clinical.referInpatient ? 'Encaminhar para internação' : 'Sem encaminhamento' }}</p>
+              <p v-if="clinical.referInpatient"><strong>Box/Leito:</strong> {{ inpatientBoxLabel || 'Não definido' }}</p>
+              <p v-if="clinical.referInpatient"><strong>Motivo clínico:</strong> {{ inpatientReferral.reason || 'Não definido' }}</p>
+              <p v-if="clinical.referInpatient"><strong>Observações:</strong> {{ inpatientReferral.notes || 'Não definido' }}</p>
             </section>
           </div>
           <div class="inline-actions">
@@ -461,6 +466,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import { format } from 'date-fns'
 import AiChatFloating from '~/components/ai/AiChatFloating.vue'
+import ExamForm, { type ExamType } from '~/components/exams/ExamForm.vue'
 import { useAiConversation } from '~/composables/useAiConversation'
 
 interface DictationStructuredPayload {
@@ -511,15 +517,11 @@ const examRequestNotes = ref('')
 const examRequestFilter = ref('')
 const hasExistingExamRequest = ref(false)
 const activeExamTypes = ref<ActiveExamType[]>([])
-const examCategoryOptions = ref<{ label: string; value: number }[]>([])
+const availableInpatientBoxOptions = ref<{ label: string; value: number }[]>([])
 const quickExamCreateModalVisible = ref(false)
 const creatingQuickExamType = ref(false)
-const quickExamForm = reactive({
-  name: '',
-  description: '',
-  examCategoryId: null as number | null,
-  defaultPrice: null as number | null,
-})
+const quickExamFormRef = ref<InstanceType<typeof ExamForm> | null>(null)
+const linkedInpatientRecordId = ref<number | null>(null)
 const savingAnamnesisApproval = ref(false)
 const consultationAiChatVisible = ref(false)
 const consultationAiQuestion = ref('')
@@ -587,6 +589,11 @@ const clinical = reactive({
   exams: '',
   followUp: '',
   referInpatient: false
+})
+const inpatientReferral = reactive({
+  boxId: null as number | null,
+  reason: '',
+  notes: '',
 })
 const anamnesisAnswers = reactive<Record<string, string>>({
   symptomStart: '',
@@ -961,16 +968,18 @@ const triageRiskLabel = (value: string | null | undefined) => {
 const clientLabel = computed(() => clientOptions.value.find((c) => c.value === model.clientId)?.label || 'Não informado')
 const petLabel = computed(() => petOptions.value.find((p) => p.value === model.petId)?.label || 'Não informado')
 const veterinarianLabel = computed(() => veterinarianOptions.value.find((v) => v.value === model.veterinarianId)?.label || 'Não informado')
+const inpatientBoxLabel = computed(() => availableInpatientBoxOptions.value.find((item) => item.value === inpatientReferral.boxId)?.label || '')
 const isExistingConsultation = computed(() => Boolean(model.id))
 
 const loadLookups = async () => {
   const api = useApi()
   try {
-    const [clientsRes, petsRes, usersRes, apptsRes] = await Promise.all([
+    const [clientsRes, petsRes, usersRes, apptsRes, boxesRes] = await Promise.all([
       api<any>('/api/v1/clients?limit=500'),
       api<any>('/api/v1/pets?limit=1000'),
       api<any>('/api/v1/users?limit=100'),
-      api<any>('/api/v1/appointments?sortBy=startsAt&sortDirection=desc&limit=50')
+      api<any>('/api/v1/appointments?sortBy=startsAt&sortDirection=desc&limit=50'),
+      api<any>('/api/v1/boxes?isActive=true'),
     ])
 
     clientOptions.value = clientsRes.data.map((item: any) => ({ label: item.name, value: Number(item.id) }))
@@ -981,6 +990,10 @@ const loadLookups = async () => {
       value: Number(item.id),
       data: item
     }))
+    const boxes = Array.isArray(boxesRes?.data) ? boxesRes.data : []
+    availableInpatientBoxOptions.value = boxes
+      .filter((item: any) => !item.currentInpatient)
+      .map((item: any) => ({ label: item.name, value: Number(item.id) }))
   } catch (_error) {
     message.error('Erro ao carregar dados auxiliares')
   }
@@ -1058,6 +1071,9 @@ const hydrateClinicalNotesFromModel = () => {
   clinical.exams = getLineValue('Exames')
   clinical.followUp = getLineValue('Retorno')
   clinical.referInpatient = /Encaminhar para internação:\s*Sim/i.test(notes)
+  inpatientReferral.boxId = Number(getLineValue('Box/Leito internação ID') || 0) || null
+  inpatientReferral.reason = getLineValue('Motivo internação')
+  inpatientReferral.notes = getLineValue('Observações internação')
   anamnesisAnswers.symptomStart = getLineValue('Anamnese - Início dos sintomas')
   anamnesisAnswers.symptomEvolution = getLineValue('Anamnese - Evolução dos sintomas')
   anamnesisAnswers.feeding24h = getLineValue('Anamnese - Alimentação 24h')
@@ -1175,6 +1191,21 @@ const validateCore = () => {
   return true
 }
 
+const validateInpatientReferral = () => {
+  if (!clinical.referInpatient) return true
+  if (!inpatientReferral.boxId) {
+    message.warning('Selecione o box/leito para encaminhar para internação.')
+    currentStep.value = 3
+    return false
+  }
+  if (!String(inpatientReferral.reason || '').trim()) {
+    message.warning('Informe o motivo clínico da internação.')
+    currentStep.value = 3
+    return false
+  }
+  return true
+}
+
 const blockDecisionLabel = (value: 'pending' | 'confirmed' | 'edited' | 'discarded') => {
   if (value === 'confirmed') return 'Confirmado'
   if (value === 'edited') return 'Editado'
@@ -1267,6 +1298,10 @@ const syncExtraNotes = () => {
       !/^Exames:/i.test(line) &&
       !/^Retorno:/i.test(line) &&
       !/^Encaminhar para internação:/i.test(line) &&
+      !/^Box\/Leito internação:/i.test(line) &&
+      !/^Box\/Leito internação ID:/i.test(line) &&
+      !/^Motivo internação:/i.test(line) &&
+      !/^Observações internação:/i.test(line) &&
       !/^Prioridade clínica:/i.test(line) &&
       !/^Anamnese - /i.test(line),
     )
@@ -1278,6 +1313,10 @@ const syncExtraNotes = () => {
     clinical.exams ? `Exames: ${clinical.exams}` : '',
     clinical.followUp ? `Retorno: ${clinical.followUp}` : '',
     clinical.referInpatient ? 'Encaminhar para internação: Sim' : '',
+    clinical.referInpatient && inpatientBoxLabel.value ? `Box/Leito internação: ${inpatientBoxLabel.value}` : '',
+    clinical.referInpatient && inpatientReferral.boxId ? `Box/Leito internação ID: ${inpatientReferral.boxId}` : '',
+    clinical.referInpatient && inpatientReferral.reason ? `Motivo internação: ${inpatientReferral.reason}` : '',
+    clinical.referInpatient && inpatientReferral.notes ? `Observações internação: ${inpatientReferral.notes}` : '',
     model.triageRisk && model.triageRisk !== 'NOT_TRIAGED' ? `Prioridade clínica: ${triageRiskLabel(model.triageRisk)}` : '',
     anamnesisAnswers.symptomStart ? `Anamnese - Início dos sintomas: ${anamnesisAnswers.symptomStart}` : '',
     anamnesisAnswers.symptomEvolution ? `Anamnese - Evolução dos sintomas: ${anamnesisAnswers.symptomEvolution}` : '',
@@ -1295,6 +1334,7 @@ const syncExtraNotes = () => {
 
 const persist = async ({ finalize = false }: { finalize?: boolean } = {}) => {
   if (!validateCore()) return false
+  if (!validateInpatientReferral()) return false
   if (finalize) {
     const hasComplaint = String(model.aiOrganizedComplaint || model.originalComplaint || '').trim().length > 0
     const hasClinical = String(model.treatmentPlan || model.notes || '').trim().length > 0
@@ -1305,7 +1345,7 @@ const persist = async ({ finalize = false }: { finalize?: boolean } = {}) => {
     }
     if (!hasClinical) {
       message.warning('Informe a conduta clínica antes de finalizar.')
-      currentStep.value = 4
+      currentStep.value = 3
       return false
     }
     if (String(model.aiOrganizedComplaint || '').trim() && !model.anamnesisApproved) {
@@ -1335,6 +1375,12 @@ const persist = async ({ finalize = false }: { finalize?: boolean } = {}) => {
       const created = await api<any>('/api/v1/consultations', { method: 'POST', body: payload })
       Object.assign(model, { ...model, ...created, id: Number(created.id) })
     }
+
+    const inpatientResult = await ensureInpatientReferralCreated()
+    if (inpatientResult === 'created') {
+      message.success('Internação criada automaticamente a partir da consulta.')
+    }
+
     saveStatus.value = 'saved'
     lastSavedAt.value = Date.now()
     return true
@@ -1350,6 +1396,68 @@ const persist = async ({ finalize = false }: { finalize?: boolean } = {}) => {
 const saveDraft = async () => {
   const ok = await persist()
   if (ok) message.success('Rascunho salvo')
+}
+
+const ensureInpatientReferralCreated = async () => {
+  if (!clinical.referInpatient || !model.id || !model.petId) return 'skipped' as const
+  if (linkedInpatientRecordId.value) return 'exists' as const
+
+  const api = useApi()
+  try {
+    if (!model.clientId) {
+      throw new Error('Tutor é obrigatório para criar a internação.')
+    }
+    if (!String(inpatientReferral.reason || '').trim()) {
+      throw new Error('Motivo clínico da internação é obrigatório.')
+    }
+    const selectedBox = availableInpatientBoxOptions.value.find((item) => Number(item.value) === Number(inpatientReferral.boxId))
+    if (!selectedBox) {
+      throw new Error('O box selecionado não está mais disponível para internação.')
+    }
+
+    const usedConsultationRes = await api<any>('/api/v1/inpatient-records', {
+      query: { consultationId: model.id, page: 1, limit: 1 },
+    })
+    const usedRows = Array.isArray(usedConsultationRes?.data) ? usedConsultationRes.data : []
+    if (usedRows.length > 0) {
+      const reused = usedRows.find((item: any) => Number(item.id) !== Number(linkedInpatientRecordId.value || 0))
+      if (reused) {
+        throw new Error('A consulta de origem já foi utilizada em outra internação.')
+      }
+    }
+
+    const existingRes = await api<any>('/api/v1/inpatient-records', {
+      query: { petId: model.petId, status: 'ACTIVE', page: 1, limit: 20 },
+    })
+    const rows = Array.isArray(existingRes?.data) ? existingRes.data : []
+    const matchingRecord = rows.find((item: any) => Number(item.consultationId) === Number(model.id))
+
+    if (matchingRecord?.id) {
+      linkedInpatientRecordId.value = Number(matchingRecord.id)
+      return 'exists' as const
+    }
+
+    if (rows.length > 0) {
+      throw new Error('Paciente já possui uma internação ativa.')
+    }
+
+    const created = await api<any>('/api/v1/inpatient-records', {
+      method: 'POST',
+      body: {
+        consultationId: model.id,
+        petId: model.petId,
+        boxId: inpatientReferral.boxId,
+        admissionAt: new Date().toISOString(),
+        reason: String(inpatientReferral.reason || '').trim(),
+        notes: String(inpatientReferral.notes || '').trim(),
+      },
+    })
+
+    linkedInpatientRecordId.value = Number(created?.id || 0) || null
+    return 'created' as const
+  } catch (error: any) {
+    throw new Error(error?.data?.message || error?.message || 'Erro ao criar internação automaticamente.')
+  }
 }
 
 const saveAndContinue = async () => {
@@ -1989,10 +2097,7 @@ const fetchExamSupportData = async () => {
       examCategory: item.examCategory || null,
     }))
     const categories = Array.isArray(categoriesRes?.data) ? categoriesRes.data : []
-    examCategoryOptions.value = categories.map((item: any) => ({
-      label: item.name,
-      value: Number(item.id),
-    }))
+    void categories
   } catch (_error) {
     message.error('Não foi possível carregar exames ativos.')
   }
@@ -2055,31 +2160,25 @@ const openExamRequestModal = async () => {
 }
 
 const openQuickExamCreateModal = async () => {
-  if (!examCategoryOptions.value.length) await fetchExamSupportData()
-  quickExamForm.name = ''
-  quickExamForm.description = ''
-  quickExamForm.defaultPrice = null
-  quickExamForm.examCategoryId = null
   quickExamCreateModalVisible.value = true
 }
 
 const confirmQuickExamCreate = async () => {
-  const name = String(quickExamForm.name || '').trim()
-  if (!name) {
-    message.warning('Informe o nome do exame.')
-    return
-  }
+  quickExamFormRef.value?.submit?.()
+}
+
+const handleQuickExamSubmit = async (payload: ExamType) => {
   creatingQuickExamType.value = true
   try {
     const api = useApi()
     await api('/api/v1/exam-types', {
       method: 'POST',
       body: {
-        name,
-        description: String(quickExamForm.description || '').trim() || null,
-        examCategoryId: quickExamForm.examCategoryId || null,
-        defaultPrice: quickExamForm.defaultPrice ?? null,
-        isActive: true,
+        name: String(payload.name || '').trim(),
+        description: String(payload.description || '').trim() || null,
+        examCategoryId: payload.examCategoryId || null,
+        defaultPrice: payload.defaultPrice ?? null,
+        isActive: payload.isActive ?? true,
       },
     })
     quickExamCreateModalVisible.value = false
@@ -2504,7 +2603,7 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 }
 .modal-title {
   margin: 0;
-  font-size: 22px;
+  font-size: 24px;
   line-height: 1.2;
   color: #0f172a;
   font-weight: 700;
@@ -2611,6 +2710,63 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
   overflow: hidden !important;
 }
 
+:root .n-modal-container:has(.exam-modal) .n-modal-body-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:root .n-modal-container:has(.exam-modal) .n-modal-body-wrapper > .n-scrollbar,
+:root .n-modal-container:has(.exam-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container,
+:root .n-modal-container:has(.exam-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container > .n-scrollbar-content {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.exam-modal.n-card {
+  --n-padding-top: 0;
+  --n-padding-bottom: 0;
+  --n-padding-left: 0;
+  --n-padding-right: 0;
+  width: 760px !important;
+  max-width: calc(100vw - 24px) !important;
+  max-height: calc(100vh - 48px) !important;
+  max-height: calc(100dvh - 48px) !important;
+  margin: 0 auto !important;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.exam-modal.n-card .n-card-header {
+  flex: 0 0 auto;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 16px 20px 12px;
+  z-index: 4;
+}
+
+.exam-modal.n-card .n-card__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none !important;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 16px 20px;
+  scroll-padding-bottom: 88px;
+}
+
+.exam-modal.n-card .n-card__footer {
+  flex: 0 0 auto;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -6px 14px rgba(15, 23, 42, 0.05);
+  padding: 10px 16px;
+  z-index: 4;
+}
+
 :root .n-modal-container:has(.prescription-modal) .n-modal-body-wrapper > .n-scrollbar,
 :root .n-modal-container:has(.prescription-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container,
 :root .n-modal-container:has(.prescription-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container > .n-scrollbar-content {
@@ -2663,6 +2819,27 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 }
 
 @media (max-width: 768px) {
+  .exam-modal.n-card {
+    width: 100% !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100vh - 48px) !important;
+    max-height: calc(100dvh - 48px) !important;
+  }
+
+  .exam-modal.n-card .n-card-header {
+    padding: 14px 14px 10px;
+  }
+
+  .exam-modal.n-card .n-card__content {
+    padding: 10px 12px 16px;
+    scroll-padding-bottom: 96px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .exam-modal.n-card .n-card__footer {
+    padding: 8px 12px;
+  }
+
   .prescription-modal.n-card {
     width: 100% !important;
     max-width: calc(100vw - 24px) !important;

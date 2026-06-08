@@ -111,9 +111,10 @@
               Abrir internação
             </n-button>
             <div class="card-actions-secondary">
-              <n-button size="small" secondary class="secondary-action-btn" @click="openRecordWithTab(box.currentInpatient.id, 'vitals')">Registrar sinais</n-button>
               <n-dropdown trigger="click" :options="rowMenuOptions(box.currentInpatient)" @select="(key) => handleRowMenuSelect(key, box.currentInpatient)">
-                <n-button size="small" secondary class="menu-button menu-button-square" aria-label="Mais opções">Mais opções</n-button>
+                <n-button size="small" quaternary class="menu-button menu-button-square" aria-label="Mais opções">
+                  <AppIcon name="ellipsis" :size="16" :stroke-width="2" />
+                </n-button>
               </n-dropdown>
             </div>
           </div>
@@ -146,37 +147,97 @@
     <n-modal
       v-model:show="showAdmissionModal"
       preset="card"
-      title="Nova internação"
-      class="w-full max-w-3xl"
+      class="hospital-modal hospital-modal-admission"
       :mask-closable="false"
     >
+      <template #header>
+        <div class="modal-head">
+          <h3 class="modal-title">Nova internação</h3>
+          <p class="modal-subtitle">Registre a admissão do paciente em um leito da clínica.</p>
+        </div>
+      </template>
       <InpatientAdmissionForm
+        ref="admissionFormRef"
         :loading="savingAdmission"
         :pet-options="petOptions"
         :box-options="availableBoxOptions"
         :consultation-options="consultationOptions"
         :initial-value="admissionInitialValue"
         @submit="createAdmission"
-        @cancel="showAdmissionModal = false"
       />
+      <template #footer>
+        <div class="modal-footer">
+          <n-button tertiary :disabled="savingAdmission" @click="showAdmissionModal = false">Cancelar</n-button>
+          <n-button type="primary" class="btn-primary-green" :loading="savingAdmission" @click="submitAdmissionForm">
+            Confirmar internação
+          </n-button>
+        </div>
+      </template>
+    </n-modal>
+
+    <n-modal
+      v-model:show="showTransferModal"
+      preset="card"
+      class="hospital-modal hospital-modal-transfer"
+      :mask-closable="false"
+    >
+      <template #header>
+        <div class="modal-head">
+          <h3 class="modal-title">Transferir leito</h3>
+          <p class="modal-subtitle">
+            {{ transferModalSubtitle }}
+          </p>
+        </div>
+      </template>
+      <InpatientTransferForm
+        ref="transferFormRef"
+        :loading="savingTransfer"
+        :box-options="transferBoxOptions"
+        :current-box-label="transferCurrentBoxLabel"
+        :initial-value="transferInitialValue"
+        @submit="createTransfer"
+      />
+      <template #footer>
+        <div class="modal-footer">
+          <n-button tertiary :disabled="savingTransfer" @click="closeTransferModal">Cancelar</n-button>
+          <n-button type="primary" class="btn-primary-green" :loading="savingTransfer" @click="submitTransferForm">
+            Confirmar transferência
+          </n-button>
+        </div>
+      </template>
     </n-modal>
 
     <n-modal
       v-model:show="showPrescriptionModal"
       preset="card"
-      title="Emitir prescrição digital"
-      class="w-full max-w-3xl"
+      class="hospital-modal hospital-modal-prescription"
       :mask-closable="false"
     >
+      <template #header>
+        <div class="modal-head">
+          <h3 class="modal-title">Emitir prescrição digital</h3>
+          <p class="modal-subtitle">Preencha o conteúdo da prescrição vinculada ao atendimento.</p>
+        </div>
+      </template>
       <PrescriptionForm
+        ref="prescriptionFormRef"
         :loading="savingPrescription"
         :pet-id="prescriptionContext.petId"
         :consultation-id="prescriptionContext.consultationId"
         :pet-label="prescriptionContext.petLabel"
         :consultation-label="prescriptionContext.consultationLabel"
+        :tutor-label="prescriptionContext.tutorLabel"
+        :veterinarian-label="prescriptionContext.veterinarianLabel"
         @submit="createPrescription"
-        @cancel="showPrescriptionModal = false"
       />
+      <template #footer>
+        <div class="modal-footer">
+          <n-button tertiary :disabled="savingPrescription" @click="showPrescriptionModal = false">Cancelar</n-button>
+          <n-button type="primary" class="btn-primary-green" :loading="savingPrescription" @click="submitPrescriptionForm">
+            Emitir prescrição
+          </n-button>
+        </div>
+      </template>
     </n-modal>
 
     <n-modal
@@ -372,6 +433,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { format } from 'date-fns'
 import { useDialog, useMessage } from 'naive-ui'
 import InpatientAdmissionForm, { type InpatientAdmissionPayload } from '~/components/hospitalization/InpatientAdmissionForm.vue'
+import InpatientTransferForm, { type InpatientTransferPayload } from '~/components/hospitalization/InpatientTransferForm.vue'
 import ClinicalParametersForm from '~/components/hospitalization/ClinicalParametersForm.vue'
 import TreatmentItemForm from '~/components/hospitalization/TreatmentItemForm.vue'
 import PrescriptionForm from '~/components/hospitalization/PrescriptionForm.vue'
@@ -384,11 +446,16 @@ const dialog = useDialog()
 const loadingBoard = ref(false)
 const detailLoading = ref(false)
 const savingAdmission = ref(false)
+const savingTransfer = ref(false)
 const savingVitals = ref(false)
 const savingTreatment = ref(false)
 const savingPrescription = ref(false)
+const admissionFormRef = ref<any | null>(null)
+const transferFormRef = ref<any | null>(null)
+const prescriptionFormRef = ref<any | null>(null)
 
 const showAdmissionModal = ref(false)
+const showTransferModal = ref(false)
 const showDetailDrawer = ref(false)
 const showPrescriptionModal = ref(false)
 const showPrintModal = ref(false)
@@ -417,11 +484,15 @@ const procedures = ref<any[]>([])
 const consultations = ref<any[]>([])
 
 const admissionInitialValue = ref<Partial<InpatientAdmissionPayload> | null>(null)
+const transferInitialValue = ref<Partial<InpatientTransferPayload> | null>(null)
+const transferTargetRecord = ref<any | null>(null)
 const prescriptionContext = reactive({
   petId: null as number | null,
   consultationId: null as number | null,
   petLabel: 'Paciente não selecionado',
   consultationLabel: '',
+  tutorLabel: '',
+  veterinarianLabel: '',
 })
 
 const draftFilters = reactive({
@@ -504,6 +575,7 @@ const petOptions = computed(() =>
   pets.value.map((pet) => ({
     label: `${pet.name} • ${pet.client?.name || 'Tutor'}`,
     value: Number(pet.id),
+    clientId: pet.client?.id ? Number(pet.client.id) : null,
   })),
 )
 
@@ -523,6 +595,23 @@ const availableBoxOptions = computed(() =>
       value: Number(box.id),
     })),
 )
+
+const transferBoxOptions = computed(() =>
+  boardBoxes.value
+    .filter((box) => !box.currentInpatient && Number(box.id) !== Number(transferTargetRecord.value?.boxId || 0))
+    .map((box) => ({
+      label: box.name,
+      value: Number(box.id),
+    })),
+)
+
+const transferCurrentBoxLabel = computed(() => transferTargetRecord.value?.currentBoxLabel || transferTargetRecord.value?.box?.name || 'Box não informado')
+const transferModalSubtitle = computed(() => {
+  if (!transferTargetRecord.value?.pet?.name) {
+    return 'Selecione um box vazio e informe o motivo da movimentação.'
+  }
+  return `${transferTargetRecord.value.pet.name} será movido de ${transferCurrentBoxLabel.value}.`
+})
 
 const productOptions = computed(() => products.value.map((item) => ({ label: item.name, value: Number(item.id) })))
 const procedureOptions = computed(() => procedures.value.map((item) => ({ label: item.name, value: Number(item.id) })))
@@ -618,6 +707,7 @@ const clearFilters = () => {
 }
 
 const rowMenuOptions = (inpatient: any) => [
+  { label: 'Registrar sinais', key: `vitals:${inpatient.id}` },
   { label: 'Prescrição', key: `prescription:${inpatient.id}` },
   { label: 'Mapa terapêutico', key: `treatment:${inpatient.id}` },
   { label: 'Transferir leito', key: `transfer:${inpatient.id}` },
@@ -631,6 +721,10 @@ const openRecordWithTab = async (recordId: number, tab: string) => {
 }
 
 const handleRowMenuSelect = async (key: string, inpatient: any) => {
+  if (key.startsWith('vitals:')) {
+    await openRecordWithTab(Number(inpatient.id), 'vitals')
+    return
+  }
   if (key.startsWith('prescription:')) {
     openPrescriptionModalForContext({ petId: Number(inpatient.petId), consultationId: inpatient.consultationId ? Number(inpatient.consultationId) : null })
     return
@@ -652,7 +746,7 @@ const handleRowMenuSelect = async (key: string, inpatient: any) => {
     return
   }
   if (key.startsWith('transfer:')) {
-    message.info('Fluxo de transferência de leito será disponibilizado em breve.')
+    openTransferModal(inpatient)
     return
   }
   if (key.startsWith('history:')) {
@@ -708,6 +802,37 @@ const openAdmissionModal = (initialValue?: Partial<InpatientAdmissionPayload>) =
   showAdmissionModal.value = true
 }
 
+const submitAdmissionForm = () => {
+  admissionFormRef.value?.submit?.()
+}
+
+const resolveCurrentBoxLabel = (inpatient: any) =>
+  inpatient?.box?.name
+  || boardBoxes.value.find((box) => Number(box.currentInpatient?.id) === Number(inpatient?.id))?.name
+  || `Box #${inpatient?.boxId || '-'}`
+
+const openTransferModal = (inpatient: any) => {
+  transferTargetRecord.value = {
+    ...inpatient,
+    currentBoxLabel: resolveCurrentBoxLabel(inpatient),
+  }
+  transferInitialValue.value = {
+    boxId: null,
+    reason: '',
+  }
+  showTransferModal.value = true
+}
+
+const closeTransferModal = () => {
+  showTransferModal.value = false
+  transferInitialValue.value = null
+  transferTargetRecord.value = null
+}
+
+const submitTransferForm = () => {
+  transferFormRef.value?.submit?.()
+}
+
 const openPrescriptionModalForContext = (context: { petId: number; consultationId?: number | null }) => {
   const pet = pets.value.find((item) => Number(item.id) === Number(context.petId))
   const consultation = context.consultationId ? consultations.value.find((item) => Number(item.id) === Number(context.consultationId)) : null
@@ -716,7 +841,13 @@ const openPrescriptionModalForContext = (context: { petId: number; consultationI
   prescriptionContext.consultationId = context.consultationId ? Number(context.consultationId) : null
   prescriptionContext.petLabel = pet?.name || `Paciente #${context.petId}`
   prescriptionContext.consultationLabel = consultation ? `Consulta #${consultation.id} • ${formatDateTime(consultation.visitDate)}` : ''
+  prescriptionContext.tutorLabel = pet?.client?.name || ''
+  prescriptionContext.veterinarianLabel = consultation?.veterinarian?.name || consultation?.veterinarianName || ''
   showPrescriptionModal.value = true
+}
+
+const submitPrescriptionForm = () => {
+  prescriptionFormRef.value?.submit?.()
 }
 
 const openPrescriptionModalForSelectedRecord = () => {
@@ -768,6 +899,32 @@ const refreshSelectedRecord = async () => {
 const createAdmission = async (payload: any) => {
   savingAdmission.value = true
   try {
+    const selectedPet = pets.value.find((item) => Number(item.id) === Number(payload.petId))
+    const selectedBox = boardBoxes.value.find((item) => Number(item.id) === Number(payload.boxId))
+    if (!selectedPet?.client?.id) {
+      throw new Error('O paciente precisa estar vinculado a um tutor antes da internação.')
+    }
+    if (!selectedBox) {
+      throw new Error('Selecione um box válido para a internação.')
+    }
+    if (selectedBox.currentInpatient) {
+      throw new Error('Este box já está ocupado por outro paciente.')
+    }
+    if (!String(payload.reason || '').trim()) {
+      throw new Error('Informe o motivo clínico da internação.')
+    }
+    if (payload.consultationId) {
+      const existingForConsultation = await api<any>('/api/v1/inpatient-records', {
+        query: {
+          consultationId: payload.consultationId,
+          page: 1,
+          limit: 1,
+        },
+      })
+      if (Array.isArray(existingForConsultation?.data) && existingForConsultation.data.length > 0) {
+        throw new Error('A consulta de origem já foi utilizada em outra internação.')
+      }
+    }
     const created = await api<any>('/api/v1/inpatient-records', { method: 'POST', body: payload })
     message.success('Paciente internado com sucesso.')
     showAdmissionModal.value = false
@@ -778,6 +935,36 @@ const createAdmission = async (payload: any) => {
     message.error(error?.data?.message || 'Erro ao registrar a internação.')
   } finally {
     savingAdmission.value = false
+  }
+}
+
+const createTransfer = async (payload: InpatientTransferPayload) => {
+  if (!transferTargetRecord.value?.id) return
+
+  savingTransfer.value = true
+  try {
+    const recordId = Number(transferTargetRecord.value.id)
+    const selectedBox = boardBoxes.value.find((item) => Number(item.id) === Number(payload.boxId))
+    if (!selectedBox || selectedBox.currentInpatient) {
+      throw new Error('Selecione um box vazio para a transferência.')
+    }
+
+    await api(`/api/v1/inpatient-records/${recordId}/transfer`, {
+      method: 'PATCH',
+      body: payload,
+    })
+
+    message.success('Transferência de leito registrada.')
+    closeTransferModal()
+    await refreshBoard()
+
+    if (selectedRecordId.value === recordId) {
+      await refreshSelectedRecord()
+    }
+  } catch (error: any) {
+    message.error(error?.data?.message || 'Erro ao transferir o paciente de leito.')
+  } finally {
+    savingTransfer.value = false
   }
 }
 
@@ -1022,6 +1209,33 @@ watch(activeDetailTab, async () => {
 .btn-primary-green {
   background: #16a34a;
   border-color: #16a34a;
+}
+
+.modal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.modal-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
 }
 
 .stats-grid {
@@ -1293,22 +1507,18 @@ watch(activeDetailTab, async () => {
 
 .card-actions-secondary {
   display: flex;
-  gap: 8px;
-  width: 100%;
-}
-
-.secondary-action-btn {
-  min-height: 36px;
+  justify-content: flex-end;
+  flex: 0 0 auto;
 }
 
 .menu-button {
   font-weight: 700;
-  min-width: 38px;
 }
 
 .menu-button-square {
   width: 36px;
-  height: 32px;
+  min-width: 36px;
+  height: 36px;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -1816,24 +2026,11 @@ watch(activeDetailTab, async () => {
   }
 
   .card-actions-secondary {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    width: 100%;
-    gap: 6px;
+    width: auto;
+    justify-content: flex-end;
   }
 
-  .secondary-action-btn {
-    width: 100%;
-    --n-width: 100%;
-    --n-height: 38px;
-    min-height: 38px;
-    justify-content: center;
-    white-space: nowrap;
-  }
-
-  .card-actions-row :deep(.n-button):not(.open-record-btn):not(.secondary-action-btn) {
-    width: 100%;
+  .card-actions-row :deep(.n-button):not(.open-record-btn) {
     justify-content: center;
   }
 
@@ -1842,12 +2039,11 @@ watch(activeDetailTab, async () => {
   }
 
   .card-actions-secondary .menu-button-square {
-    width: auto;
-    min-width: 116px;
+    width: 38px;
+    min-width: 38px;
     --n-height: 38px;
     height: 38px;
-    padding: 0 12px;
-    white-space: nowrap;
+    padding: 0;
   }
 
   .filter-actions {
@@ -1860,6 +2056,129 @@ watch(activeDetailTab, async () => {
 
   .print-head {
     flex-direction: column;
+  }
+
+  .modal-title {
+    font-size: 20px;
+  }
+
+  .modal-footer {
+    width: 100%;
+  }
+
+  .modal-footer :deep(.n-button) {
+    flex: 1;
+  }
+}
+</style>
+
+<style>
+:root .n-modal-container:has(.hospital-modal) .n-modal-body-wrapper {
+  overflow: hidden !important;
+}
+
+:root .n-modal-container:has(.hospital-modal) .n-modal-body-wrapper > .n-scrollbar,
+:root .n-modal-container:has(.hospital-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container,
+:root .n-modal-container:has(.hospital-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container > .n-scrollbar-content {
+  max-height: 100vh !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
+}
+
+.hospital-modal.n-card {
+  --n-padding-top: 0;
+  --n-padding-bottom: 0;
+  --n-padding-left: 0;
+  --n-padding-right: 0;
+  width: 760px !important;
+  max-width: calc(100vw - 48px) !important;
+  max-height: calc(100vh - 48px) !important;
+  max-height: calc(100dvh - 48px) !important;
+  margin: 0 auto !important;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.hospital-modal.n-card .n-card-header {
+  flex: 0 0 auto;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 18px 22px 14px;
+  z-index: 4;
+}
+
+.hospital-modal.n-card .n-card-header__main {
+  min-width: 0;
+}
+
+.hospital-modal.n-card .n-card-header__extra {
+  padding-left: 12px;
+}
+
+.hospital-modal.n-card .n-card__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none !important;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 18px 18px;
+  background: #ffffff;
+  scroll-padding-bottom: 96px;
+}
+
+.hospital-modal.n-card .n-card__footer {
+  flex: 0 0 auto;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -6px 14px rgba(15, 23, 42, 0.05);
+  padding: 12px 18px;
+  z-index: 4;
+}
+
+.hospital-modal .n-button--primary-type {
+  --n-color: #16a34a;
+  --n-color-hover: #15803d;
+  --n-color-pressed: #166534;
+  --n-border: 1px solid #16a34a;
+  --n-border-hover: 1px solid #15803d;
+  --n-border-pressed: 1px solid #166534;
+}
+
+@media (max-width: 768px) {
+  .hospital-modal.n-card {
+    width: 100% !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100vh - 24px) !important;
+    max-height: calc(100dvh - 24px) !important;
+  }
+
+  .hospital-modal.n-card .n-card-header {
+    padding: 16px 16px 12px;
+  }
+
+  .hospital-modal.n-card .n-card__content {
+    padding: 12px;
+  }
+
+  .hospital-modal.n-card .n-card__footer {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 560px) {
+  .hospital-modal.n-card {
+    max-width: calc(100vw - 8px) !important;
+    max-height: calc(100vh - 8px) !important;
+    max-height: calc(100dvh - 8px) !important;
+    align-self: end;
+  }
+
+  .hospital-modal.n-card .n-card__footer .modal-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
   }
 }
 </style>

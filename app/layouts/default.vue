@@ -321,6 +321,7 @@ const quickCreateOptions = [
   { label: 'Nova venda', key: '/financeiro/vendas/nova' },
   { label: 'Novo cliente', key: '/clientes' },
   { label: 'Novo pet', key: '/pets' },
+  { label: 'Novo box', key: '/cadastros/boxes' },
   { label: 'Nova conta a pagar', key: '/financeiro/contas-a-pagar' }
 ]
 
@@ -344,6 +345,7 @@ const notificationCount = computed(() => notifications.length)
 const searchableItems = [
   { type: 'Clientes', label: 'Cadastro de clientes', meta: 'Clientes', to: '/clientes' },
   { type: 'Pets', label: 'Cadastro de pets', meta: 'Pets', to: '/pets' },
+  { type: 'Boxes', label: 'Cadastro de boxes', meta: 'Cadastros', to: '/cadastros/boxes' },
   { type: 'Vendas', label: 'Vendas', meta: 'Financeiro', to: '/financeiro/vendas' },
   { type: 'Produtos', label: 'Produtos e serviços', meta: 'Cadastros', to: '/cadastros/produtos' },
   { type: 'Financeiro', label: 'Contas a pagar', meta: 'Financeiro', to: '/financeiro/contas-a-pagar' },
@@ -481,6 +483,7 @@ const menuItems = [
       { label: 'Tipos de agendamento', icon: CalendarCog, to: '/cadastros/tipos-agendamento' },
       { label: 'Categorias de produto', icon: Tags, to: '/cadastros/categorias-produto' },
       { label: 'Fornecedores', icon: Truck, to: '/cadastros/fornecedores' },
+      { label: 'Boxes de internação', icon: Hospital, to: '/cadastros/boxes' },
       { label: 'Produtos e serviços', icon: Package, to: '/cadastros/produtos' },
       { label: 'Procedimentos médicos', icon: Stethoscope, to: '/cadastros/procedimentos' },
       { label: 'Exames', icon: ClipboardList, to: '/cadastros/exames' },
