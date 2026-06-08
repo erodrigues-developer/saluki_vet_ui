@@ -172,6 +172,7 @@ import {
   Dna,
   FolderKanban,
   Hospital,
+  MapPin,
   Package,
   PanelLeft,
   PawPrint,
@@ -319,6 +320,7 @@ const quickCreateOptions = [
   { label: 'Novo atendimento', key: '/consultas/novo-atendimento' },
   { label: 'Novo agendamento', key: '/atendimento/agendamentos' },
   { label: 'Nova venda', key: '/financeiro/vendas/nova' },
+  { label: 'Nova entrada de estoque', key: '/estoque/saldos' },
   { label: 'Novo cliente', key: '/clientes' },
   { label: 'Novo pet', key: '/pets' },
   { label: 'Novo box', key: '/cadastros/boxes' },
@@ -335,7 +337,7 @@ const profileOptions = [
 
 const notifications = [
   { id: 'n1', title: '3 vacinas atrasadas', meta: 'Agenda de vacinas', to: '/atendimento/agendamentos' },
-  { id: 'n2', title: '3 itens com estoque crítico', meta: 'Produtos', to: '/cadastros/produtos' },
+  { id: 'n2', title: '3 itens com estoque crítico', meta: 'Estoque', to: '/estoque/saldos?status=LOW' },
   { id: 'n3', title: 'R$ 3.550 em contas atrasadas', meta: 'Financeiro', to: '/financeiro/contas-a-pagar' },
   { id: 'n4', title: '3 vendas abertas', meta: 'Vendas', to: '/financeiro/vendas?status=aberta' }
 ]
@@ -348,6 +350,9 @@ const searchableItems = [
   { type: 'Boxes', label: 'Cadastro de boxes', meta: 'Cadastros', to: '/cadastros/boxes' },
   { type: 'Vendas', label: 'Vendas', meta: 'Financeiro', to: '/financeiro/vendas' },
   { type: 'Produtos', label: 'Produtos e serviços', meta: 'Cadastros', to: '/cadastros/produtos' },
+  { type: 'Estoque', label: 'Saldos de estoque', meta: 'Estoque', to: '/estoque/saldos' },
+  { type: 'Estoque', label: 'Histórico de movimentações', meta: 'Estoque', to: '/estoque/movimentacoes' },
+  { type: 'Estoque', label: 'Locais de estoque', meta: 'Cadastros', to: '/cadastros/locais-estoque' },
   { type: 'Financeiro', label: 'Contas a pagar', meta: 'Financeiro', to: '/financeiro/contas-a-pagar' },
   { type: 'Financeiro', label: 'Comissões', meta: 'Financeiro', to: '/financeiro/comissoes' },
   { type: 'Fornecedores', label: 'Fornecedores', meta: 'Cadastros', to: '/cadastros/fornecedores' },
@@ -476,6 +481,14 @@ const menuItems = [
     ]
   },
   {
+    label: 'Estoque',
+    icon: Package,
+    children: [
+      { label: 'Saldos', icon: Package, to: '/estoque/saldos' },
+      { label: 'Movimentações', icon: ClipboardList, to: '/estoque/movimentacoes' }
+    ]
+  },
+  {
     label: 'Cadastros',
     icon: FolderKanban,
     children: [
@@ -484,6 +497,7 @@ const menuItems = [
       { label: 'Categorias de produto', icon: Tags, to: '/cadastros/categorias-produto' },
       { label: 'Fornecedores', icon: Truck, to: '/cadastros/fornecedores' },
       { label: 'Boxes de internação', icon: Hospital, to: '/cadastros/boxes' },
+      { label: 'Locais de estoque', icon: MapPin, to: '/cadastros/locais-estoque' },
       { label: 'Produtos e serviços', icon: Package, to: '/cadastros/produtos' },
       { label: 'Procedimentos médicos', icon: Stethoscope, to: '/cadastros/procedimentos' },
       { label: 'Exames', icon: ClipboardList, to: '/cadastros/exames' },

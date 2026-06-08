@@ -116,7 +116,7 @@
           </template>
         </article>
 
-        <article class="card kpi-card is-primary" role="button" tabindex="0" @click="goTo('/cadastros/produtos')" @keydown.enter="goTo('/cadastros/produtos')">
+        <article class="card kpi-card is-primary" role="button" tabindex="0" @click="goTo('/estoque/saldos?status=LOW')" @keydown.enter="goTo('/estoque/saldos?status=LOW')">
           <template v-if="bootLoading">
             <div class="skeleton h16 w36"></div>
             <div class="skeleton h34 w30"></div>
@@ -128,21 +128,21 @@
               <div>
                 <p class="label">Estoque crítico</p>
                 <div class="kpi-title">
-                  <h3>{{ criticalStock.length }}</h3>
+                  <h3>{{ criticalStockCount }}</h3>
                   <small class="kpi-sub">itens abaixo do mínimo</small>
                 </div>
               </div>
               <span class="pill alert">Ação hoje</span>
             </div>
             <ul v-if="criticalStock.length" class="mini-list compact">
-              <li v-for="item in criticalStock.slice(0, 3)" :key="item.name">
-                <span class="truncate">{{ item.name }}</span>
-                <span class="micro align-right">{{ item.daysLeft }} dias</span>
+              <li v-for="item in criticalStock.slice(0, 3)" :key="`${item.productId}-${item.stockLocationId}`">
+                <span class="truncate">{{ item.productName }}</span>
+                <span class="micro align-right">{{ item.currentStockLabel }} / min {{ item.minimumStockLabel }}</span>
               </li>
             </ul>
             <p v-else class="empty-state">Nenhum item crítico no estoque.</p>
             </div>
-            <button class="action-link" @click.stop="goTo('/cadastros/produtos')">Ver estoque crítico</button>
+            <button class="action-link" @click.stop="goTo('/estoque/saldos?status=LOW')">Ver estoque crítico</button>
           </template>
         </article>
       </div>
@@ -243,13 +243,13 @@
             <span class="pill alert">Prioridade alta</span>
           </div>
           <ul v-if="criticalStock.length" class="mini-list">
-            <li v-for="item in criticalStock.slice(0, 3)" :key="item.name">
-              <span class="truncate">{{ item.name }} · {{ item.qty }} un</span>
-              <span class="micro align-right">{{ item.daysLeft }} dias</span>
+            <li v-for="item in criticalStock.slice(0, 3)" :key="`${item.productId}-${item.stockLocationId}-alert`">
+              <span class="truncate">{{ item.productName }} · {{ item.currentStockLabel }}</span>
+              <span class="micro align-right">{{ item.stockLocationName }}</span>
             </li>
           </ul>
           <p v-else class="empty-state">Nenhum item crítico no estoque.</p>
-          <button class="action-link" @click="goTo('/cadastros/produtos')">Repor estoque</button>
+          <button class="action-link" @click="goTo('/estoque/saldos?status=LOW')">Repor estoque</button>
         </article>
 
         <article class="card section-card">
@@ -372,8 +372,10 @@ import { useAiConversation } from '~/composables/useAiConversation'
 
 const router = useRouter()
 const dashboardData = ref(null)
+const stockData = ref(null)
 const financeLoading = ref(false)
 const financeError = ref(false)
+const stockError = ref(false)
 const bootLoading = ref(true)
 const chartsLoading = ref(true)
 const alertsLoading = ref(true)
@@ -392,7 +394,7 @@ const dashboardContextSnapshot = () => ({
   salesToday,
   receivedToday,
   avgTicket,
-  criticalStockCount: criticalStock.length,
+  criticalStockCount: criticalStockCount.value,
   criticalStock: criticalStock.slice(0, 5),
   vaccines: vaccinesSummary,
   finance: financeKpis.value,
@@ -427,6 +429,24 @@ const fetchPayablesDash = async () => {
   }
 }
 
+const fetchStockDash = async () => {
+  stockError.value = false
+  try {
+    const api = useApi()
+    const response = await api('/api/v1/stock-movements/balance', {
+      query: {
+        page: 1,
+        limit: 5,
+        status: 'LOW'
+      }
+    })
+    stockData.value = response
+  } catch (err) {
+    stockError.value = true
+    stockData.value = null
+  }
+}
+
 onMounted(async () => {
   if (typeof window !== 'undefined') {
     mediaQuery = window.matchMedia('(max-width: 900px)')
@@ -435,7 +455,7 @@ onMounted(async () => {
     mediaQuery.addEventListener?.('change', mediaQueryListener)
     mediaQuery.addListener?.(mediaQueryListener)
   }
-  await Promise.all([fetchPayablesDash(), new Promise((resolve) => setTimeout(resolve, 500))])
+  await Promise.all([fetchPayablesDash(), fetchStockDash(), new Promise((resolve) => setTimeout(resolve, 500))])
   bootLoading.value = false
   chartsLoading.value = false
   alertsLoading.value = false
@@ -505,12 +525,6 @@ const salesToday = 12450
 const receivedToday = 10740
 const avgTicket = 294
 
-const criticalStock = [
-  { name: 'Antibiótico felino 80mg', qty: 6, daysLeft: 2 },
-  { name: 'Soro hidratante 500ml', qty: 9, daysLeft: 3 },
-  { name: 'Vacina V8', qty: 14, daysLeft: 4 }
-]
-
 const vaccinesSummary = { today: 14, overdue: 3, upcoming: 22 }
 const vaccinesList = [
   { name: 'Bella · Leptospirose', when: '08h30 · sala 2' },
@@ -561,6 +575,14 @@ const openSalesTotalPending = computed(() =>
   openSales.reduce((sum, sale) => sum + Number(sale.amount || 0), 0)
 )
 const openSalesCount = computed(() => openSales.length)
+const criticalStock = computed(() =>
+  (stockData.value?.data || []).map((item) => ({
+    ...item,
+    currentStockLabel: formatQuantity(item.currentStock),
+    minimumStockLabel: formatQuantity(item.minimumStock)
+  }))
+)
+const criticalStockCount = computed(() => Number(stockData.value?.meta?.total || 0))
 
 const financeKpis = computed(() => ({
   totalPending: dashboardData.value?.kpis?.totalPending || 0,
@@ -682,6 +704,12 @@ const goTo = (path) => router.push(path)
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 }).format(value)
+
+const formatQuantity = (value) =>
+  Number(value || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3
+  })
 </script>
 
 <style scoped>
