@@ -3,8 +3,8 @@
     <div class="page-header page-head">
       <div class="head-copy">
         <p class="eyebrow">FINANCEIRO</p>
-        <h1>Contas a pagar</h1>
-        <p class="subhead">Gerencie despesas, vencimentos, pagamentos e pendências financeiras.</p>
+        <h1>Contas a receber</h1>
+        <p class="subhead">Gerencie recebimentos, vencimentos, clientes e pendências financeiras.</p>
       </div>
       <n-button v-if="!isMobile" type="primary" size="large" class="head-cta" @click="openCreateModal">
         Nova conta
@@ -25,7 +25,7 @@
         <strong class="summary-value">{{ formatCurrency(filteredSummary.totalPending) }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card summary-card-success">
-        <p class="summary-label">Pago</p>
+        <p class="summary-label">Recebido</p>
         <strong class="summary-value">{{ formatCurrency(filteredSummary.totalPaid) }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card summary-card-danger">
@@ -44,7 +44,7 @@
         <strong class="summary-value-mobile">{{ formatCurrency(filteredSummary.totalPending) }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card mobile-card summary-card-success">
-        <p class="summary-label">Pago</p>
+        <p class="summary-label">Recebido</p>
         <strong class="summary-value-mobile">{{ formatCurrency(filteredSummary.totalPaid) }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card mobile-card summary-card-danger">
@@ -55,7 +55,7 @@
 
     <n-card v-if="!isMobile" :bordered="false" size="small" class="filters-card">
       <div class="filters-grid filters-grid-finance">
-        <n-input v-model:value="filters.search" placeholder="Buscar por descrição ou fornecedor" clearable />
+        <n-input v-model:value="filters.search" placeholder="Buscar por descrição, cliente ou venda" clearable />
         <n-date-picker
           v-model:value="filters.dueDateRange"
           type="daterange"
@@ -64,7 +64,18 @@
           start-placeholder="Período de vencimento"
           end-placeholder="Período de vencimento"
         />
-        <n-select v-model:value="filters.category" :options="categoryOptions" placeholder="Categoria" />
+        <n-select
+          v-model:value="filters.clientId"
+          :options="clientOptions"
+          placeholder="Cliente"
+          filterable
+          remote
+          clearable
+          :loading="clientLoading"
+          @search="onClientSearch"
+          @focus="ensureClientsLoaded"
+        />
+        <n-select v-model:value="filters.originType" :options="originOptions" placeholder="Origem" />
         <n-select v-model:value="filters.status" :options="statusOptions" placeholder="Status" />
         <div class="filter-actions">
           <n-button text class="btn-clear" @click="handleClearFilters">Limpar filtros</n-button>
@@ -75,19 +86,19 @@
 
     <n-card v-else :bordered="false" size="small" class="filters-card mobile-filters-card">
       <div class="mobile-filter-top">
-        <n-input v-model:value="filters.search" placeholder="Buscar despesa ou fornecedor" clearable />
+        <n-input v-model:value="filters.search" placeholder="Buscar por descrição, cliente ou venda" clearable />
         <n-button secondary strong class="mobile-filter-trigger" @click="showMobileFilters = true"><span class="inline-icon-label"><AppIcon name="search" :size="16" :stroke-width="2" /><span>Filtros</span></span></n-button>
       </div>
     </n-card>
 
     <template v-if="isMobile">
-      <template v-if="!filteredPayables.length && !loading">
+      <template v-if="!filteredReceivables.length && !loading">
         <div class="data-table-card empty-state">
           <h3>{{ hasActiveFilters ? 'Nenhuma conta encontrada' : 'Nenhuma conta cadastrada' }}</h3>
           <p>
             {{ hasActiveFilters
-              ? 'Não encontramos despesas para os filtros selecionados.'
-              : 'Adicione sua primeira conta para acompanhar vencimentos e pagamentos.' }}
+              ? 'Não encontramos recebimentos para os filtros selecionados.'
+              : 'Adicione sua primeira conta para acompanhar vencimentos e recebimentos.' }}
           </p>
           <div class="empty-actions">
             <n-button v-if="hasActiveFilters" tertiary @click="handleClearFilters">Limpar filtros</n-button>
@@ -97,13 +108,14 @@
       </template>
       <template v-else>
         <div class="mobile-list card-list">
-          <div v-for="row in paginatedPayables" :key="row.id" class="mobile-record-card entity-card">
+          <div v-for="row in paginatedReceivables" :key="row.id" class="mobile-record-card entity-card">
             <div class="mobile-record-top">
               <p class="card-title">{{ row.description }}</p>
               <span :class="['badge', statusBadgeClass(getEffectiveStatus(row))]">{{ statusLabel(getEffectiveStatus(row)) }}</span>
             </div>
-            <p class="card-subtitle"><span class="card-line-label">Fornecedor: </span><span class="card-line-value">{{ row.supplier?.name || '-' }}</span></p>
-            <p class="card-subtitle"><span class="card-line-label">Categoria: </span><span class="card-line-value">{{ row.category || '-' }}</span></p>
+            <p class="card-subtitle"><span class="card-line-label">Cliente: </span><span class="card-line-value">{{ row.client?.name || 'Sem cliente' }}</span></p>
+            <p class="card-subtitle"><span class="card-line-label">Origem: </span><span class="card-line-value">{{ originLabel(row) }}</span></p>
+            <p v-if="row.saleId" class="card-subtitle"><span class="card-line-label">Venda: </span><span class="card-line-value">#{{ row.saleId }}</span></p>
             <p class="card-subtitle" :class="{ 'is-overdue': getEffectiveStatus(row) === 'OVERDUE' }">
               <span class="card-line-label">{{ getEffectiveStatus(row) === 'OVERDUE' ? 'Vencido em: ' : 'Vencimento: ' }}</span>
               <span :class="['card-line-value', { 'overdue-value': getEffectiveStatus(row) === 'OVERDUE' }]">{{ formatDateDisplay(row.dueDate) }}</span>
@@ -121,12 +133,12 @@
     </template>
 
     <template v-else>
-      <div v-if="!filteredPayables.length && !loading" class="data-table-card empty-state">
+      <div v-if="!filteredReceivables.length && !loading" class="data-table-card empty-state">
         <h3>{{ hasActiveFilters ? 'Nenhuma conta encontrada' : 'Nenhuma conta cadastrada' }}</h3>
         <p>
           {{ hasActiveFilters
-            ? 'Não encontramos despesas para os filtros selecionados.'
-            : 'Adicione sua primeira conta para acompanhar vencimentos e pagamentos.' }}
+            ? 'Não encontramos recebimentos para os filtros selecionados.'
+            : 'Adicione sua primeira conta para acompanhar vencimentos e recebimentos.' }}
         </p>
         <div class="empty-actions">
           <n-button v-if="hasActiveFilters" tertiary @click="handleClearFilters">Limpar filtros</n-button>
@@ -136,7 +148,7 @@
       <n-data-table
         v-else
         :columns="columns"
-        :data="filteredPayables"
+        :data="filteredReceivables"
         :loading="loading"
         :pagination="tablePagination"
         :bordered="false"
@@ -146,7 +158,7 @@
       />
     </template>
 
-    <n-drawer v-model:show="showMobileFilters" placement="bottom" height="52%" :trap-focus="false">
+    <n-drawer v-model:show="showMobileFilters" placement="bottom" height="56%" :trap-focus="false">
       <n-drawer-content title="Filtros">
         <div class="mobile-filters-panel">
           <n-date-picker
@@ -157,7 +169,18 @@
             start-placeholder="Período de vencimento"
             end-placeholder="Período de vencimento"
           />
-          <n-select v-model:value="filters.category" :options="categoryOptions" placeholder="Categoria" />
+          <n-select
+            v-model:value="filters.clientId"
+            :options="clientOptions"
+            placeholder="Cliente"
+            filterable
+            remote
+            clearable
+            :loading="clientLoading"
+            @search="onClientSearch"
+            @focus="ensureClientsLoaded"
+          />
+          <n-select v-model:value="filters.originType" :options="originOptions" placeholder="Origem" />
           <n-select v-model:value="filters.status" :options="statusOptions" placeholder="Status" />
           <div class="mobile-filter-actions">
             <n-button text class="btn-clear" @click="handleClearFilters">Limpar filtros</n-button>
@@ -170,57 +193,62 @@
     <n-modal
       v-model:show="showCreateModal"
       preset="card"
-      class="accounts-payable-modal"
+      class="accounts-receivable-modal"
       :mask-closable="false"
       style="width: 760px"
     >
       <template #header>
         <div class="modal-head">
-          <h3 class="modal-title">{{ editingAccountId ? 'Editar conta a pagar' : 'Nova conta a pagar' }}</h3>
-          <p class="modal-subtitle">Informe os dados da despesa, vencimento e pagamento.</p>
+          <h3 class="modal-title">{{ editingAccountId ? 'Editar conta a receber' : 'Nova conta a receber' }}</h3>
+          <p class="modal-subtitle">Informe os dados do recebimento, vencimento e liquidação.</p>
         </div>
       </template>
       <n-form :model="createForm" ref="createFormRef" :rules="createRules" label-placement="top" :show-require-mark="false">
         <div class="sections">
           <section class="form-section">
-            <h4 class="section-title">Dados da conta</h4>
-            <div class="form-grid">
-              <n-form-item label="Descrição *" path="description" required>
-                <n-input v-model:value="createForm.description" placeholder="Ex: Aluguel" />
-              </n-form-item>
-              <n-form-item label="Fornecedor *" path="supplierId" required>
-                <n-select
-                  v-model:value="createForm.supplierId"
-                  :options="supplierOptions"
-                  placeholder="Selecione o fornecedor"
-                  filterable
-                  remote
-                  clearable
-                  :loading="supplierLoading"
-                  @search="onSupplierSearch"
-                  @focus="ensureSuppliersLoaded"
-                />
-              </n-form-item>
-              <n-form-item label="Categoria" path="category">
-                <n-select
-                  v-model:value="createForm.category"
-                  :options="categoryOptions.filter((o) => o.value !== 'Todas as categorias')"
-                />
-              </n-form-item>
-            </div>
-          </section>
-
-          <section class="form-section">
             <div class="section-head">
-              <h4 class="section-title">Financeiro</h4>
+              <h4 class="section-title">Dados da conta</h4>
               <n-tag :bordered="false" class="status-chip" :class="statusBadgeClass(modalCurrentStatus)">
                 {{ statusLabel(modalCurrentStatus) }}
               </n-tag>
             </div>
             <div class="form-grid">
+              <n-form-item label="Descrição *" path="description" required>
+                <n-input v-model:value="createForm.description" :disabled="isManagedBySale" placeholder="Ex: Hospedagem em aberto" />
+              </n-form-item>
+              <n-form-item label="Cliente" path="clientId">
+                <n-select
+                  v-model:value="createForm.clientId"
+                  :options="clientOptions"
+                  placeholder="Selecione o cliente"
+                  filterable
+                  remote
+                  clearable
+                  :disabled="isManagedBySale"
+                  :loading="clientLoading"
+                  @search="onClientSearch"
+                  @focus="ensureClientsLoaded"
+                />
+              </n-form-item>
+              <n-form-item label="Origem">
+                <n-input :value="originLabelFromValue(createForm.originType, linkedSaleId)" disabled />
+              </n-form-item>
+              <n-form-item v-if="linkedSaleId" label="Venda vinculada">
+                <n-input :value="`Venda #${linkedSaleId}`" disabled />
+              </n-form-item>
+            </div>
+            <p v-if="isManagedBySale" class="origin-hint full-row">
+              Este lançamento foi gerado automaticamente a partir de uma venda. Alterações e estornos devem ser feitos pelo fluxo de vendas.
+            </p>
+          </section>
+
+          <section class="form-section">
+            <h4 class="section-title">Financeiro</h4>
+            <div class="form-grid">
               <n-form-item label="Valor *" path="amount" required>
                 <n-input
                   v-model:value="amountDisplay"
+                  :disabled="isManagedBySale"
                   placeholder="R$ 0,00"
                   @update:value="onAmountInput"
                   @blur="onAmountBlur"
@@ -231,56 +259,64 @@
                   v-model:value="createForm.dueDate"
                   type="date"
                   clearable
+                  :disabled="isManagedBySale"
                   style="width: 100%"
                 />
               </n-form-item>
               <p v-if="modalCurrentStatus === 'OVERDUE'" class="overdue-hint full-row">
-                Esta conta está vencida e ainda não possui pagamento registrado.
+                Esta conta está vencida e ainda não possui recebimento registrado.
               </p>
             </div>
+
             <div v-if="editingAccountId" class="payment-inline-area">
               <div v-if="modalCurrentStatus === 'PAID'" class="payment-registered-card">
-                <p class="payment-registered-title">Pagamento registrado</p>
-                <p><span class="card-line-label">Data de pagamento: </span><span class="card-line-value">{{ formatDateTimeDisplay(registeredPayment.paidAt) }}</span></p>
-                <p><span class="card-line-label">Valor pago: </span><span class="card-line-value">{{ formatCurrency(Number(registeredPayment.paidAmount || 0)) }}</span></p>
-                <p><span class="card-line-label">Forma de pagamento: </span><span class="card-line-value">{{ registeredPayment.paymentMethod || '-' }}</span></p>
-                <n-button size="small" tertiary @click="handleUndoInlinePayment">Estornar pagamento</n-button>
+                <p class="payment-registered-title">Recebimento registrado</p>
+                <p><span class="card-line-label">Data de recebimento: </span><span class="card-line-value">{{ formatDateTimeDisplay(registeredReceipt.paidAt) }}</span></p>
+                <p><span class="card-line-label">Valor recebido: </span><span class="card-line-value">{{ formatCurrency(Number(registeredReceipt.paidAmount || 0)) }}</span></p>
+                <p><span class="card-line-label">Forma de pagamento: </span><span class="card-line-value">{{ registeredReceipt.paymentMethodName || '-' }}</span></p>
+                <n-button v-if="!isManagedBySale" size="small" tertiary @click="handleUndoInlineReceipt">Estornar recebimento</n-button>
               </div>
 
-              <template v-else>
+              <template v-else-if="!isManagedBySale">
                 <n-button
-                  v-if="!showInlinePaymentForm"
+                  v-if="!showInlineReceiptForm"
                   size="small"
                   secondary
                   type="primary"
-                  @click="openInlinePaymentForm"
+                  @click="openInlineReceiptForm"
                 >
-                  Registrar pagamento
+                  Registrar recebimento
                 </n-button>
 
                 <div v-else class="payment-form-inline">
                   <div class="payment-form-head">
-                    <p class="payment-form-title">Registrar pagamento</p>
-                    <n-button text class="btn-clear" @click="collapseInlinePaymentForm">Ocultar pagamento</n-button>
+                    <p class="payment-form-title">Registrar recebimento</p>
+                    <n-button text class="btn-clear" @click="collapseInlineReceiptForm">Ocultar recebimento</n-button>
                   </div>
-                  <p class="payment-form-status-impact">Ao confirmar, esta conta será marcada como Paga.</p>
+                  <p class="payment-form-status-impact">Ao confirmar, esta conta será marcada como Recebida.</p>
                   <div class="form-grid">
-                    <n-form-item label="Data de pagamento *">
-                      <n-date-picker v-model:value="inlinePayForm.paidAt" type="date" clearable style="width: 100%" />
+                    <n-form-item label="Data do recebimento *">
+                      <n-date-picker v-model:value="inlineReceiptForm.paidAt" type="datetime" clearable style="width: 100%" />
                     </n-form-item>
-                    <n-form-item label="Valor pago *">
+                    <n-form-item label="Valor recebido *">
                       <n-input
-                        v-model:value="inlinePaidAmountDisplay"
+                        v-model:value="inlineReceivedAmountDisplay"
                         placeholder="R$ 0,00"
-                        @update:value="onInlinePaidAmountInput"
-                        @blur="onInlinePaidAmountBlur"
+                        @update:value="onInlineReceivedAmountInput"
+                        @blur="onInlineReceivedAmountBlur"
                       />
                     </n-form-item>
                     <n-form-item label="Forma de pagamento *">
-                      <n-select v-model:value="inlinePayForm.paymentMethod" :options="paymentMethodOptions" />
+                      <n-select
+                        v-model:value="inlineReceiptForm.paymentMethodId"
+                        :options="paymentMethodOptions"
+                        :loading="paymentMethodLoading"
+                        clearable
+                        filterable
+                      />
                     </n-form-item>
-                    <n-form-item label="Observação do pagamento" class="full-row">
-                      <n-input v-model:value="inlinePayForm.note" type="textarea" :rows="2" />
+                    <n-form-item label="Observação do recebimento" class="full-row">
+                      <n-input v-model:value="inlineReceiptForm.note" type="textarea" :rows="2" />
                     </n-form-item>
                   </div>
                 </div>
@@ -292,7 +328,10 @@
             <h4 class="section-title">Observações</h4>
             <div class="form-grid">
               <n-form-item label="Anotações" path="notes" class="full-row">
-                <n-input type="textarea" v-model:value="createForm.notes" :rows="3" />
+                <n-input type="textarea" v-model:value="createForm.notes" :disabled="isManagedBySale" :rows="3" />
+              </n-form-item>
+              <n-form-item label="Link do documento" path="documentUrl" class="full-row">
+                <n-input v-model:value="createForm.documentUrl" :disabled="isManagedBySale" placeholder="https://..." />
               </n-form-item>
             </div>
           </section>
@@ -301,13 +340,17 @@
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeCreateModal">Cancelar</n-button>
-          <n-button type="primary" :loading="primaryActionLoading" @click="handlePrimaryModalAction">
+          <n-button
+            type="primary"
+            :loading="primaryActionLoading"
+            :disabled="primaryActionDisabled"
+            @click="handlePrimaryModalAction"
+          >
             {{ primaryActionLabel }}
           </n-button>
         </div>
       </template>
     </n-modal>
-
   </div>
 </template>
 
@@ -317,59 +360,76 @@ import { NButton, NDropdown, NTag, useMessage } from 'naive-ui';
 
 definePageMeta({ layout: 'default' });
 
-interface SupplierListItem {
+interface ClientListItem {
   id: number;
   name: string;
 }
 
-interface AccountPayableItem {
+interface SaleReference {
+  id: number;
+}
+
+interface PaymentMethodReference {
+  id: number;
+  name: string;
+}
+
+interface AccountReceivableItem {
   id: number;
   description: string;
-  supplierId?: number | null;
-  supplier?: SupplierListItem | null;
-  category?: string | null;
+  clientId?: number | null;
+  client?: ClientListItem | null;
+  saleId?: number | null;
+  sale?: SaleReference | null;
+  paymentMethodId?: number | null;
+  paymentMethod?: PaymentMethodReference | null;
+  originType?: 'MANUAL' | 'SALE' | string;
   amount: number;
   dueDate: string;
   status: string;
   paidAmount?: number | null;
   paidAt?: string | null;
-  paymentMethod?: string | null;
   notes?: string | null;
+  documentUrl?: string | null;
 }
 
-type FinancialStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELED';
+type FinancialStatus = 'PENDING' | 'PAID' | 'OVERDUE';
+type AccountOrigin = 'MANUAL' | 'SALE';
 
+const router = useRouter();
 const message = useMessage();
 const loading = ref(false);
 const saving = ref(false);
-const savingInlinePayment = ref(false);
+const savingInlineReceipt = ref(false);
 const showCreateModal = ref(false);
 const showMobileFilters = ref(false);
 const createFormRef = ref();
 const editingAccountId = ref<number | null>(null);
+const linkedSaleId = ref<number | null>(null);
 const editingOriginalNotes = ref<string | null>(null);
+const editingOriginalDocumentUrl = ref<string | null>(null);
 const modalBaseStatus = ref<string>('PENDING');
-const modalHadPayment = ref(false);
+const modalHadReceipt = ref(false);
 const amountDisplay = ref('R$ 0,00');
-const showInlinePaymentForm = ref(false);
-const inlinePayForm = reactive({
+const showInlineReceiptForm = ref(false);
+const inlineReceiptForm = reactive({
   paidAt: Date.now(),
   paidAmount: 0,
-  paymentMethod: 'PIX',
+  paymentMethodId: null as number | null,
   note: '',
 });
-const inlinePaidAmountDisplay = ref('R$ 0,00');
-const registeredPayment = reactive<{
+const inlineReceivedAmountDisplay = ref('R$ 0,00');
+const registeredReceipt = reactive<{
   paidAt: string | null;
   paidAmount: number | null;
-  paymentMethod: string | null;
+  paymentMethodName: string | null;
 }>({
   paidAt: null,
   paidAmount: null,
-  paymentMethod: null,
+  paymentMethodName: null,
 });
 
-const payables = ref<AccountPayableItem[]>([]);
+const receivables = ref<AccountReceivableItem[]>([]);
 const isMobile = ref(false);
 let mediaQuery: MediaQueryList | null = null;
 const updateIsMobile = () => { isMobile.value = mediaQuery?.matches ?? false; };
@@ -379,8 +439,10 @@ const pagination = reactive({
   pageSize: 10,
 });
 
-const supplierOptions = ref<{ label: string; value: number }[]>([]);
-const supplierLoading = ref(false);
+const clientOptions = ref<{ label: string; value: number }[]>([]);
+const clientLoading = ref(false);
+const paymentMethodOptions = ref<{ label: string; value: number }[]>([]);
+const paymentMethodLoading = ref(false);
 
 const today = new Date();
 today.setHours(0, 0, 0, 0);
@@ -391,52 +453,36 @@ const defaultDueDateTo = new Date(today.getTime() + THIRTY_DAYS_IN_MS).getTime()
 const filters = reactive({
   search: '',
   dueDateRange: [defaultDueDateFrom, defaultDueDateTo] as [number, number] | null,
-  category: 'Todas as categorias',
-  status: 'ALL',
+  clientId: null as number | null,
+  originType: 'ALL' as 'ALL' | AccountOrigin,
+  status: 'ALL' as 'ALL' | FinancialStatus,
 });
 
-const categoryOptions = [
-  { label: 'Todas as categorias', value: 'Todas as categorias' },
-  { label: 'Custos Fixos', value: 'Custos Fixos' },
-  { label: 'Fornecedores', value: 'Fornecedores' },
-  { label: 'Impostos', value: 'Impostos' },
-  { label: 'Folha de Pagamento', value: 'Folha de Pagamento' },
-  { label: 'Marketing', value: 'Marketing' },
-  { label: 'Outros', value: 'Outros' },
-];
-
-const paymentMethodOptions = [
-  { label: 'PIX', value: 'PIX' },
-  { label: 'Transferência Bancária', value: 'BANK_TRANSFER' },
-  { label: 'Boleto', value: 'BOLETO' },
-  { label: 'Dinheiro', value: 'CASH' },
+const originOptions = [
+  { label: 'Todas as origens', value: 'ALL' },
+  { label: 'Manual', value: 'MANUAL' },
+  { label: 'Venda', value: 'SALE' },
 ];
 
 const statusOptions = [
   { label: 'Todos', value: 'ALL' },
   { label: 'Pendente', value: 'PENDING' },
-  { label: 'Pago', value: 'PAID' },
+  { label: 'Recebido', value: 'PAID' },
   { label: 'Atrasado', value: 'OVERDUE' },
-  { label: 'Cancelado', value: 'CANCELED' },
 ];
 
 const createForm = reactive({
   description: '',
-  supplierId: null as number | null,
-  category: 'Custos Fixos',
+  clientId: null as number | null,
+  originType: 'MANUAL' as AccountOrigin,
   amount: 0,
   dueDate: Date.now(),
   notes: '',
+  documentUrl: '',
 });
 
 const createRules = {
   description: { required: true, message: 'Requerido', trigger: 'blur' },
-  supplierId: {
-    required: true,
-    trigger: ['change', 'blur'],
-    validator: (_rule: any, value: number | null) =>
-      value ? true : new Error('Selecione um fornecedor'),
-  },
   amount: {
     type: 'number',
     required: true,
@@ -475,14 +521,16 @@ const onAmountBlur = () => {
   amountDisplay.value = formatCurrencyInput(createForm.amount);
 };
 
-const onInlinePaidAmountInput = (value: string) => {
+const onInlineReceivedAmountInput = (value: string) => {
   const parsed = parseCurrencyBr(value);
-  inlinePayForm.paidAmount = parsed;
-  inlinePaidAmountDisplay.value = formatCurrencyInput(parsed);
+  inlineReceiptForm.paidAmount = parsed;
+  inlineReceivedAmountDisplay.value = formatCurrencyInput(parsed);
 };
 
-const onInlinePaidAmountBlur = () => {
-  inlinePaidAmountDisplay.value = formatCurrencyInput(inlinePayForm.paidAmount);
+const onInlineReceivedAmountBlur = () => {
+  inlineReceivedAmountDisplay.value = formatCurrencyInput(
+    inlineReceiptForm.paidAmount,
+  );
 };
 
 const formatDateDisplay = (value?: string | null) => {
@@ -497,16 +545,37 @@ const formatDateTimeDisplay = (value?: string | null) => {
   return date.toLocaleString('pt-BR');
 };
 
-const isOverdue = (row: AccountPayableItem) => {
-  const due = new Date(`${row.dueDate}T00:00:00`);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return row.status === 'PENDING' && due.valueOf() < today.valueOf();
+const normalizeOptionalText = (value?: string | null): string | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 };
 
-const getEffectiveStatus = (row: AccountPayableItem): FinancialStatus => {
+const toDatePickerValue = (rawDate?: string) => {
+  if (!rawDate) {
+    return Date.now();
+  }
+
+  const date = new Date(`${rawDate}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return Date.now();
+  }
+
+  return date.getTime();
+};
+
+const isOverdue = (row: AccountReceivableItem) => {
+  const due = new Date(`${row.dueDate}T00:00:00`);
+  const currentDate = new Date();
+  currentDate.setHours(0, 0, 0, 0);
+  return row.status === 'PENDING' && due.valueOf() < currentDate.valueOf();
+};
+
+const getEffectiveStatus = (row: AccountReceivableItem): FinancialStatus => {
   if (row.status === 'PAID') return 'PAID';
-  if (row.status === 'CANCELED') return 'CANCELED';
   if (isOverdue(row)) return 'OVERDUE';
   return 'PENDING';
 };
@@ -514,31 +583,55 @@ const getEffectiveStatus = (row: AccountPayableItem): FinancialStatus => {
 const getCalculatedStatus = (
   baseStatus: string,
   dueDateMs: number,
-  hasPayment: boolean,
+  hasReceipt: boolean,
 ): FinancialStatus => {
-  if (baseStatus === 'CANCELED') return 'CANCELED';
-  if (baseStatus === 'PAID' || hasPayment) return 'PAID';
+  if (baseStatus === 'PAID' || hasReceipt) return 'PAID';
   const due = new Date(dueDateMs);
   due.setHours(0, 0, 0, 0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return due.valueOf() < today.valueOf() ? 'OVERDUE' : 'PENDING';
+  const currentDate = new Date();
+  currentDate.setHours(0, 0, 0, 0);
+  return due.valueOf() < currentDate.valueOf() ? 'OVERDUE' : 'PENDING';
 };
 
 const modalCurrentStatus = computed<FinancialStatus>(() =>
-  getCalculatedStatus(modalBaseStatus.value, Number(createForm.dueDate), modalHadPayment.value),
+  getCalculatedStatus(
+    modalBaseStatus.value,
+    Number(createForm.dueDate),
+    modalHadReceipt.value,
+  ),
+);
+
+const isManagedBySale = computed(
+  () => createForm.originType === 'SALE' || linkedSaleId.value !== null,
 );
 
 const primaryActionLabel = computed(() => {
-  if (editingAccountId.value && showInlinePaymentForm.value) {
-    return 'Salvar e registrar pagamento';
+  if (isManagedBySale.value) {
+    return linkedSaleId.value ? 'Abrir venda' : 'Fechar';
   }
+
+  if (editingAccountId.value && showInlineReceiptForm.value) {
+    return 'Salvar e registrar recebimento';
+  }
+
   return editingAccountId.value ? 'Salvar alterações' : 'Criar conta';
 });
 
+const primaryActionDisabled = computed(() => {
+  if (isManagedBySale.value) {
+    return !linkedSaleId.value;
+  }
+
+  if (editingAccountId.value && showInlineReceiptForm.value) {
+    return savingInlineReceipt.value;
+  }
+
+  return saving.value;
+});
+
 const primaryActionLoading = computed(() => {
-  if (editingAccountId.value && showInlinePaymentForm.value) {
-    return savingInlinePayment.value;
+  if (editingAccountId.value && showInlineReceiptForm.value) {
+    return savingInlineReceipt.value;
   }
   return saving.value;
 });
@@ -546,9 +639,8 @@ const primaryActionLoading = computed(() => {
 const statusLabel = (status: FinancialStatus) => {
   const labels: Record<FinancialStatus, string> = {
     PENDING: 'Pendente',
-    PAID: 'Pago',
+    PAID: 'Recebido',
     OVERDUE: 'Atrasado',
-    CANCELED: 'Cancelado',
   };
   return labels[status];
 };
@@ -558,25 +650,49 @@ const statusBadgeClass = (status: FinancialStatus) => {
     PENDING: 'badge-soft-warning',
     PAID: 'badge-soft-success',
     OVERDUE: 'badge-soft-danger',
-    CANCELED: 'badge-soft-neutral',
   };
   return classes[status];
 };
 
-const filteredPayables = computed(() => {
-  let data = [...payables.value];
+const originLabelFromValue = (
+  originType?: string | null,
+  saleId?: number | null,
+) => {
+  if (originType === 'SALE' || saleId) {
+    return saleId ? `Venda #${saleId}` : 'Venda';
+  }
+  return 'Manual';
+};
+
+const originLabel = (row: AccountReceivableItem) =>
+  originLabelFromValue(row.originType, row.saleId);
+
+const filteredReceivables = computed(() => {
+  let data = [...receivables.value];
   const term = filters.search.trim().toLowerCase();
 
   if (term) {
     data = data.filter((row) => {
       const description = (row.description || '').toLowerCase();
-      const supplier = (row.supplier?.name || '').toLowerCase();
-      return description.includes(term) || supplier.includes(term);
+      const client = (row.client?.name || '').toLowerCase();
+      const sale = row.saleId ? String(row.saleId) : '';
+      return (
+        description.includes(term)
+        || client.includes(term)
+        || sale.includes(term)
+      );
     });
   }
 
-  if (filters.category !== 'Todas as categorias') {
-    data = data.filter((row) => (row.category || 'Outros') === filters.category);
+  if (filters.clientId) {
+    data = data.filter((row) => Number(row.clientId) === Number(filters.clientId));
+  }
+
+  if (filters.originType !== 'ALL') {
+    data = data.filter((row) => {
+      const origin = (row.originType || (row.saleId ? 'SALE' : 'MANUAL')) as AccountOrigin;
+      return origin === filters.originType;
+    });
   }
 
   if (filters.status === 'OVERDUE') {
@@ -606,15 +722,15 @@ const filteredPayables = computed(() => {
   return data;
 });
 
-const paginatedPayables = computed(() => {
+const paginatedReceivables = computed(() => {
   const start = (pagination.page - 1) * pagination.pageSize;
-  return filteredPayables.value.slice(start, start + pagination.pageSize);
+  return filteredReceivables.value.slice(start, start + pagination.pageSize);
 });
 
 const tablePagination = computed(() => ({
   page: pagination.page,
   pageSize: pagination.pageSize,
-  itemCount: filteredPayables.value.length,
+  itemCount: filteredReceivables.value.length,
   pageSizes: [10, 20, 50],
   showSizePicker: true,
 }));
@@ -624,13 +740,14 @@ const hasActiveFilters = computed(() => {
     filters.search.trim()
     || filters.dueDateRange?.[0] !== defaultDueDateFrom
     || filters.dueDateRange?.[1] !== defaultDueDateTo
-    || filters.category !== 'Todas as categorias'
+    || filters.clientId !== null
+    || filters.originType !== 'ALL'
     || filters.status !== 'ALL',
   );
 });
 
 const filteredSummary = computed(() => {
-  return filteredPayables.value.reduce(
+  return filteredReceivables.value.reduce(
     (acc, row) => {
       const status = getEffectiveStatus(row);
       const amount = Number(row.amount || 0);
@@ -644,20 +761,31 @@ const filteredSummary = computed(() => {
   );
 });
 
+const openSale = (saleId?: number | null) => {
+  if (!saleId) return;
+  router.push(`/financeiro/vendas/${saleId}`);
+};
+
 const columns = [
   { title: 'Descrição', key: 'description' },
   {
-    title: 'Fornecedor',
-    key: 'supplier',
-    render(row: AccountPayableItem) {
-      return row.supplier?.name || '-';
+    title: 'Cliente',
+    key: 'client',
+    render(row: AccountReceivableItem) {
+      return row.client?.name || 'Sem cliente';
     },
   },
-  { title: 'Categoria', key: 'category' },
+  {
+    title: 'Origem',
+    key: 'originType',
+    render(row: AccountReceivableItem) {
+      return originLabel(row);
+    },
+  },
   {
     title: 'Vencimento',
     key: 'dueDate',
-    render(row: AccountPayableItem) {
+    render(row: AccountReceivableItem) {
       return formatDateDisplay(row.dueDate);
     },
   },
@@ -666,14 +794,14 @@ const columns = [
     key: 'amount',
     align: 'right',
     titleAlign: 'right',
-    render(row: AccountPayableItem) {
+    render(row: AccountReceivableItem) {
       return h('span', { class: 'amount-cell' }, formatCurrency(Number(row.amount)));
     },
   },
   {
     title: 'Status',
     key: 'status',
-    render(row: AccountPayableItem) {
+    render(row: AccountReceivableItem) {
       const status = getEffectiveStatus(row);
       return h(
         NTag,
@@ -685,7 +813,7 @@ const columns = [
   {
     title: 'Ações',
     key: 'actions',
-    render(row: AccountPayableItem) {
+    render(row: AccountReceivableItem) {
       return h('div', { class: 'data-table__actions' }, [
         h(
           'div',
@@ -745,119 +873,141 @@ const columns = [
   },
 ];
 
-const tableRowProps = (row: AccountPayableItem) => {
+const tableRowProps = (row: AccountReceivableItem) => {
   return {
     style: 'cursor: pointer;',
     onClick: () => openEditModal(row),
   };
 };
 
-const buildActionOptions = (row: AccountPayableItem) => {
+const buildActionOptions = (row: AccountReceivableItem) => {
   const options: Array<{ label: string; key: string }> = [
-    { label: 'Editar', key: 'edit' },
+    { label: row.saleId ? 'Visualizar' : 'Editar', key: 'edit' },
   ];
 
-  if (getEffectiveStatus(row) !== 'PAID') {
-    options.push({ label: 'Registrar pagamento', key: 'pay' });
+  if (!row.saleId && getEffectiveStatus(row) !== 'PAID') {
+    options.push({ label: 'Registrar recebimento', key: 'receive' });
+    options.push({ label: 'Duplicar', key: 'duplicate' });
   }
 
-  options.push({ label: 'Duplicar', key: 'duplicate' });
+  if (row.saleId) {
+    options.push({ label: `Abrir venda #${row.saleId}`, key: 'open-sale' });
+  }
+
   return options;
 };
 
-const handleActionSelect = (key: string, row: AccountPayableItem) => {
+const handleActionSelect = (key: string, row: AccountReceivableItem) => {
   if (key === 'edit') {
     openEditModal(row);
     return;
   }
 
-  if (key === 'pay') {
-    openEditModal(row, { openPayment: true });
+  if (key === 'receive') {
+    openEditModal(row, { openReceipt: true });
     return;
   }
 
   if (key === 'duplicate') {
     openDuplicateModal(row);
+    return;
+  }
+
+  if (key === 'open-sale') {
+    openSale(row.saleId);
   }
 };
 
-const openDuplicateModal = (row: AccountPayableItem) => {
-  editingAccountId.value = null;
-  createForm.description = row.description || '';
-  createForm.supplierId = row.supplierId || row.supplier?.id || null;
-  createForm.category = row.category || 'Outros';
-  createForm.amount = Number(row.amount || 0);
-  createForm.dueDate = Date.now();
-  createForm.notes = row.notes || '';
-  editingOriginalNotes.value = null;
+const ensureSelectedClientOption = (clientId: number | null, name?: string) => {
+  if (!clientId) return;
 
-  ensureSelectedSupplierOption(createForm.supplierId, row.supplier?.name);
-  showCreateModal.value = true;
-  ensureSuppliersLoaded();
-};
-
-const ensureSelectedSupplierOption = (supplierId: number | null, name?: string) => {
-  if (!supplierId) return;
-
-  const exists = supplierOptions.value.some((opt) => opt.value === supplierId);
-
+  const exists = clientOptions.value.some((opt) => opt.value === clientId);
   if (!exists) {
-    supplierOptions.value = [
-      { label: name || `Fornecedor ${supplierId}`, value: supplierId },
-      ...supplierOptions.value,
+    clientOptions.value = [
+      { label: name || `Cliente ${clientId}`, value: clientId },
+      ...clientOptions.value,
     ];
   }
 };
 
-const fetchSuppliers = async (search?: string) => {
-  supplierLoading.value = true;
+const fetchClients = async (search?: string) => {
+  clientLoading.value = true;
   const api = useApi();
 
   try {
-    const response = await api<any>('/api/v1/suppliers', {
+    const response = await api<any>('/api/v1/clients', {
       query: {
         limit: 20,
-        isActive: true,
-        ...(search ? { search } : {}),
+        ...(search ? { name: search } : {}),
       },
     });
 
-    const suppliers = (response.data || []) as SupplierListItem[];
+    const clients = (response.data || []) as ClientListItem[];
 
-    supplierOptions.value = suppliers.map((supplier) => ({
-      label: supplier.name,
-      value: Number(supplier.id),
+    clientOptions.value = clients.map((client) => ({
+      label: client.name,
+      value: Number(client.id),
     }));
 
-    ensureSelectedSupplierOption(createForm.supplierId);
+    ensureSelectedClientOption(createForm.clientId);
+    ensureSelectedClientOption(filters.clientId);
   } catch (_err) {
-    message.error('Erro ao carregar fornecedores');
+    message.error('Erro ao carregar clientes');
   } finally {
-    supplierLoading.value = false;
+    clientLoading.value = false;
   }
 };
 
-const onSupplierSearch = (value: string) => {
-  fetchSuppliers(value || undefined);
+const onClientSearch = (value: string) => {
+  fetchClients(value || undefined);
 };
 
-const ensureSuppliersLoaded = () => {
-  if (!supplierOptions.value.length && !supplierLoading.value) {
-    fetchSuppliers();
+const ensureClientsLoaded = () => {
+  if (!clientOptions.value.length && !clientLoading.value) {
+    fetchClients();
   }
 };
 
-const fetchPayables = async () => {
+const fetchPaymentMethods = async () => {
+  paymentMethodLoading.value = true;
+  const api = useApi();
+
+  try {
+    const response = await api<any>('/api/v1/payment-methods', {
+      query: {
+        limit: 100,
+      },
+    });
+
+    const methods = ((response.data || []) as Array<{
+      id: number;
+      name: string;
+      isActive?: boolean;
+    }>).filter((method) => method.isActive !== false);
+
+    paymentMethodOptions.value = methods.map((method) => ({
+      label: method.name,
+      value: Number(method.id),
+    }));
+  } catch (_err) {
+    message.error('Erro ao carregar formas de pagamento');
+  } finally {
+    paymentMethodLoading.value = false;
+  }
+};
+
+const fetchReceivables = async () => {
   loading.value = true;
 
   try {
     const api = useApi();
-    const [listRes] = await Promise.all([
-      api('/api/v1/accounts-payable'),
-    ]);
+    const response = await api('/api/v1/accounts-receivable');
+    receivables.value = ((response as any).data || []) as AccountReceivableItem[];
 
-    payables.value = ((listRes as any).data || []) as AccountPayableItem[];
-    if (pagination.page > 1 && (pagination.page - 1) * pagination.pageSize >= filteredPayables.value.length) {
+    if (
+      pagination.page > 1
+      && (pagination.page - 1) * pagination.pageSize >= filteredReceivables.value.length
+    ) {
       pagination.page = 1;
     }
   } catch (_err) {
@@ -869,24 +1019,27 @@ const fetchPayables = async () => {
 
 const resetCreateForm = () => {
   createForm.description = '';
-  createForm.supplierId = null;
-  createForm.category = 'Custos Fixos';
+  createForm.clientId = null;
+  createForm.originType = 'MANUAL';
   createForm.amount = 0;
   createForm.dueDate = Date.now();
   createForm.notes = '';
+  createForm.documentUrl = '';
   editingOriginalNotes.value = null;
+  editingOriginalDocumentUrl.value = null;
+  linkedSaleId.value = null;
   modalBaseStatus.value = 'PENDING';
-  modalHadPayment.value = false;
+  modalHadReceipt.value = false;
   amountDisplay.value = formatCurrencyInput(0);
-  showInlinePaymentForm.value = false;
-  inlinePayForm.paidAt = Date.now();
-  inlinePayForm.paidAmount = 0;
-  inlinePayForm.paymentMethod = 'PIX';
-  inlinePayForm.note = '';
-  inlinePaidAmountDisplay.value = formatCurrencyInput(0);
-  registeredPayment.paidAt = null;
-  registeredPayment.paidAmount = null;
-  registeredPayment.paymentMethod = null;
+  showInlineReceiptForm.value = false;
+  inlineReceiptForm.paidAt = Date.now();
+  inlineReceiptForm.paidAmount = 0;
+  inlineReceiptForm.paymentMethodId = null;
+  inlineReceiptForm.note = '';
+  inlineReceivedAmountDisplay.value = formatCurrencyInput(0);
+  registeredReceipt.paidAt = null;
+  registeredReceipt.paidAmount = null;
+  registeredReceipt.paymentMethodName = null;
 };
 
 const closeCreateModal = () => {
@@ -899,72 +1052,88 @@ const openCreateModal = () => {
   editingAccountId.value = null;
   resetCreateForm();
   showCreateModal.value = true;
-  ensureSuppliersLoaded();
+  ensureClientsLoaded();
 };
 
-const normalizeOptionalNote = (value?: string | null): string | null => {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-};
-
-const toDatePickerValue = (rawDate?: string) => {
-  if (!rawDate) {
-    return Date.now();
-  }
-
-  const date = new Date(`${rawDate}T00:00:00`);
-
-  if (Number.isNaN(date.getTime())) {
-    return Date.now();
-  }
-
-  return date.getTime();
-};
-
-const openEditModal = (row: AccountPayableItem, options?: { openPayment?: boolean }) => {
-  editingAccountId.value = Number(row.id);
+const openDuplicateModal = (row: AccountReceivableItem) => {
+  editingAccountId.value = null;
+  linkedSaleId.value = null;
   createForm.description = row.description || '';
-  createForm.supplierId =
-    row.supplierId != null
-      ? Number(row.supplierId)
-      : row.supplier?.id != null
-        ? Number(row.supplier.id)
+  createForm.clientId = row.clientId || row.client?.id || null;
+  createForm.originType = 'MANUAL';
+  createForm.amount = Number(row.amount || 0);
+  createForm.dueDate = Date.now();
+  createForm.notes = row.notes || '';
+  createForm.documentUrl = row.documentUrl || '';
+  editingOriginalNotes.value = null;
+  editingOriginalDocumentUrl.value = null;
+  modalBaseStatus.value = 'PENDING';
+  modalHadReceipt.value = false;
+  amountDisplay.value = formatCurrencyInput(createForm.amount);
+  showInlineReceiptForm.value = false;
+  registeredReceipt.paidAt = null;
+  registeredReceipt.paidAmount = null;
+  registeredReceipt.paymentMethodName = null;
+
+  ensureSelectedClientOption(createForm.clientId, row.client?.name);
+  showCreateModal.value = true;
+  ensureClientsLoaded();
+};
+
+const openEditModal = (
+  row: AccountReceivableItem,
+  options?: { openReceipt?: boolean },
+) => {
+  editingAccountId.value = Number(row.id);
+  linkedSaleId.value =
+    row.saleId != null
+      ? Number(row.saleId)
+      : row.sale?.id != null
+        ? Number(row.sale.id)
         : null;
-  createForm.category = row.category || 'Outros';
+  createForm.description = row.description || '';
+  createForm.clientId =
+    row.clientId != null
+      ? Number(row.clientId)
+      : row.client?.id != null
+        ? Number(row.client.id)
+        : null;
+  createForm.originType = (row.originType || (linkedSaleId.value ? 'SALE' : 'MANUAL')) as AccountOrigin;
   createForm.amount = Number(row.amount || 0);
   createForm.dueDate = toDatePickerValue(row.dueDate);
   createForm.notes = row.notes || '';
-  editingOriginalNotes.value = normalizeOptionalNote(row.notes);
+  createForm.documentUrl = row.documentUrl || '';
+  editingOriginalNotes.value = normalizeOptionalText(row.notes);
+  editingOriginalDocumentUrl.value = normalizeOptionalText(row.documentUrl);
   modalBaseStatus.value = row.status || 'PENDING';
-  modalHadPayment.value = Boolean(row.paidAt || row.paidAmount);
+  modalHadReceipt.value = Boolean(row.paidAt || row.paidAmount);
   amountDisplay.value = formatCurrencyInput(createForm.amount);
-  registeredPayment.paidAt = row.paidAt || null;
-  registeredPayment.paidAmount = row.paidAmount != null ? Number(row.paidAmount) : null;
-  registeredPayment.paymentMethod = row.paymentMethod || null;
-  showInlinePaymentForm.value = Boolean(options?.openPayment && modalCurrentStatus.value !== 'PAID');
-  inlinePayForm.paidAt = Date.now();
-  inlinePayForm.paidAmount = Number(row.amount || 0);
-  inlinePayForm.paymentMethod = 'PIX';
-  inlinePayForm.note = '';
-  inlinePaidAmountDisplay.value = formatCurrencyInput(inlinePayForm.paidAmount);
+  registeredReceipt.paidAt = row.paidAt || null;
+  registeredReceipt.paidAmount =
+    row.paidAmount != null ? Number(row.paidAmount) : null;
+  registeredReceipt.paymentMethodName = row.paymentMethod?.name || null;
+  showInlineReceiptForm.value = Boolean(
+    options?.openReceipt
+      && !isManagedBySale.value
+      && modalCurrentStatus.value !== 'PAID',
+  );
+  inlineReceiptForm.paidAt = Date.now();
+  inlineReceiptForm.paidAmount = Number(row.amount || 0);
+  inlineReceiptForm.paymentMethodId = row.paymentMethodId
+    ? Number(row.paymentMethodId)
+    : null;
+  inlineReceiptForm.note = '';
+  inlineReceivedAmountDisplay.value = formatCurrencyInput(
+    inlineReceiptForm.paidAmount,
+  );
 
-  ensureSelectedSupplierOption(createForm.supplierId, row.supplier?.name);
-
+  ensureSelectedClientOption(createForm.clientId, row.client?.name);
   showCreateModal.value = true;
-  ensureSuppliersLoaded();
+  ensureClientsLoaded();
 };
 
 const handleSubmitAccount = async () => {
-  if (
-    !createForm.description
-    || !createForm.supplierId
-    || !createForm.amount
-    || !createForm.dueDate
-  ) {
+  if (!createForm.description || !createForm.amount || !createForm.dueDate) {
     message.error('Preencha os campos obrigatórios');
     return;
   }
@@ -973,29 +1142,36 @@ const handleSubmitAccount = async () => {
   const api = useApi();
 
   try {
-    const normalizedNotes = normalizeOptionalNote(createForm.notes);
+    const normalizedNotes = normalizeOptionalText(createForm.notes);
+    const normalizedDocumentUrl = normalizeOptionalText(createForm.documentUrl);
     const payload: Record<string, unknown> = {
       description: createForm.description,
-      supplierId: Number(createForm.supplierId),
-      category: createForm.category,
+      clientId: createForm.clientId ? Number(createForm.clientId) : undefined,
       amount: createForm.amount,
       dueDate: new Date(createForm.dueDate).toISOString().split('T')[0],
+      notes: normalizedNotes,
+      documentUrl: normalizedDocumentUrl,
     };
 
+    if (!payload.clientId) {
+      delete payload.clientId;
+    }
+
     if (editingAccountId.value) {
-      if (normalizedNotes !== editingOriginalNotes.value) {
-        payload.notes = normalizedNotes;
+      if (normalizedNotes === editingOriginalNotes.value) {
+        delete payload.notes;
+      }
+      if (normalizedDocumentUrl === editingOriginalDocumentUrl.value) {
+        delete payload.documentUrl;
       }
 
-      await api(`/api/v1/accounts-payable/${editingAccountId.value}`, {
+      await api(`/api/v1/accounts-receivable/${editingAccountId.value}`, {
         method: 'PATCH',
         body: payload,
       });
       message.success('Conta atualizada com sucesso!');
     } else {
-      payload.notes = normalizedNotes;
-
-      await api('/api/v1/accounts-payable', {
+      await api('/api/v1/accounts-receivable', {
         method: 'POST',
         body: payload,
       });
@@ -1003,7 +1179,7 @@ const handleSubmitAccount = async () => {
     }
 
     closeCreateModal();
-    fetchPayables();
+    await fetchReceivables();
   } catch (_err) {
     message.error('Erro ao salvar conta');
   } finally {
@@ -1011,106 +1187,106 @@ const handleSubmitAccount = async () => {
   }
 };
 
-const openInlinePaymentForm = () => {
-  inlinePayForm.paidAt = Date.now();
-  inlinePayForm.paidAmount = Number(createForm.amount || 0);
-  inlinePayForm.paymentMethod = 'PIX';
-  inlinePayForm.note = '';
-  inlinePaidAmountDisplay.value = formatCurrencyInput(inlinePayForm.paidAmount);
-  showInlinePaymentForm.value = true;
+const openInlineReceiptForm = () => {
+  inlineReceiptForm.paidAt = Date.now();
+  inlineReceiptForm.paidAmount = Number(createForm.amount || 0);
+  inlineReceiptForm.paymentMethodId = paymentMethodOptions.value[0]?.value || null;
+  inlineReceiptForm.note = '';
+  inlineReceivedAmountDisplay.value = formatCurrencyInput(
+    inlineReceiptForm.paidAmount,
+  );
+  showInlineReceiptForm.value = true;
 };
 
-const collapseInlinePaymentForm = () => {
-  showInlinePaymentForm.value = false;
-};
-
-const cancelInlinePayment = () => {
-  inlinePayForm.paidAt = Date.now();
-  inlinePayForm.paidAmount = Number(createForm.amount || 0);
-  inlinePayForm.paymentMethod = 'PIX';
-  inlinePayForm.note = '';
-  inlinePaidAmountDisplay.value = formatCurrencyInput(inlinePayForm.paidAmount);
-  showInlinePaymentForm.value = false;
+const collapseInlineReceiptForm = () => {
+  showInlineReceiptForm.value = false;
 };
 
 const handlePrimaryModalAction = async () => {
-  if (editingAccountId.value && showInlinePaymentForm.value) {
-    await confirmInlinePayment();
+  if (isManagedBySale.value) {
+    openSale(linkedSaleId.value);
     return;
   }
+
+  if (editingAccountId.value && showInlineReceiptForm.value) {
+    await confirmInlineReceipt();
+    return;
+  }
+
   await handleSubmitAccount();
 };
 
-const confirmInlinePayment = async () => {
+const confirmInlineReceipt = async () => {
   if (!editingAccountId.value) return;
-  if (!inlinePayForm.paidAt || !inlinePayForm.paidAmount || !inlinePayForm.paymentMethod) {
-    message.error('Preencha os campos obrigatórios do pagamento');
-    return;
-  }
-  if (Math.abs(Number(inlinePayForm.paidAmount) - Number(createForm.amount)) > 0.0001) {
-    message.error('Pagamento parcial ainda não é suportado. Informe o valor total da conta.');
+  if (
+    !inlineReceiptForm.paidAt
+    || !inlineReceiptForm.paidAmount
+    || !inlineReceiptForm.paymentMethodId
+  ) {
+    message.error('Preencha os campos obrigatórios do recebimento');
     return;
   }
 
-  savingInlinePayment.value = true;
+  if (
+    Math.abs(Number(inlineReceiptForm.paidAmount) - Number(createForm.amount))
+    > 0.0001
+  ) {
+    message.error('Recebimento parcial ainda não é suportado. Informe o valor total da conta.');
+    return;
+  }
+
+  savingInlineReceipt.value = true;
   const api = useApi();
 
   try {
-    await api(`/api/v1/accounts-payable/${editingAccountId.value}/pay`, {
+    await api(`/api/v1/accounts-receivable/${editingAccountId.value}/receive`, {
       method: 'PATCH',
       body: {
-        paidAt: new Date(inlinePayForm.paidAt).toISOString(),
-        paidAmount: inlinePayForm.paidAmount,
-        paymentMethod: inlinePayForm.paymentMethod,
+        paidAt: new Date(inlineReceiptForm.paidAt).toISOString(),
+        paidAmount: inlineReceiptForm.paidAmount,
+        paymentMethodId: inlineReceiptForm.paymentMethodId,
+        note: inlineReceiptForm.note.trim() || undefined,
       },
     });
 
-    if (inlinePayForm.note.trim()) {
-      const mergedNote = [normalizeOptionalNote(createForm.notes), `[Pagamento] ${inlinePayForm.note.trim()}`]
-        .filter(Boolean)
-        .join('\n');
-      await api(`/api/v1/accounts-payable/${editingAccountId.value}`, {
-        method: 'PATCH',
-        body: { notes: mergedNote },
-      });
-      createForm.notes = mergedNote;
-    }
-
     modalBaseStatus.value = 'PAID';
-    modalHadPayment.value = true;
-    registeredPayment.paidAt = new Date(inlinePayForm.paidAt).toISOString();
-    registeredPayment.paidAmount = inlinePayForm.paidAmount;
-    registeredPayment.paymentMethod = inlinePayForm.paymentMethod;
-    showInlinePaymentForm.value = false;
-    message.success('Pagamento registrado!');
-    await fetchPayables();
+    modalHadReceipt.value = true;
+    registeredReceipt.paidAt = new Date(inlineReceiptForm.paidAt).toISOString();
+    registeredReceipt.paidAmount = inlineReceiptForm.paidAmount;
+    registeredReceipt.paymentMethodName =
+      paymentMethodOptions.value.find(
+        (option) => option.value === inlineReceiptForm.paymentMethodId,
+      )?.label || null;
+    showInlineReceiptForm.value = false;
+    message.success('Recebimento registrado!');
+    await fetchReceivables();
   } catch (_err) {
-    message.error('Erro ao registrar pagamento');
+    message.error('Erro ao registrar recebimento');
   } finally {
-    savingInlinePayment.value = false;
+    savingInlineReceipt.value = false;
   }
 };
 
-const handleUndoInlinePayment = async () => {
-  if (!editingAccountId.value) return;
-  savingInlinePayment.value = true;
+const handleUndoInlineReceipt = async () => {
+  if (!editingAccountId.value || isManagedBySale.value) return;
+  savingInlineReceipt.value = true;
   const api = useApi();
 
   try {
-    await api(`/api/v1/accounts-payable/${editingAccountId.value}/undo-pay`, {
+    await api(`/api/v1/accounts-receivable/${editingAccountId.value}/undo-receive`, {
       method: 'PATCH',
     });
     modalBaseStatus.value = 'PENDING';
-    modalHadPayment.value = false;
-    registeredPayment.paidAt = null;
-    registeredPayment.paidAmount = null;
-    registeredPayment.paymentMethod = null;
-    message.success('Pagamento estornado');
-    await fetchPayables();
+    modalHadReceipt.value = false;
+    registeredReceipt.paidAt = null;
+    registeredReceipt.paidAmount = null;
+    registeredReceipt.paymentMethodName = null;
+    message.success('Recebimento estornado');
+    await fetchReceivables();
   } catch (_err) {
-    message.error('Erro ao estornar pagamento');
+    message.error('Erro ao estornar recebimento');
   } finally {
-    savingInlinePayment.value = false;
+    savingInlineReceipt.value = false;
   }
 };
 
@@ -1124,16 +1300,15 @@ const handleFilter = () => {
     return;
   }
   pagination.page = 1;
-  fetchPayables();
 };
 
 const handleClearFilters = () => {
   filters.search = '';
   filters.dueDateRange = [defaultDueDateFrom, defaultDueDateTo];
-  filters.category = 'Todas as categorias';
+  filters.clientId = null;
+  filters.originType = 'ALL';
   filters.status = 'ALL';
   pagination.page = 1;
-  fetchPayables();
 };
 
 const applyMobileFilters = () => {
@@ -1150,17 +1325,22 @@ const onPageSizeChange = (pageSize: number) => {
   pagination.page = 1;
 };
 
-watch(() => filters.search, () => {
-  pagination.page = 1;
-});
+watch(
+  () => filters.search,
+  () => {
+    pagination.page = 1;
+  },
+);
 
 onMounted(() => {
   mediaQuery = window.matchMedia('(max-width: 768px)');
   updateIsMobile();
   mediaQuery.addEventListener('change', updateIsMobile);
-  fetchSuppliers();
-  fetchPayables();
+  fetchClients();
+  fetchPaymentMethods();
+  fetchReceivables();
 });
+
 onBeforeUnmount(() => {
   mediaQuery?.removeEventListener('change', updateIsMobile);
 });
@@ -1270,7 +1450,7 @@ h1 {
 }
 
 .filters-grid-finance {
-  grid-template-columns: 2fr 1.35fr repeat(2, minmax(0, 1fr)) auto;
+  grid-template-columns: 2fr 1.35fr repeat(3, minmax(0, 1fr)) auto;
 }
 
 .filter-actions {
@@ -1380,12 +1560,6 @@ h1 {
   border: 1px solid #fecaca;
 }
 
-.badge-soft-neutral {
-  color: #475569;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-}
-
 :deep(.status-chip.n-tag) {
   border-width: 1px !important;
 }
@@ -1406,12 +1580,6 @@ h1 {
   color: #991b1b;
   background: #fef2f2;
   border: 1px solid #fecaca;
-}
-
-:deep(.status-chip.badge-soft-neutral.n-tag) {
-  color: #475569;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
 }
 
 .empty-state {
@@ -1571,11 +1739,19 @@ h1 {
   margin-bottom: 0;
 }
 
-.overdue-hint {
+.overdue-hint,
+.origin-hint {
   margin: -6px 0 0;
   font-size: 12px;
   line-height: 1.4;
+}
+
+.overdue-hint {
   color: #b45309;
+}
+
+.origin-hint {
+  color: #475569;
 }
 
 .payment-inline-area {
@@ -1663,7 +1839,7 @@ h1 {
   justify-content: flex-end;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1440px) {
   .filters-grid-finance {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1696,19 +1872,19 @@ h1 {
 </style>
 
 <style>
-:root .n-modal-container:has(.accounts-payable-modal) .n-modal-body-wrapper {
+:root .n-modal-container:has(.accounts-receivable-modal) .n-modal-body-wrapper {
   overflow: hidden !important;
 }
 
-:root .n-modal-container:has(.accounts-payable-modal) .n-modal-body-wrapper > .n-scrollbar,
-:root .n-modal-container:has(.accounts-payable-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container,
-:root .n-modal-container:has(.accounts-payable-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container > .n-scrollbar-content {
+:root .n-modal-container:has(.accounts-receivable-modal) .n-modal-body-wrapper > .n-scrollbar,
+:root .n-modal-container:has(.accounts-receivable-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container,
+:root .n-modal-container:has(.accounts-receivable-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container > .n-scrollbar-content {
   max-height: 100vh !important;
   max-height: 100dvh !important;
   overflow: hidden !important;
 }
 
-.accounts-payable-modal.n-card {
+.accounts-receivable-modal.n-card {
   --n-padding-top: 0;
   --n-padding-bottom: 0;
   --n-padding-left: 0;
@@ -1724,7 +1900,7 @@ h1 {
   overflow: hidden;
 }
 
-.accounts-payable-modal.n-card .n-card-header {
+.accounts-receivable-modal.n-card .n-card-header {
   flex: 0 0 auto;
   background: #fff;
   border-bottom: 1px solid #e5e7eb;
@@ -1732,7 +1908,7 @@ h1 {
   z-index: 4;
 }
 
-.accounts-payable-modal.n-card .n-card__content {
+.accounts-receivable-modal.n-card .n-card__content {
   flex: 1 1 auto;
   min-height: 0;
   max-height: none !important;
@@ -1742,7 +1918,7 @@ h1 {
   scroll-padding-bottom: 136px;
 }
 
-.accounts-payable-modal.n-card .n-card__footer {
+.accounts-receivable-modal.n-card .n-card__footer {
   flex: 0 0 auto;
   background: #fff;
   border-top: 1px solid #e5e7eb;

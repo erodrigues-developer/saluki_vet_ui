@@ -324,7 +324,8 @@ const quickCreateOptions = [
   { label: 'Novo cliente', key: '/clientes' },
   { label: 'Novo pet', key: '/pets' },
   { label: 'Novo box', key: '/cadastros/boxes' },
-  { label: 'Nova conta a pagar', key: '/financeiro/contas-a-pagar' }
+  { label: 'Nova conta a pagar', key: '/financeiro/contas-a-pagar' },
+  { label: 'Nova conta a receber', key: '/financeiro/contas-a-receber' }
 ]
 
 const profileOptions = [
@@ -354,6 +355,7 @@ const searchableItems = [
   { type: 'Estoque', label: 'Histórico de movimentações', meta: 'Estoque', to: '/estoque/movimentacoes' },
   { type: 'Estoque', label: 'Locais de estoque', meta: 'Cadastros', to: '/cadastros/locais-estoque' },
   { type: 'Financeiro', label: 'Contas a pagar', meta: 'Financeiro', to: '/financeiro/contas-a-pagar' },
+  { type: 'Financeiro', label: 'Contas a receber', meta: 'Financeiro', to: '/financeiro/contas-a-receber' },
   { type: 'Financeiro', label: 'Comissões', meta: 'Financeiro', to: '/financeiro/comissoes' },
   { type: 'Fornecedores', label: 'Fornecedores', meta: 'Cadastros', to: '/cadastros/fornecedores' },
   { type: 'Agendamentos', label: 'Agendamentos', meta: 'Atendimentos', to: '/atendimento/agendamentos' },
@@ -476,6 +478,7 @@ const menuItems = [
     icon: CircleDollarSign,
     children: [
       { label: 'Contas a pagar', icon: ReceiptText, to: '/financeiro/contas-a-pagar' },
+      { label: 'Contas a receber', icon: CreditCard, to: '/financeiro/contas-a-receber' },
       { label: 'Vendas', icon: ShoppingCart, to: '/financeiro/vendas' },
       { label: 'Comissões', icon: BadgePercent, to: '/financeiro/comissoes' }
     ]
