@@ -17,6 +17,29 @@
           </div>
         </div>
         <div class="section-grid">
+          <n-form-item label="Foto do pet" path="photoUrl" class="full-row">
+            <div class="photo-upload-wrap">
+              <div v-if="model.photoUrl" class="photo-preview-card">
+                <img :src="model.photoUrl" alt="Foto do pet" class="photo-preview" />
+              </div>
+              <div class="photo-upload-actions">
+                <input
+                  ref="photoInputRef"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  class="hidden-file-input"
+                  @change="handlePhotoSelected"
+                />
+                <n-button secondary :loading="uploadingPhoto" :disabled="loading" @click="openPhotoPicker">
+                  {{ model.photoUrl ? 'Trocar foto' : 'Enviar foto' }}
+                </n-button>
+                <n-button v-if="model.photoUrl" tertiary :disabled="loading || uploadingPhoto" @click="clearPhoto">
+                  Remover foto
+                </n-button>
+                <span class="photo-upload-hint">PNG, JPG, WEBP ou GIF até 5 MB.</span>
+              </div>
+            </div>
+          </n-form-item>
           <n-form-item label="Nome *" path="name" required>
             <n-input v-model:value="model.name" placeholder="Nome do pet" />
           </n-form-item>
@@ -169,6 +192,8 @@ export interface Pet {
   allergies?: string | null
   chronicDiseases?: string | null
   notes?: string | null
+  photoUrl?: string | null
+  photoStorageKey?: string | null
   isActive: boolean
   createdAt?: string
   updatedAt?: string
@@ -199,6 +224,8 @@ const emit = defineEmits<{
 
 const message = useMessage()
 const formRef = ref<FormInst | null>(null)
+const photoInputRef = ref<HTMLInputElement | null>(null)
+const uploadingPhoto = ref(false)
 const model = reactive<Pet>({
   id: undefined,
   name: '',
@@ -213,6 +240,8 @@ const model = reactive<Pet>({
   allergies: '',
   chronicDiseases: '',
   notes: '',
+  photoUrl: null,
+  photoStorageKey: null,
   isActive: true
 })
 
@@ -308,10 +337,65 @@ const handleSubmit = async () => {
     clientId: model.clientId != null ? Number(model.clientId) : null,
     speciesId: model.speciesId != null ? Number(model.speciesId) : null,
     breedId: model.breedId != null ? Number(model.breedId) : null,
-    weightKg: model.weightKg != null ? Number(model.weightKg) : null
+    weightKg: model.weightKg != null ? Number(model.weightKg) : null,
+    photoUrl: model.photoUrl ? String(model.photoUrl).trim() : null,
+    photoStorageKey: model.photoStorageKey ? String(model.photoStorageKey).trim() : null
   })
 }
 defineExpose({ submit: handleSubmit })
+
+const openPhotoPicker = () => {
+  photoInputRef.value?.click()
+}
+
+const clearPhoto = () => {
+  model.photoUrl = null
+  model.photoStorageKey = null
+  if (photoInputRef.value) {
+    photoInputRef.value.value = ''
+  }
+}
+
+const handlePhotoSelected = async (event: Event) => {
+  const input = event.target as HTMLInputElement | null
+  const file = input?.files?.[0]
+  if (!file) return
+
+  if (!file.type.startsWith('image/')) {
+    message.error('Selecione um arquivo de imagem válido.')
+    if (input) input.value = ''
+    return
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    message.error('A imagem deve ter no máximo 5 MB.')
+    if (input) input.value = ''
+    return
+  }
+
+  const api = useApi()
+  const formData = new FormData()
+  formData.append('file', file)
+
+  uploadingPhoto.value = true
+  try {
+    const response = await api<{ photoUrl: string; photoStorageKey?: string }>('/api/v1/pets/upload-photo', {
+      method: 'POST',
+      body: formData
+    })
+    model.photoUrl = response.photoUrl
+    model.photoStorageKey = response.photoStorageKey || null
+    message.success('Foto enviada.')
+  } catch (err: any) {
+    const apiMessage = Array.isArray(err?.data?.message)
+      ? err.data.message.join(', ')
+      : err?.data?.message
+    message.error(apiMessage || 'Erro ao enviar foto')
+  } finally {
+    uploadingPhoto.value = false
+    if (input) input.value = ''
+  }
+}
 
 const fetchClientOptions = async (search?: string) => {
   clientLoading.value = true
@@ -389,6 +473,8 @@ watch(
       allergies: val?.allergies ?? '',
       chronicDiseases: val?.chronicDiseases ?? '',
       notes: val?.notes ?? '',
+      photoUrl: val?.photoUrl ?? null,
+      photoStorageKey: val?.photoStorageKey ?? null,
       isActive: val?.isActive ?? true
     })
     clientOptions.value = upsertOption(clientOptions.value, model.clientId, val?.client?.name)
@@ -513,6 +599,45 @@ onMounted(() => {
 
 .full-width {
   width: 100%;
+}
+
+.photo-upload-wrap {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.photo-preview-card {
+  width: 112px;
+  height: 112px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.photo-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-upload-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.photo-upload-hint {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.hidden-file-input {
+  display: none;
 }
 
 @media (max-width: 1024px) {

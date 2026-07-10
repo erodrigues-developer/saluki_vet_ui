@@ -604,6 +604,7 @@ const resolveInitialStep = (consultation: any) => {
   if (!hasText(consultation?.mainComplaint)) return 2
   if (hasText(consultation?.mainComplaint) && !hasText(consultation?.clinicalFindings)) return 3
   if (hasText(consultation?.clinicalFindings) && !hasText(consultation?.diagnosis) && !hasText(consultation?.treatmentPlan)) return 4
+  if (String(consultation?.recordStatus || '').toUpperCase() === 'FINALIZED') return 6
   if (hasText(consultation?.diagnosis) || hasText(consultation?.treatmentPlan)) return 5
   return 0
 }

@@ -374,6 +374,7 @@ const props = defineProps<{ saleId?: number | null }>();
 const message = useMessage();
 const dialog = useDialog();
 const router = useRouter();
+const route = useRoute();
 
 const isEdit = computed(() => Boolean(props.saleId));
 const isNew = computed(() => !isEdit.value);
@@ -386,6 +387,7 @@ const saving = ref(false);
 const loading = ref(false);
 const showCheckoutModal = ref(false);
 const checkoutLoading = ref(false);
+const checkoutQueryHandled = ref(false);
 
 const paymentMethodOptions = ref<Array<{ label: string; value: number }>>([]);
 const clientOptions = ref<{ label: string; value: number }[]>([]);
@@ -417,6 +419,8 @@ const model = reactive({
     unitPrice: number;
     discountAmount: number;
     totalPrice: number;
+    originType?: string | null;
+    originReferenceId?: number | null;
     _key: string;
   }>,
 });
@@ -525,6 +529,8 @@ const addItem = () => {
     unitPrice: 0,
     discountAmount: 0,
     totalPrice: 0,
+    originType: null,
+    originReferenceId: null,
     _key: Math.random().toString(36).substring(7),
   });
 };
@@ -535,6 +541,8 @@ const handleItemTypeChange = (row: any) => {
   row.unitPrice = 0;
   row.discountAmount = 0;
   row.totalPrice = 0;
+  row.originType = null;
+  row.originReferenceId = null;
 };
 
 const handleItemRefChange = (row: any, val: number) => {
@@ -709,6 +717,8 @@ const loadSale = async () => {
       unitPrice: Number(item.unitPrice || 0),
       discountAmount: Number(item.discountAmount || 0),
       totalPrice: Number(item.totalPrice || 0),
+      originType: item.originType || null,
+      originReferenceId: item.originReferenceId ? Number(item.originReferenceId) : null,
       _key: Math.random().toString(36).substring(7),
     }));
 
@@ -723,6 +733,10 @@ const loadSale = async () => {
 
     createdByLabel.value = sale.veterinarian?.name || '-';
     createdAtLabel.value = sale.createdAt ? format(new Date(sale.createdAt), 'dd/MM/yyyy HH:mm') : '-';
+    if (route.query.checkout === '1' && !checkoutQueryHandled.value) {
+      checkoutQueryHandled.value = true;
+      openCheckoutModal();
+    }
   } catch (_err) {
     message.error('Erro ao carregar venda');
   } finally {
@@ -786,6 +800,8 @@ const saveSale = async (): Promise<number | null> => {
           unitPrice: Number(item.unitPrice),
           discountAmount: Number(item.discountAmount || 0),
           totalPrice: Math.max(0, Number(item.totalPrice || 0)),
+          originType: item.originType || null,
+          originReferenceId: item.originReferenceId || null,
         },
       });
     }

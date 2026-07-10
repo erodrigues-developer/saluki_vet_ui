@@ -297,6 +297,58 @@
             </div>
           </template>
         </n-modal>
+        <n-modal v-model:show="billingProcedureModalVisible" preset="card" class="billing-procedure-modal" :mask-closable="false">
+          <template #header>
+            <div class="modal-head">
+              <h3 class="modal-title">{{ billingProcedureForm.id ? 'Editar procedimento cobrável' : 'Adicionar procedimento cobrável' }}</h3>
+              <p class="modal-subtitle">Esses itens serão levados automaticamente para a venda ao finalizar e cobrar.</p>
+            </div>
+          </template>
+          <div class="suggestion-modal-body prescription-modal-body">
+            <div class="prescription-sections">
+              <section class="prescription-form-section">
+                <div class="grid">
+                  <n-form-item label="Procedimento" class="full-row" required>
+                    <n-select
+                      v-model:value="billingProcedureForm.procedureId"
+                      :options="procedureOptions"
+                      placeholder="Selecione o procedimento"
+                      filterable
+                      @update:value="handleBillingProcedureChange"
+                    />
+                  </n-form-item>
+                  <n-form-item label="Quantidade" required>
+                    <n-input-number
+                      v-model:value="billingProcedureForm.quantity"
+                      :min="1"
+                      :precision="0"
+                      style="width: 100%"
+                      @update:value="recalculateBillingProcedureTotal"
+                    />
+                  </n-form-item>
+                  <n-form-item label="Preço unitário" required>
+                    <CurrencyInput
+                      v-model="billingProcedureForm.unitPrice"
+                      @update:model-value="recalculateBillingProcedureTotal"
+                    />
+                  </n-form-item>
+                </div>
+                <div class="billing-procedure-total">
+                  <span>Total do procedimento</span>
+                  <strong>{{ formatCurrency(billingProcedureTotal) }}</strong>
+                </div>
+              </section>
+            </div>
+          </div>
+          <template #footer>
+            <div class="modal-actions">
+              <n-button tertiary @click="billingProcedureModalVisible = false">Cancelar</n-button>
+              <n-button type="primary" :loading="savingBillingProcedure" @click="submitBillingProcedure">
+                {{ billingProcedureForm.id ? 'Salvar procedimento' : 'Adicionar procedimento' }}
+              </n-button>
+            </div>
+          </template>
+        </n-modal>
 
         <n-card v-show="currentStep === 3" :bordered="false" class="step-card">
           <template #header>
@@ -478,11 +530,11 @@
         <n-card v-show="currentStep === 4" :bordered="false" class="step-card">
           <template #header>
             <div class="step-head">
-              <h3>5. Revisão</h3>
-              <p>Revise os dados antes da finalização.</p>
+              <h3>5. Revisão clínica</h3>
+              <p>Revise os dados clínicos antes de avançar para a finalização.</p>
             </div>
           </template>
-          <p class="muted">Revise os dados antes de finalizar. O atendimento será registrado no prontuário do paciente.</p>
+          <p class="muted">Revise os dados antes de seguir para a etapa final. O atendimento será registrado no prontuário do paciente.</p>
           <n-alert
             v-if="hasPendingAppliedAiBlocks"
             type="warning"
@@ -525,10 +577,101 @@
               <p><strong>Pedidos de exame:</strong> {{ consultationExamRequests.length }}</p>
               <p><strong>Resultados anexados:</strong> {{ examResults.length }}</p>
             </section>
+            <section class="review-block">
+              <div class="review-block-head"><h4>Cobrança</h4><button type="button" class="edit-link" @click="setCurrentStep(5)">Editar</button></div>
+              <p><strong>Procedimentos cobrados:</strong> {{ consultationBillingItems.length }}</p>
+              <p><strong>Total previsto:</strong> {{ formatCurrency(consultationBillingTotal) }}</p>
+              <p><strong>Status:</strong> {{ consultationBillingItems.length ? 'Itens lançados para cobrança' : 'Sem itens para cobrança' }}</p>
+            </section>
+          </div>
+        </n-card>
+
+        <n-card v-show="currentStep === 5" :bordered="false" class="step-card">
+          <template #header>
+            <div class="step-head">
+              <h3>6. Finalização e cobrança</h3>
+              <p>Defina os itens de cobrança e finalize a consulta com um único fluxo.</p>
+            </div>
+          </template>
+          <n-alert
+            v-if="canFinalizeAndBill"
+            type="info"
+            :show-icon="false"
+            class="ai-error"
+          >
+            Esta consulta possui itens para cobrança. Ao finalizar, o sistema irá gerar ou atualizar a venda vinculada e abrir o checkout automaticamente.
+          </n-alert>
+          <n-alert
+            v-else
+            type="default"
+            :show-icon="false"
+            class="ai-error"
+          >
+            Esta consulta não possui itens para cobrança. Ao finalizar, apenas o prontuário será concluído.
+          </n-alert>
+
+          <section class="artifact-section billing-section">
+            <div class="artifact-section-head">
+              <div>
+                <h4>Itens para cobrança</h4>
+                <p>Procedimentos realizados na consulta que devem seguir para a venda e o checkout.</p>
+              </div>
+              <div class="artifact-section-actions">
+                <n-button type="primary" secondary @click="openBillingProcedureModal()">Adicionar procedimento</n-button>
+              </div>
+            </div>
+            <p v-if="!model.id" class="field-help">Ao adicionar o primeiro item, a consulta será salva como rascunho para liberar a cobrança.</p>
+            <div v-if="!consultationBillingItems.length" class="artifact-empty">
+              Nenhum procedimento cobrável lançado nesta consulta.
+            </div>
+            <div v-else class="billing-list">
+              <article v-for="item in consultationBillingItems" :key="item.id" class="artifact-item billing-item">
+                <div class="artifact-item-copy">
+                  <strong>{{ resolveProcedureLabel(item.procedureId) }}</strong>
+                  <span>
+                    {{ Number(item.quantity) }} {{ Number(item.quantity) === 1 ? 'unidade' : 'unidades' }}
+                    · {{ formatCurrency(item.unitPrice) }} cada
+                  </span>
+                  <small>Total: {{ formatCurrency(item.totalPrice) }}</small>
+                </div>
+                <div class="artifact-item-actions">
+                  <n-button tertiary size="small" @click="openBillingProcedureModal(item)">Editar</n-button>
+                  <n-button
+                    tertiary
+                    size="small"
+                    type="error"
+                    :loading="removingBillingProcedureId === item.id"
+                    @click="removeBillingProcedure(item.id)"
+                  >
+                    Remover
+                  </n-button>
+                </div>
+              </article>
+            </div>
+            <div class="billing-summary-row">
+              <span>Total previsto para cobrança</span>
+              <strong>{{ formatCurrency(consultationBillingTotal) }}</strong>
+            </div>
+          </section>
+
+          <div class="review-grid finalization-grid">
+            <section class="review-block">
+              <div class="review-block-head"><h4>Resumo final</h4><button type="button" class="edit-link" @click="setCurrentStep(4)">Revisar</button></div>
+              <p><strong>Paciente:</strong> {{ petLabel }}</p>
+              <p><strong>Conduta registrada:</strong> {{ model.treatmentPlan || 'Ainda não registrado' }}</p>
+              <p><strong>Total para cobrança:</strong> {{ formatCurrency(consultationBillingTotal) }}</p>
+            </section>
           </div>
           <div class="inline-actions">
-            <n-button tertiary @click="currentStep = 0">Voltar e editar</n-button>
-            <n-button type="primary" :loading="saving" :disabled="hasPendingAppliedAiBlocks" @click="finalizeAttendance">Finalizar atendimento</n-button>
+            <n-button tertiary @click="currentStep = 4">Voltar para revisão</n-button>
+            <n-button
+              type="primary"
+              :loading="saving || finalizingAndBilling || loadingConsultationBillingItems"
+              :disabled="hasPendingAppliedAiBlocks"
+              @click="finalizeAttendance"
+            >
+              Finalizar consulta
+            </n-button>
           </div>
         </n-card>
 
@@ -582,6 +725,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import { format } from 'date-fns'
 import AiChatFloating from '~/components/ai/AiChatFloating.vue'
+import CurrencyInput from '~/components/common/CurrencyInput.vue'
 import ExamForm, { type ExamType } from '~/components/exams/ExamForm.vue'
 import { useAiConversation } from '~/composables/useAiConversation'
 
@@ -641,6 +785,15 @@ interface ExamResultRow {
   veterinarian?: { name?: string | null } | null
 }
 
+interface ConsultationBillingProcedureRow {
+  id: number
+  consultationId: number
+  procedureId: number
+  quantity: number
+  unitPrice: number
+  totalPrice: number
+}
+
 const message = useMessage()
 const route = useRoute()
 const saving = ref(false)
@@ -684,6 +837,11 @@ const quickExamFormRef = ref<InstanceType<typeof ExamForm> | null>(null)
 const linkedInpatientRecordId = ref<number | null>(null)
 const savingAnamnesisApproval = ref(false)
 const consultationAiChatVisible = ref(false)
+const billingProcedureModalVisible = ref(false)
+const savingBillingProcedure = ref(false)
+const removingBillingProcedureId = ref<number | null>(null)
+const loadingConsultationBillingItems = ref(false)
+const finalizingAndBilling = ref(false)
 const consultationAiQuestion = ref('')
 const consultationAiMode = ref<'general' | 'anamnesis' | 'clinical-support'>('general')
 const suggestedAnamnesisText = ref('')
@@ -708,7 +866,8 @@ const steps = [
   { key: 'triage', label: 'Triagem e sinais vitais' },
   { key: 'anamnesis', label: 'Anamnese' },
   { key: 'diagnosis', label: 'Conduta clínica' },
-  { key: 'review', label: 'Revisão do prontuário' }
+  { key: 'review', label: 'Revisão clínica' },
+  { key: 'finalization', label: 'Finalização e cobrança' }
 ]
 
 const model = reactive<any>({
@@ -828,6 +987,8 @@ const petOptions = ref<{ label: string; value: number }[]>([])
 const allPets = ref<any[]>([])
 const veterinarianOptions = ref<{ label: string; value: number }[]>([])
 const appointmentsOptions = ref<{ label: string; value: number; data: any }[]>([])
+const procedureOptions = ref<Array<{ label: string; value: number; defaultPrice: number }>>([])
+const consultationBillingItems = ref<ConsultationBillingProcedureRow[]>([])
 const hasExistingPrescription = ref(false)
 
 const dictations = ref<any[]>([])
@@ -856,6 +1017,18 @@ let autoSuggestionTimer: ReturnType<typeof setTimeout> | null = null
 let speechRecognition: any = null
 let audioChunks: Blob[] = []
 let recordingTicker: ReturnType<typeof setInterval> | null = null
+
+const billingProcedureForm = reactive<{
+  id: number | null
+  procedureId: number | null
+  quantity: number
+  unitPrice: number
+}>({
+  id: null,
+  procedureId: null,
+  quantity: 1,
+  unitPrice: 0,
+})
 
 const MIN_AUTOMATION_LENGTH = 18
 const aiHasError = computed(() => Boolean(aiErrorMessage.value))
@@ -1130,16 +1303,41 @@ const petLabel = computed(() => petOptions.value.find((p) => p.value === model.p
 const veterinarianLabel = computed(() => veterinarianOptions.value.find((v) => v.value === model.veterinarianId)?.label || 'Não informado')
 const inpatientBoxLabel = computed(() => availableInpatientBoxOptions.value.find((item) => item.value === inpatientReferral.boxId)?.label || '')
 const isExistingConsultation = computed(() => Boolean(model.id))
+const hasBillableConsultationItems = computed(() =>
+  consultationBillingItems.value.some((item) =>
+    Number(item.quantity || 0) > 0 && Number(item.totalPrice || 0) > 0,
+  ),
+)
+const consultationBillingTotal = computed(() =>
+  consultationBillingItems.value.reduce((sum, item) => {
+    const quantity = Number(item.quantity || 0)
+    const totalPrice = Number(item.totalPrice || 0)
+    if (quantity <= 0 || totalPrice <= 0) return sum
+    return sum + totalPrice
+  }, 0),
+)
+const billingProcedureTotal = computed(() =>
+  Math.max(
+    0,
+    Number(billingProcedureForm.quantity || 0) * Number(billingProcedureForm.unitPrice || 0),
+  ),
+)
+const canFinalizeAndBill = computed(
+  () => hasBillableConsultationItems.value && consultationBillingTotal.value > 0,
+)
+const formatCurrency = (value: number | string) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0))
 
 const loadLookups = async () => {
   const api = useApi()
   try {
-    const [clientsRes, petsRes, usersRes, apptsRes, boxesRes] = await Promise.all([
+    const [clientsRes, petsRes, usersRes, apptsRes, boxesRes, proceduresRes] = await Promise.all([
       api<any>('/api/v1/clients?limit=500'),
       api<any>('/api/v1/pets?limit=1000'),
       api<any>('/api/v1/users?limit=100'),
       api<any>('/api/v1/appointments?sortBy=startsAt&sortDirection=desc&limit=50'),
       api<any>('/api/v1/boxes?isActive=true'),
+      api<any>('/api/v1/procedures?limit=500'),
     ])
 
     clientOptions.value = clientsRes.data.map((item: any) => ({ label: item.name, value: Number(item.id) }))
@@ -1154,6 +1352,13 @@ const loadLookups = async () => {
     availableInpatientBoxOptions.value = boxes
       .filter((item: any) => !item.currentInpatient)
       .map((item: any) => ({ label: item.name, value: Number(item.id) }))
+    procedureOptions.value = (proceduresRes.data || [])
+      .filter((item: any) => item.isActive !== false)
+      .map((item: any) => ({
+        label: item.name,
+        value: Number(item.id),
+        defaultPrice: Number(item.defaultPrice || 0),
+      }))
   } catch (_error) {
     message.error('Erro ao carregar dados auxiliares')
   }
@@ -1178,6 +1383,7 @@ const resolveInitialStepFromModel = () => {
 
   if (!hasAnamnesis) return 2
   if (hasAnamnesis && !hasDiagnosis) return 3
+  if (model.recordStatus === 'FINALIZED') return 5
   return 4
 }
 
@@ -1214,6 +1420,7 @@ const hydrateCompletedStepsFromModel = (activeStep: number) => {
   if (hasComplaint || hasAnamnesis) done.add(2)
   if (hasConduct) done.add(3)
   if (hasCoreContext && (hasComplaint || hasAnamnesis) && hasConduct) done.add(4)
+  if (String(model.recordStatus || '').toUpperCase() === 'FINALIZED') done.add(5)
 
   for (let idx = 0; idx < activeStep; idx += 1) done.add(idx)
   completedSteps.value = done
@@ -1274,6 +1481,7 @@ const loadConsultationFromRoute = async () => {
     updatePetOptions()
     hydrateClinicalNotesFromModel()
     await loadDictations()
+    await loadConsultationBillingItems()
 
     const requestedStep = normalizeStepIndex(Array.isArray(route.query.step) ? route.query.step[0] : route.query.step)
     currentStep.value = requestedStep ?? resolveInitialStepFromModel()
@@ -1286,6 +1494,31 @@ const loadConsultationFromRoute = async () => {
     message.error(error?.data?.message || 'Erro ao carregar atendimento clínico')
   } finally {
     isHydratingConsultation.value = false
+  }
+}
+
+const loadConsultationBillingItems = async () => {
+  if (!model.id) {
+    consultationBillingItems.value = []
+    return
+  }
+
+  loadingConsultationBillingItems.value = true
+  try {
+    const api = useApi()
+    const rows = await api<any[]>(`/api/v1/consultation-procedures/consultation/${model.id}`)
+    consultationBillingItems.value = (Array.isArray(rows) ? rows : []).map((item: any) => ({
+      id: Number(item.id),
+      consultationId: Number(item.consultationId),
+      procedureId: Number(item.procedureId),
+      quantity: Number(item.quantity || 0),
+      unitPrice: Number(item.unitPrice || 0),
+      totalPrice: Number(item.totalPrice || 0),
+    }))
+  } catch (_error) {
+    message.error('Não foi possível carregar os procedimentos cobrados.')
+  } finally {
+    loadingConsultationBillingItems.value = false
   }
 }
 
@@ -1349,6 +1582,123 @@ const validateCore = () => {
     return false
   }
   return true
+}
+
+const resetBillingProcedureForm = () => {
+  billingProcedureForm.id = null
+  billingProcedureForm.procedureId = null
+  billingProcedureForm.quantity = 1
+  billingProcedureForm.unitPrice = 0
+}
+
+const recalculateBillingProcedureTotal = () => {
+  billingProcedureForm.quantity = Math.max(1, Number(billingProcedureForm.quantity || 1))
+  billingProcedureForm.unitPrice = Math.max(0, Number(billingProcedureForm.unitPrice || 0))
+}
+
+const resolveProcedureLabel = (procedureId?: number | null) =>
+  procedureOptions.value.find((item) => Number(item.value) === Number(procedureId))?.label || `Procedimento #${procedureId || '-'}`
+
+const handleBillingProcedureChange = (procedureId: number | null) => {
+  if (!procedureId) return
+  const selected = procedureOptions.value.find((item) => Number(item.value) === Number(procedureId))
+  if (!selected) return
+  if (!billingProcedureForm.id) {
+    billingProcedureForm.unitPrice = Number(selected.defaultPrice || 0)
+  }
+  recalculateBillingProcedureTotal()
+}
+
+const ensureConsultationDraftForBilling = async () => {
+  if (model.id) return true
+  const ok = await persist()
+  if (!ok || !model.id) return false
+  await loadConsultationBillingItems()
+  return true
+}
+
+const syncConsultationBillingItems = async () => {
+  const ready = await ensureConsultationDraftForBilling()
+  if (!ready) return false
+  await loadConsultationBillingItems()
+  return true
+}
+
+const openBillingProcedureModal = async (item?: ConsultationBillingProcedureRow) => {
+  const ready = await ensureConsultationDraftForBilling()
+  if (!ready) return
+
+  if (item) {
+    billingProcedureForm.id = Number(item.id)
+    billingProcedureForm.procedureId = Number(item.procedureId)
+    billingProcedureForm.quantity = Number(item.quantity || 1)
+    billingProcedureForm.unitPrice = Number(item.unitPrice || 0)
+  } else {
+    resetBillingProcedureForm()
+  }
+
+  billingProcedureModalVisible.value = true
+}
+
+const submitBillingProcedure = async () => {
+  if (!model.id) return
+  if (!billingProcedureForm.procedureId) {
+    message.warning('Selecione o procedimento a cobrar.')
+    return
+  }
+
+  recalculateBillingProcedureTotal()
+  if (billingProcedureTotal.value <= 0) {
+    message.warning('Informe um valor válido para o procedimento.')
+    return
+  }
+
+  savingBillingProcedure.value = true
+  try {
+    const api = useApi()
+    const body = {
+      consultationId: model.id,
+      procedureId: billingProcedureForm.procedureId,
+      quantity: Number(billingProcedureForm.quantity || 1),
+      unitPrice: Number(billingProcedureForm.unitPrice || 0),
+      totalPrice: Number(billingProcedureTotal.value || 0),
+    }
+
+    if (billingProcedureForm.id) {
+      await api(`/api/v1/consultation-procedures/${billingProcedureForm.id}`, {
+        method: 'PATCH',
+        body,
+      })
+    } else {
+      await api('/api/v1/consultation-procedures', {
+        method: 'POST',
+        body,
+      })
+    }
+
+    billingProcedureModalVisible.value = false
+    resetBillingProcedureForm()
+    await loadConsultationBillingItems()
+    message.success('Procedimento de cobrança salvo com sucesso.')
+  } catch (error: any) {
+    message.error(error?.data?.message || 'Erro ao salvar procedimento de cobrança.')
+  } finally {
+    savingBillingProcedure.value = false
+  }
+}
+
+const removeBillingProcedure = async (id: number) => {
+  removingBillingProcedureId.value = id
+  try {
+    const api = useApi()
+    await api(`/api/v1/consultation-procedures/${id}`, { method: 'DELETE' })
+    await loadConsultationBillingItems()
+    message.success('Procedimento removido da cobrança.')
+  } catch (error: any) {
+    message.error(error?.data?.message || 'Erro ao remover procedimento de cobrança.')
+  } finally {
+    removingBillingProcedureId.value = null
+  }
 }
 
 const validateInpatientReferral = () => {
@@ -1633,10 +1983,98 @@ const saveAndContinue = async () => {
 }
 
 const finalizeAttendance = async () => {
+  const ready = await syncConsultationBillingItems()
+  if (!ready) return
+
+  if (canFinalizeAndBill.value) {
+    await finalizeAndBill({ skipBillingSync: true })
+    return
+  }
   const ok = await persist({ finalize: true })
   if (!ok) return
   message.success('Atendimento finalizado com sucesso')
   await navigateTo('/atendimento/consultas')
+}
+
+const finalizeAndBill = async (options: { skipBillingSync?: boolean } = {}) => {
+  const ready = options.skipBillingSync ? await ensureConsultationDraftForBilling() : await syncConsultationBillingItems()
+  if (!ready || !model.id) return
+  if (!canFinalizeAndBill.value) {
+    const ok = await persist({ finalize: true })
+    if (!ok) return
+    message.success('Atendimento finalizado com sucesso')
+    await navigateTo('/atendimento/consultas')
+    return
+  }
+  if (!validateInpatientReferral()) return
+
+  const hasComplaint = String(model.aiOrganizedComplaint || model.originalComplaint || '').trim().length > 0
+  const hasClinical = String(model.treatmentPlan || model.notes || '').trim().length > 0
+  if (!hasComplaint) {
+    message.warning('Informe a queixa principal ou relato clínico antes de finalizar.')
+    currentStep.value = 2
+    return
+  }
+  if (!hasClinical) {
+    message.warning('Informe a conduta clínica antes de finalizar.')
+    currentStep.value = 3
+    return
+  }
+  if (String(model.aiOrganizedComplaint || '').trim() && !model.anamnesisApproved) {
+    message.warning('Utilize ou revise o texto sugerido antes de finalizar o atendimento.')
+    currentStep.value = 2
+    return
+  }
+
+  syncExtraNotes()
+  finalizingAndBilling.value = true
+  try {
+    const api = useApi()
+    const response = await api<any>(`/api/v1/consultations/${model.id}/finalize-and-bill`, {
+      method: 'POST',
+      body: {
+        ...model,
+        visitDate: model.visitDate ? new Date(model.visitDate).toISOString() : null,
+        recordStatus: 'FINALIZED',
+        billingItems: consultationBillingItems.value.map((item) => ({
+          id: item.id,
+          consultationId: item.consultationId,
+          procedureId: item.procedureId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+        })),
+      },
+    })
+
+    if (response?.consultation) {
+      Object.assign(model, response.consultation, {
+        id: Number(response.consultation.id),
+        appointmentId: response.consultation.appointmentId ? Number(response.consultation.appointmentId) : null,
+        petId: response.consultation.petId ? Number(response.consultation.petId) : null,
+        clientId: response.consultation.clientId ? Number(response.consultation.clientId) : null,
+        veterinarianId: response.consultation.veterinarianId ? Number(response.consultation.veterinarianId) : null,
+        visitDate: response.consultation.visitDate ? new Date(response.consultation.visitDate).getTime() : model.visitDate,
+      })
+    }
+
+    const saleId = Number(response?.saleId || 0)
+    if (!saleId) {
+      message.success('Atendimento finalizado com sucesso')
+      await navigateTo('/atendimento/consultas')
+      return
+    }
+
+    message.success('Atendimento finalizado e venda preparada para cobrança.')
+    await navigateTo({
+      path: `/financeiro/vendas/${saleId}`,
+      query: response?.shouldOpenCheckout ? { checkout: '1' } : undefined,
+    })
+  } catch (error: any) {
+    message.error(error?.data?.message || error?.message || 'Erro ao finalizar e cobrar.')
+  } finally {
+    finalizingAndBilling.value = false
+  }
 }
 
 const goPrev = () => {
@@ -2636,6 +3074,7 @@ watch(
     void refreshExamRequestStatus()
     void loadConsultationAttachments()
     void loadExamResults()
+    void loadConsultationBillingItems()
   },
   { immediate: true },
 )
@@ -3041,6 +3480,44 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
   gap: 8px;
 }
 
+.billing-section {
+  margin-top: 14px;
+  background: linear-gradient(180deg, #fcfdff 0%, #f8fafc 100%);
+}
+
+.billing-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.billing-item {
+  background: #fff;
+}
+
+.billing-summary-row,
+.billing-procedure-total {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 12px;
+  color: #0f172a;
+}
+
+.billing-summary-row span,
+.billing-procedure-total span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.billing-summary-row strong,
+.billing-procedure-total strong {
+  font-size: 16px;
+}
+
 .artifact-empty {
   border: 1px dashed #cbd5e1;
   border-radius: 10px;
@@ -3149,6 +3626,10 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
   justify-content: center;
 }
 
+:root .n-modal-container:has(.billing-procedure-modal) .n-modal-body-wrapper {
+  overflow: hidden !important;
+}
+
 :root .n-modal-container:has(.exam-modal) .n-modal-body-wrapper > .n-scrollbar,
 :root .n-modal-container:has(.exam-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container,
 :root .n-modal-container:has(.exam-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container > .n-scrollbar-content {
@@ -3208,6 +3689,14 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
   overflow: hidden !important;
 }
 
+:root .n-modal-container:has(.billing-procedure-modal) .n-modal-body-wrapper > .n-scrollbar,
+:root .n-modal-container:has(.billing-procedure-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container,
+:root .n-modal-container:has(.billing-procedure-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container > .n-scrollbar-content {
+  max-height: 100vh !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
+}
+
 .prescription-modal.n-card {
   --n-padding-top: 0;
   --n-padding-bottom: 0;
@@ -3251,6 +3740,48 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
   z-index: 4;
 }
 
+.billing-procedure-modal.n-card {
+  --n-padding-top: 0;
+  --n-padding-bottom: 0;
+  --n-padding-left: 0;
+  --n-padding-right: 0;
+  width: 640px !important;
+  max-width: calc(100vw - 24px) !important;
+  max-height: calc(100vh - 48px) !important;
+  max-height: calc(100dvh - 48px) !important;
+  margin: 0 auto !important;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.billing-procedure-modal.n-card .n-card-header {
+  flex: 0 0 auto;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 16px 20px 12px;
+  z-index: 4;
+}
+
+.billing-procedure-modal.n-card .n-card__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none !important;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 16px 20px;
+}
+
+.billing-procedure-modal.n-card .n-card__footer {
+  flex: 0 0 auto;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -6px 14px rgba(15, 23, 42, 0.05);
+  padding: 10px 16px;
+  z-index: 4;
+}
+
 @media (max-width: 768px) {
   .exam-modal.n-card {
     width: 100% !important;
@@ -3280,6 +3811,13 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
     max-height: calc(100dvh - 48px) !important;
   }
 
+  .billing-procedure-modal.n-card {
+    width: 100% !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100vh - 48px) !important;
+    max-height: calc(100dvh - 48px) !important;
+  }
+
   .prescription-modal.n-card .n-card-header {
     padding: 14px 14px 10px;
   }
@@ -3294,6 +3832,19 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
     padding: 8px 12px;
   }
 
+  .billing-procedure-modal.n-card .n-card-header {
+    padding: 14px 14px 10px;
+  }
+
+  .billing-procedure-modal.n-card .n-card__content {
+    padding: 10px 12px 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .billing-procedure-modal.n-card .n-card__footer {
+    padding: 8px 12px;
+  }
+
   .prescription-modal .modal-actions {
     width: 100%;
     display: grid;
@@ -3302,6 +3853,18 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
   }
 
   .prescription-modal .modal-actions .n-button {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .billing-procedure-modal .modal-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .billing-procedure-modal .modal-actions .n-button {
     min-height: 44px;
     width: 100%;
   }

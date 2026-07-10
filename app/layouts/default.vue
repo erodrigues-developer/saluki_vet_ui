@@ -470,7 +470,7 @@ const menuItems = [
   {
     label: 'Pets',
     icon: PawPrint,
-    children: [{ label: 'Cadastro de pets', icon: PawPrint, to: '/pets' }]
+    to: '/pets'
   },
   { label: 'Clientes', icon: Users, to: '/clientes' },
   {

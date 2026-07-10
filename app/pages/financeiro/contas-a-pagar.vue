@@ -102,7 +102,7 @@
               <p class="card-title">{{ row.description }}</p>
               <span :class="['badge', statusBadgeClass(getEffectiveStatus(row))]">{{ statusLabel(getEffectiveStatus(row)) }}</span>
             </div>
-            <p class="card-subtitle"><span class="card-line-label">Fornecedor: </span><span class="card-line-value">{{ row.supplier?.name || '-' }}</span></p>
+            <p class="card-subtitle"><span class="card-line-label">Favorecido: </span><span class="card-line-value">{{ resolvePayeeName(row) }}</span></p>
             <p class="card-subtitle"><span class="card-line-label">Categoria: </span><span class="card-line-value">{{ row.category || '-' }}</span></p>
             <p class="card-subtitle" :class="{ 'is-overdue': getEffectiveStatus(row) === 'OVERDUE' }">
               <span class="card-line-label">{{ getEffectiveStatus(row) === 'OVERDUE' ? 'Vencido em: ' : 'Vencimento: ' }}</span>
@@ -186,7 +186,7 @@
             <h4 class="section-title">Dados da conta</h4>
             <div class="form-grid">
               <n-form-item label="Descrição *" path="description" required>
-                <n-input v-model:value="createForm.description" placeholder="Ex: Aluguel" />
+                <n-input v-model:value="createForm.description" placeholder="Ex: Aluguel" :disabled="isGeneratedCommissionAccount" />
               </n-form-item>
               <n-form-item label="Fornecedor *" path="supplierId" required>
                 <n-select
@@ -197,6 +197,7 @@
                   remote
                   clearable
                   :loading="supplierLoading"
+                  :disabled="isGeneratedCommissionAccount"
                   @search="onSupplierSearch"
                   @focus="ensureSuppliersLoaded"
                 />
@@ -205,6 +206,7 @@
                 <n-select
                   v-model:value="createForm.category"
                   :options="categoryOptions.filter((o) => o.value !== 'Todas as categorias')"
+                  :disabled="isGeneratedCommissionAccount"
                 />
               </n-form-item>
             </div>
@@ -222,6 +224,7 @@
                 <n-input
                   v-model:value="amountDisplay"
                   placeholder="R$ 0,00"
+                  :disabled="isGeneratedCommissionAccount"
                   @update:value="onAmountInput"
                   @blur="onAmountBlur"
                 />
@@ -231,6 +234,7 @@
                   v-model:value="createForm.dueDate"
                   type="date"
                   clearable
+                  :disabled="isGeneratedCommissionAccount"
                   style="width: 100%"
                 />
               </n-form-item>
@@ -277,7 +281,7 @@
                       />
                     </n-form-item>
                     <n-form-item label="Forma de pagamento *">
-                      <n-select v-model:value="inlinePayForm.paymentMethod" :options="paymentMethodOptions" />
+                      <n-select v-model:value="inlinePayForm.paymentMethodId" :options="paymentMethodOptions" />
                     </n-form-item>
                     <n-form-item label="Observação do pagamento" class="full-row">
                       <n-input v-model:value="inlinePayForm.note" type="textarea" :rows="2" />
@@ -292,7 +296,7 @@
             <h4 class="section-title">Observações</h4>
             <div class="form-grid">
               <n-form-item label="Anotações" path="notes" class="full-row">
-                <n-input type="textarea" v-model:value="createForm.notes" :rows="3" />
+                <n-input type="textarea" v-model:value="createForm.notes" :rows="3" :disabled="isGeneratedCommissionAccount" />
               </n-form-item>
             </div>
           </section>
@@ -322,11 +326,18 @@ interface SupplierListItem {
   name: string;
 }
 
+interface BeneficiaryUserListItem {
+  id: number;
+  name: string;
+}
+
 interface AccountPayableItem {
   id: number;
   description: string;
   supplierId?: number | null;
   supplier?: SupplierListItem | null;
+  beneficiaryUserId?: number | null;
+  beneficiaryUser?: BeneficiaryUserListItem | null;
   category?: string | null;
   amount: number;
   dueDate: string;
@@ -334,12 +345,17 @@ interface AccountPayableItem {
   paidAmount?: number | null;
   paidAt?: string | null;
   paymentMethod?: string | null;
+  paymentMethodId?: number | null;
+  originType?: string | null;
+  originReferenceId?: number | null;
   notes?: string | null;
 }
 
 type FinancialStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELED';
 
 const message = useMessage();
+const route = useRoute();
+const router = useRouter();
 const loading = ref(false);
 const saving = ref(false);
 const savingInlinePayment = ref(false);
@@ -350,12 +366,17 @@ const editingAccountId = ref<number | null>(null);
 const editingOriginalNotes = ref<string | null>(null);
 const modalBaseStatus = ref<string>('PENDING');
 const modalHadPayment = ref(false);
+const modalOriginType = ref<string>('MANUAL');
 const amountDisplay = ref('R$ 0,00');
 const showInlinePaymentForm = ref(false);
+const pendingAccountIdToOpen = ref<number | null>(
+  route.query.accountId ? Number(route.query.accountId) : null,
+);
+const hasOpenedRouteAccount = ref(false);
 const inlinePayForm = reactive({
   paidAt: Date.now(),
   paidAmount: 0,
-  paymentMethod: 'PIX',
+  paymentMethodId: null as number | null,
   note: '',
 });
 const inlinePaidAmountDisplay = ref('R$ 0,00');
@@ -405,12 +426,7 @@ const categoryOptions = [
   { label: 'Outros', value: 'Outros' },
 ];
 
-const paymentMethodOptions = [
-  { label: 'PIX', value: 'PIX' },
-  { label: 'Transferência Bancária', value: 'BANK_TRANSFER' },
-  { label: 'Boleto', value: 'BOLETO' },
-  { label: 'Dinheiro', value: 'CASH' },
-];
+const paymentMethodOptions = ref<Array<{ label: string; value: number }>>([]);
 
 const statusOptions = [
   { label: 'Todos', value: 'ALL' },
@@ -529,9 +545,16 @@ const modalCurrentStatus = computed<FinancialStatus>(() =>
   getCalculatedStatus(modalBaseStatus.value, Number(createForm.dueDate), modalHadPayment.value),
 );
 
+const isGeneratedCommissionAccount = computed(
+  () => editingAccountId.value !== null && modalOriginType.value === 'COMMISSION_PAYOUT',
+);
+
 const primaryActionLabel = computed(() => {
   if (editingAccountId.value && showInlinePaymentForm.value) {
     return 'Salvar e registrar pagamento';
+  }
+  if (isGeneratedCommissionAccount.value) {
+    return 'Fechar';
   }
   return editingAccountId.value ? 'Salvar alterações' : 'Criar conta';
 });
@@ -563,6 +586,10 @@ const statusBadgeClass = (status: FinancialStatus) => {
   return classes[status];
 };
 
+const resolvePayeeName = (row: AccountPayableItem) => {
+  return row.supplier?.name || row.beneficiaryUser?.name || '-';
+};
+
 const filteredPayables = computed(() => {
   let data = [...payables.value];
   const term = filters.search.trim().toLowerCase();
@@ -570,8 +597,8 @@ const filteredPayables = computed(() => {
   if (term) {
     data = data.filter((row) => {
       const description = (row.description || '').toLowerCase();
-      const supplier = (row.supplier?.name || '').toLowerCase();
-      return description.includes(term) || supplier.includes(term);
+      const payee = resolvePayeeName(row).toLowerCase();
+      return description.includes(term) || payee.includes(term);
     });
   }
 
@@ -634,7 +661,7 @@ const filteredSummary = computed(() => {
     (acc, row) => {
       const status = getEffectiveStatus(row);
       const amount = Number(row.amount || 0);
-      acc.expectedTotal += amount;
+      if (status !== 'CANCELED') acc.expectedTotal += amount;
       if (status === 'PAID') acc.totalPaid += Number(row.paidAmount || row.amount || 0);
       if (status === 'PENDING') acc.totalPending += amount;
       if (status === 'OVERDUE') acc.totalOverdue += amount;
@@ -647,10 +674,10 @@ const filteredSummary = computed(() => {
 const columns = [
   { title: 'Descrição', key: 'description' },
   {
-    title: 'Fornecedor',
+    title: 'Favorecido',
     key: 'supplier',
     render(row: AccountPayableItem) {
-      return row.supplier?.name || '-';
+      return resolvePayeeName(row);
     },
   },
   { title: 'Categoria', key: 'category' },
@@ -761,7 +788,9 @@ const buildActionOptions = (row: AccountPayableItem) => {
     options.push({ label: 'Registrar pagamento', key: 'pay' });
   }
 
-  options.push({ label: 'Duplicar', key: 'duplicate' });
+  if (row.originType !== 'COMMISSION_PAYOUT') {
+    options.push({ label: 'Duplicar', key: 'duplicate' });
+  }
   return options;
 };
 
@@ -837,6 +866,37 @@ const fetchSuppliers = async (search?: string) => {
   }
 };
 
+const fetchPaymentMethods = async () => {
+  try {
+    const api = useApi();
+    const response = await api<any>('/api/v1/payment-methods', {
+      query: {
+        page: 1,
+        limit: 100,
+      },
+    });
+
+    const methods = (response.data || []) as Array<{
+      id: number;
+      name: string;
+      isActive?: boolean;
+    }>;
+
+    paymentMethodOptions.value = methods
+      .filter((method) => method.isActive !== false)
+      .map((method) => ({
+        label: method.name,
+        value: Number(method.id),
+      }));
+
+    if (!inlinePayForm.paymentMethodId && paymentMethodOptions.value.length) {
+      inlinePayForm.paymentMethodId = paymentMethodOptions.value[0].value;
+    }
+  } catch (_err) {
+    message.error('Erro ao carregar formas de pagamento');
+  }
+};
+
 const onSupplierSearch = (value: string) => {
   fetchSuppliers(value || undefined);
 };
@@ -860,6 +920,7 @@ const fetchPayables = async () => {
     if (pagination.page > 1 && (pagination.page - 1) * pagination.pageSize >= filteredPayables.value.length) {
       pagination.page = 1;
     }
+    maybeOpenRouteAccount();
   } catch (_err) {
     message.error('Erro ao carregar dados');
   } finally {
@@ -877,11 +938,12 @@ const resetCreateForm = () => {
   editingOriginalNotes.value = null;
   modalBaseStatus.value = 'PENDING';
   modalHadPayment.value = false;
+  modalOriginType.value = 'MANUAL';
   amountDisplay.value = formatCurrencyInput(0);
   showInlinePaymentForm.value = false;
   inlinePayForm.paidAt = Date.now();
   inlinePayForm.paidAmount = 0;
-  inlinePayForm.paymentMethod = 'PIX';
+  inlinePayForm.paymentMethodId = paymentMethodOptions.value[0]?.value ?? null;
   inlinePayForm.note = '';
   inlinePaidAmountDisplay.value = formatCurrencyInput(0);
   registeredPayment.paidAt = null;
@@ -941,6 +1003,7 @@ const openEditModal = (row: AccountPayableItem, options?: { openPayment?: boolea
   editingOriginalNotes.value = normalizeOptionalNote(row.notes);
   modalBaseStatus.value = row.status || 'PENDING';
   modalHadPayment.value = Boolean(row.paidAt || row.paidAmount);
+  modalOriginType.value = row.originType || 'MANUAL';
   amountDisplay.value = formatCurrencyInput(createForm.amount);
   registeredPayment.paidAt = row.paidAt || null;
   registeredPayment.paidAmount = row.paidAmount != null ? Number(row.paidAmount) : null;
@@ -948,7 +1011,7 @@ const openEditModal = (row: AccountPayableItem, options?: { openPayment?: boolea
   showInlinePaymentForm.value = Boolean(options?.openPayment && modalCurrentStatus.value !== 'PAID');
   inlinePayForm.paidAt = Date.now();
   inlinePayForm.paidAmount = Number(row.amount || 0);
-  inlinePayForm.paymentMethod = 'PIX';
+  inlinePayForm.paymentMethodId = row.paymentMethodId || paymentMethodOptions.value[0]?.value || null;
   inlinePayForm.note = '';
   inlinePaidAmountDisplay.value = formatCurrencyInput(inlinePayForm.paidAmount);
 
@@ -959,6 +1022,10 @@ const openEditModal = (row: AccountPayableItem, options?: { openPayment?: boolea
 };
 
 const handleSubmitAccount = async () => {
+  if (isGeneratedCommissionAccount.value) {
+    closeCreateModal();
+    return;
+  }
   if (
     !createForm.description
     || !createForm.supplierId
@@ -1014,7 +1081,7 @@ const handleSubmitAccount = async () => {
 const openInlinePaymentForm = () => {
   inlinePayForm.paidAt = Date.now();
   inlinePayForm.paidAmount = Number(createForm.amount || 0);
-  inlinePayForm.paymentMethod = 'PIX';
+  inlinePayForm.paymentMethodId = paymentMethodOptions.value[0]?.value || null;
   inlinePayForm.note = '';
   inlinePaidAmountDisplay.value = formatCurrencyInput(inlinePayForm.paidAmount);
   showInlinePaymentForm.value = true;
@@ -1027,13 +1094,17 @@ const collapseInlinePaymentForm = () => {
 const cancelInlinePayment = () => {
   inlinePayForm.paidAt = Date.now();
   inlinePayForm.paidAmount = Number(createForm.amount || 0);
-  inlinePayForm.paymentMethod = 'PIX';
+  inlinePayForm.paymentMethodId = paymentMethodOptions.value[0]?.value || null;
   inlinePayForm.note = '';
   inlinePaidAmountDisplay.value = formatCurrencyInput(inlinePayForm.paidAmount);
   showInlinePaymentForm.value = false;
 };
 
 const handlePrimaryModalAction = async () => {
+  if (isGeneratedCommissionAccount.value && !showInlinePaymentForm.value) {
+    closeCreateModal();
+    return;
+  }
   if (editingAccountId.value && showInlinePaymentForm.value) {
     await confirmInlinePayment();
     return;
@@ -1043,7 +1114,7 @@ const handlePrimaryModalAction = async () => {
 
 const confirmInlinePayment = async () => {
   if (!editingAccountId.value) return;
-  if (!inlinePayForm.paidAt || !inlinePayForm.paidAmount || !inlinePayForm.paymentMethod) {
+  if (!inlinePayForm.paidAt || !inlinePayForm.paidAmount || !inlinePayForm.paymentMethodId) {
     message.error('Preencha os campos obrigatórios do pagamento');
     return;
   }
@@ -1061,7 +1132,7 @@ const confirmInlinePayment = async () => {
       body: {
         paidAt: new Date(inlinePayForm.paidAt).toISOString(),
         paidAmount: inlinePayForm.paidAmount,
-        paymentMethod: inlinePayForm.paymentMethod,
+        paymentMethodId: inlinePayForm.paymentMethodId,
       },
     });
 
@@ -1080,7 +1151,8 @@ const confirmInlinePayment = async () => {
     modalHadPayment.value = true;
     registeredPayment.paidAt = new Date(inlinePayForm.paidAt).toISOString();
     registeredPayment.paidAmount = inlinePayForm.paidAmount;
-    registeredPayment.paymentMethod = inlinePayForm.paymentMethod;
+    registeredPayment.paymentMethod =
+      paymentMethodOptions.value.find((option) => option.value === inlinePayForm.paymentMethodId)?.label || null;
     showInlinePaymentForm.value = false;
     message.success('Pagamento registrado!');
     await fetchPayables();
@@ -1150,15 +1222,44 @@ const onPageSizeChange = (pageSize: number) => {
   pagination.page = 1;
 };
 
+const maybeOpenRouteAccount = () => {
+  const targetId = pendingAccountIdToOpen.value;
+  if (!targetId || hasOpenedRouteAccount.value) {
+    return;
+  }
+
+  const row = payables.value.find((item) => Number(item.id) === Number(targetId));
+  if (!row) {
+    return;
+  }
+
+  hasOpenedRouteAccount.value = true;
+  openEditModal(row);
+  pendingAccountIdToOpen.value = null;
+  const nextQuery = { ...route.query };
+  delete nextQuery.accountId;
+  router.replace({ query: nextQuery });
+};
+
 watch(() => filters.search, () => {
   pagination.page = 1;
 });
+
+watch(
+  () => route.query.accountId,
+  (value) => {
+    pendingAccountIdToOpen.value = value ? Number(value) : null;
+    hasOpenedRouteAccount.value = false;
+    maybeOpenRouteAccount();
+  },
+);
 
 onMounted(() => {
   mediaQuery = window.matchMedia('(max-width: 768px)');
   updateIsMobile();
   mediaQuery.addEventListener('change', updateIsMobile);
   fetchSuppliers();
+  fetchPaymentMethods();
   fetchPayables();
 });
 onBeforeUnmount(() => {

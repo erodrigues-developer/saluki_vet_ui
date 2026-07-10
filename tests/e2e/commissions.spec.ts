@@ -36,11 +36,24 @@ test.describe('Commissions and procedures', () => {
         contentType: 'application/json',
         body: JSON.stringify({
           pendingTotal: 42.35,
+          scheduledTotal: 0,
           paidTotal: 17.8,
+          canceledTotal: 0,
           countByStatus: {
             PENDING: 2,
             PAID: 1
           }
+        })
+      })
+    })
+
+    await page.route('**/api/v1/commissions/payouts**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: [],
+          meta: { total: 0 }
         })
       })
     })
@@ -75,8 +88,9 @@ test.describe('Commissions and procedures', () => {
 
     await page.goto('/financeiro/comissoes')
 
-    await expect(page.getByText('Carteira de Comissões')).toBeVisible()
-    await expect(page.locator('.card-value').first()).toContainText('42,35')
+    await expect(page.getByRole('heading', { name: 'Comissões' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Comissões calculadas' })).toBeVisible()
+    await expect(page.locator('.summary-value').first()).toContainText('42,35')
     await expect(page.getByRole('cell', { name: 'Consulta Clínica' })).toBeVisible()
     await expect(page.getByRole('cell', { name: 'Venda #10' })).toBeVisible()
   })
