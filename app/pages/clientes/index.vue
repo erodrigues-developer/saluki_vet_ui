@@ -158,18 +158,64 @@
           </p>
         </div>
       </template>
+      <n-tabs
+        v-if="editingClient?.id"
+        v-model:value="activeClientTab"
+        type="line"
+        animated
+        class="detail-tabs"
+        @update:value="handleClientTabChange"
+      >
+        <n-tab-pane name="details" tab="Cadastro">
+          <ClientForm
+            ref="clientFormRef"
+            :value="editingClient"
+            :loading="saving"
+            @submit="handleSubmit"
+          />
+        </n-tab-pane>
+        <n-tab-pane :tab="`Pets associados (${clientPets.length})`" name="pets">
+          <div class="related-panel">
+            <n-spin :show="clientPetsLoading">
+              <div v-if="!clientPets.length && !clientPetsLoading" class="related-empty">
+                Nenhum pet associado a este cliente.
+              </div>
+              <div v-else-if="isMobile" class="related-card-list">
+                <div v-for="pet in clientPets" :key="pet.id" class="related-card">
+                  <p class="related-card-title">{{ pet.name }}</p>
+                  <p class="related-card-line">Espécie: {{ displayValue(pet.species?.name) }}</p>
+                  <p class="related-card-line">Raça: {{ displayValue(pet.breed?.name) }}</p>
+                  <p class="related-card-line">Microchip: {{ displayValue(pet.microchipCode) }}</p>
+                </div>
+              </div>
+              <n-data-table
+                v-else
+                class="related-pets-table"
+                :columns="clientPetsColumns"
+                :data="clientPets"
+                :bordered="false"
+              />
+            </n-spin>
+          </div>
+        </n-tab-pane>
+      </n-tabs>
       <ClientForm
+        v-else
         ref="clientFormRef"
         :value="editingClient"
         :loading="saving"
         @submit="handleSubmit"
       />
       <template #footer>
-        <div class="modal-actions">
+        <div v-if="activeClientTab === 'details' || !editingClient?.id" class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
           <n-button type="primary" :loading="saving" @click="submitClientForm">
             {{ editingClient ? 'Salvar alterações' : 'Criar cliente' }}
           </n-button>
+        </div>
+        <div v-else class="modal-actions">
+          <n-button tertiary @click="closeModal">Fechar</n-button>
+          <n-button type="primary" secondary @click="activeClientTab = 'details'">Editar cadastro</n-button>
         </div>
       </template>
     </n-modal>
@@ -188,6 +234,18 @@ interface ClientsResponse {
     limit: number
     total: number
   }
+}
+
+interface ClientPetSummary {
+  id: number
+  name: string
+  microchipCode?: string | null
+  species?: { name?: string | null } | null
+  breed?: { name?: string | null } | null
+}
+
+interface ClientPetsResponse {
+  data: ClientPetSummary[]
 }
 
 const message = useMessage()
@@ -213,6 +271,9 @@ const showModal = ref(false)
 const showMobileFilters = ref(false)
 const editingClient = ref<Client | null>(null)
 const clientFormRef = ref<{ submit: () => Promise<void> } | null>(null)
+const activeClientTab = ref<'details' | 'pets'>('details')
+const clientPets = ref<ClientPetSummary[]>([])
+const clientPetsLoading = ref(false)
 const mobileSearch = ref('')
 const activeRequestId = ref(0)
 const isMobile = ref(false)
@@ -257,6 +318,24 @@ const actionOptions = [
   { label: 'Ver histórico', key: 'history' },
   { type: 'divider', key: 'divider' },
   { label: 'Excluir', key: 'delete' }
+]
+
+const clientPetsColumns = [
+  {
+    title: 'Pet',
+    key: 'name',
+    render: (row: ClientPetSummary) => h('strong', row.name)
+  },
+  {
+    title: 'Espécie',
+    key: 'species',
+    render: (row: ClientPetSummary) => displayValue(row.species?.name)
+  },
+  {
+    title: 'Raça',
+    key: 'breed',
+    render: (row: ClientPetSummary) => displayValue(row.breed?.name)
+  }
 ]
 
 const columns = [
@@ -477,7 +556,7 @@ const handleActionSelect = (key: string, client: Client) => {
   }
 
   if (key === 'pets') {
-    message.info('Visualização de pets vinculados será disponibilizada em breve.')
+    openEdit(client, 'pets')
     return
   }
 
@@ -493,20 +572,49 @@ const handleActionSelect = (key: string, client: Client) => {
 
 const openCreate = () => {
   editingClient.value = null
+  activeClientTab.value = 'details'
+  clientPets.value = []
   showModal.value = true
 }
 
-const openEdit = (client: Client) => {
+const openEdit = (client: Client, tab: 'details' | 'pets' = 'details') => {
   editingClient.value = client
+  activeClientTab.value = tab
   showModal.value = true
+  if (tab === 'pets') {
+    void loadClientPets(client.id)
+  }
 }
 
 const closeModal = () => {
   showModal.value = false
+  activeClientTab.value = 'details'
+  clientPets.value = []
 }
 
 const submitClientForm = async () => {
   await clientFormRef.value?.submit()
+}
+
+const loadClientPets = async (clientId?: number) => {
+  if (!clientId) return
+  clientPetsLoading.value = true
+  const api = useApi()
+  try {
+    const response = await api<ClientPetsResponse>(`/api/v1/clients/${clientId}/pets`)
+    clientPets.value = response.data || []
+  } catch (err: any) {
+    message.error(err?.data?.message || 'Erro ao carregar pets vinculados')
+  } finally {
+    clientPetsLoading.value = false
+  }
+}
+
+const handleClientTabChange = (tab: 'details' | 'pets') => {
+  activeClientTab.value = tab
+  if (tab === 'pets') {
+    void loadClientPets(editingClient.value?.id)
+  }
 }
 
 const handleClearFilters = () => {
@@ -1209,6 +1317,78 @@ h1 {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.client-modal .detail-tabs .n-tabs-nav {
+  margin-bottom: 14px;
+}
+
+.client-modal .detail-tabs .n-tabs-pane-wrapper,
+.client-modal .detail-tabs .n-tab-pane {
+  width: 100%;
+  min-width: 0;
+}
+
+.related-panel {
+  width: 100%;
+  min-height: 180px;
+  min-width: 0;
+}
+
+.related-panel .n-spin-container,
+.related-panel .n-spin-content {
+  width: 100%;
+  min-width: 0;
+}
+
+.related-empty {
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  padding: 24px 16px;
+  text-align: center;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.related-card-list {
+  display: grid;
+  gap: 10px;
+}
+
+.related-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px;
+  background: #fff;
+}
+
+.related-card-title {
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.related-card-line {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+}
+
+.related-pets-table.n-data-table,
+.related-pets-table .n-data-table-wrapper,
+.related-pets-table .n-data-table-base-table,
+.related-pets-table .n-data-table-base-table-body,
+.related-pets-table .n-scrollbar-container,
+.related-pets-table .n-scrollbar-content {
+  box-sizing: border-box;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.related-pets-table .n-data-table-table {
+  width: 100% !important;
+  table-layout: fixed !important;
 }
 
 @media (max-width: 768px) {

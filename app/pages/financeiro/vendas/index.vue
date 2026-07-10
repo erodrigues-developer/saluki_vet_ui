@@ -7,12 +7,12 @@
         <p class="subhead">Gerencie vendas, recebimentos, clientes e lançamentos financeiros.</p>
       </div>
       <n-button v-if="!isMobile" type="primary" size="large" class="head-cta" @click="openCreateModal">
-        Nova venda
+        Nova venda avulsa
       </n-button>
     </div>
 
     <n-button v-if="isMobile" type="primary" block class="mobile-primary-cta" @click="openCreateModal">
-      Nova venda
+      Nova venda avulsa
     </n-button>
 
     <div v-if="!isMobile" class="summary-grid">

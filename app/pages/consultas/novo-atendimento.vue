@@ -363,6 +363,116 @@
               <span><strong>{{ examRequestActionLabel }}</strong> — {{ examRequestActionHint }}</span>
             </button>
           </div>
+
+          <div class="artifact-sections">
+            <section class="artifact-section">
+              <div class="artifact-section-head">
+                <div>
+                  <h4>Arquivos do prontuário</h4>
+                  <p>Anexe documentos, imagens e arquivos enviados pelo tutor.</p>
+                </div>
+                <div class="artifact-section-actions">
+                  <input
+                    ref="consultationFileInputRef"
+                    type="file"
+                    class="hidden-file-input"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.doc,.docx,.xls,.xlsx"
+                    @change="handleConsultationFileSelected"
+                  />
+                  <n-button
+                    type="primary"
+                    secondary
+                    :loading="uploadingConsultationAttachment"
+                    :disabled="!model.id"
+                    @click="openConsultationFilePicker"
+                  >
+                    Enviar arquivo
+                  </n-button>
+                </div>
+              </div>
+              <p v-if="!model.id" class="field-help">Salve a consulta para liberar uploads no prontuário.</p>
+              <n-spin :show="consultationAttachmentsLoading">
+                <div v-if="!consultationAttachments.length && !consultationAttachmentsLoading" class="artifact-empty">
+                  Nenhum arquivo anexado ao prontuário.
+                </div>
+                <div v-else class="artifact-list">
+                  <article v-for="item in consultationAttachments" :key="item.id" class="artifact-item">
+                    <div class="artifact-item-copy">
+                      <strong>{{ item.originalName }}</strong>
+                      <span>{{ formatDate(item.createdAt) }} · {{ formatFileSize(item.fileSize) }}</span>
+                      <small v-if="item.notes">{{ item.notes }}</small>
+                    </div>
+                    <div class="artifact-item-actions">
+                      <n-button tertiary size="small" @click="openExternalFile(item.fileUrl)">Abrir</n-button>
+                      <n-button
+                        tertiary
+                        size="small"
+                        type="error"
+                        :loading="deletingConsultationAttachmentId === item.id"
+                        @click="removeConsultationAttachment(item.id)"
+                      >
+                        Remover
+                      </n-button>
+                    </div>
+                  </article>
+                </div>
+              </n-spin>
+            </section>
+
+            <section class="artifact-section">
+              <div class="artifact-section-head">
+                <div>
+                  <h4>Resultados de exames</h4>
+                  <p>Envie laudos e arquivos dos pedidos vinculados a esta consulta.</p>
+                </div>
+                <input
+                  ref="examResultFileInputRef"
+                  type="file"
+                  class="hidden-file-input"
+                  accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.doc,.docx,.xls,.xlsx"
+                  @change="handleExamResultFileSelected"
+                />
+              </div>
+              <n-spin :show="examResultsLoading">
+                <div v-if="!consultationExamRequests.length && !examResultsLoading" class="artifact-empty">
+                  Nenhum pedido de exame gerado para esta consulta.
+                </div>
+                <div v-else class="exam-request-list">
+                  <article v-for="request in consultationExamRequests" :key="request.id" class="exam-request-item">
+                    <div class="artifact-item-copy">
+                      <strong>{{ request.examType?.name || `Pedido #${request.id}` }}</strong>
+                      <span>{{ request.examType?.examCategory?.name || 'Sem categoria' }} · {{ formatDate(request.requestedAt) }}</span>
+                      <small>{{ request.notes || 'Sem observações.' }}</small>
+                    </div>
+                    <div class="artifact-item-actions">
+                      <n-tag :bordered="false" round>{{ normalizeExamRequestStatus(request.status) }}</n-tag>
+                      <n-button
+                        tertiary
+                        size="small"
+                        :loading="uploadingExamResult && pendingExamRequestIdForUpload === request.id"
+                        @click="openExamResultFilePicker(request.id)"
+                      >
+                        Enviar resultado
+                      </n-button>
+                    </div>
+                  </article>
+                </div>
+
+                <div v-if="examResults.length" class="artifact-list">
+                  <article v-for="item in examResults" :key="item.id" class="artifact-item">
+                    <div class="artifact-item-copy">
+                      <strong>{{ item.examRequest?.examType?.name || 'Resultado de exame' }}</strong>
+                      <span>{{ formatDate(item.completedAt) }} · {{ item.veterinarian?.name || 'Sem responsável' }}</span>
+                      <small>{{ item.originalName || item.notes || 'Resultado textual registrado.' }}</small>
+                    </div>
+                    <div class="artifact-item-actions">
+                      <n-button v-if="item.fileUrl" tertiary size="small" @click="openExternalFile(item.fileUrl)">Abrir</n-button>
+                    </div>
+                  </article>
+                </div>
+              </n-spin>
+            </section>
+          </div>
         </n-card>
 
         <n-card v-show="currentStep === 4" :bordered="false" class="step-card">
@@ -408,6 +518,12 @@
               <p v-if="clinical.referInpatient"><strong>Box/Leito:</strong> {{ inpatientBoxLabel || 'Não definido' }}</p>
               <p v-if="clinical.referInpatient"><strong>Motivo clínico:</strong> {{ inpatientReferral.reason || 'Não definido' }}</p>
               <p v-if="clinical.referInpatient"><strong>Observações:</strong> {{ inpatientReferral.notes || 'Não definido' }}</p>
+            </section>
+            <section class="review-block">
+              <div class="review-block-head"><h4>Anexos e exames</h4><button type="button" class="edit-link" @click="setCurrentStep(3)">Editar</button></div>
+              <p><strong>Arquivos do prontuário:</strong> {{ consultationAttachments.length }}</p>
+              <p><strong>Pedidos de exame:</strong> {{ consultationExamRequests.length }}</p>
+              <p><strong>Resultados anexados:</strong> {{ examResults.length }}</p>
             </section>
           </div>
           <div class="inline-actions">
@@ -492,6 +608,39 @@ interface ActiveExamType {
   examCategory?: { id: number; name: string } | null
 }
 
+interface ConsultationAttachmentRow {
+  id: number
+  attachmentType: string
+  originalName: string
+  fileUrl: string
+  notes?: string | null
+  mimeType: string
+  fileSize: number
+  createdAt: string
+}
+
+interface ExamRequestRow {
+  id: number
+  status: string
+  requestedAt: string
+  notes?: string | null
+  examType?: {
+    name?: string | null
+    examCategory?: { name?: string | null } | null
+  } | null
+}
+
+interface ExamResultRow {
+  id: number
+  fileUrl?: string | null
+  originalName?: string | null
+  notes?: string | null
+  resultData?: string | null
+  completedAt: string
+  examRequest?: ExamRequestRow | null
+  veterinarian?: { name?: string | null } | null
+}
+
 const message = useMessage()
 const route = useRoute()
 const saving = ref(false)
@@ -517,6 +666,17 @@ const examRequestNotes = ref('')
 const examRequestFilter = ref('')
 const hasExistingExamRequest = ref(false)
 const activeExamTypes = ref<ActiveExamType[]>([])
+const consultationAttachments = ref<ConsultationAttachmentRow[]>([])
+const consultationAttachmentsLoading = ref(false)
+const uploadingConsultationAttachment = ref(false)
+const deletingConsultationAttachmentId = ref<number | null>(null)
+const consultationFileInputRef = ref<HTMLInputElement | null>(null)
+const consultationExamRequests = ref<ExamRequestRow[]>([])
+const examResults = ref<ExamResultRow[]>([])
+const examResultsLoading = ref(false)
+const uploadingExamResult = ref(false)
+const examResultFileInputRef = ref<HTMLInputElement | null>(null)
+const pendingExamRequestIdForUpload = ref<number | null>(null)
 const availableInpatientBoxOptions = ref<{ label: string; value: number }[]>([])
 const quickExamCreateModalVisible = ref(false)
 const creatingQuickExamType = ref(false)
@@ -2106,6 +2266,7 @@ const fetchExamSupportData = async () => {
 const refreshExamRequestStatus = async () => {
   if (!model.id) {
     hasExistingExamRequest.value = false
+    consultationExamRequests.value = []
     return
   }
   try {
@@ -2113,10 +2274,171 @@ const refreshExamRequestStatus = async () => {
     const response = await api<any>('/api/v1/exam-requests', {
       query: { consultationId: model.id },
     })
-    hasExistingExamRequest.value = Array.isArray(response?.data) && response.data.length > 0
+    consultationExamRequests.value = Array.isArray(response?.data) ? response.data : []
+    hasExistingExamRequest.value = consultationExamRequests.value.length > 0
   } catch (_error) {
     hasExistingExamRequest.value = false
+    consultationExamRequests.value = []
   }
+}
+
+const loadConsultationAttachments = async () => {
+  if (!model.id) {
+    consultationAttachments.value = []
+    return
+  }
+  consultationAttachmentsLoading.value = true
+  try {
+    const api = useApi()
+    const response = await api<{ data: ConsultationAttachmentRow[] }>(`/api/v1/consultations/${model.id}/attachments`)
+    consultationAttachments.value = response.data || []
+  } catch (_error) {
+    message.error('Não foi possível carregar os anexos do prontuário.')
+  } finally {
+    consultationAttachmentsLoading.value = false
+  }
+}
+
+const loadExamResults = async () => {
+  if (!model.id) {
+    examResults.value = []
+    return
+  }
+  examResultsLoading.value = true
+  try {
+    const api = useApi()
+    const response = await api<{ data: ExamResultRow[] }>('/api/v1/exam-results', {
+      query: { consultationId: model.id },
+    })
+    examResults.value = response.data || []
+  } catch (_error) {
+    message.error('Não foi possível carregar os resultados de exames.')
+  } finally {
+    examResultsLoading.value = false
+  }
+}
+
+const openConsultationFilePicker = () => {
+  if (!model.id) {
+    message.warning('Salve a consulta antes de enviar arquivos.')
+    return
+  }
+  consultationFileInputRef.value?.click()
+}
+
+const handleConsultationFileSelected = async (event: Event) => {
+  const input = event.target as HTMLInputElement | null
+  const file = input?.files?.[0]
+  if (!file || !model.id) {
+    if (input) input.value = ''
+    return
+  }
+
+  const api = useApi()
+  const formData = new FormData()
+  formData.append('attachmentType', 'DOCUMENT')
+  formData.append('file', file)
+
+  uploadingConsultationAttachment.value = true
+  try {
+    await api(`/api/v1/consultations/${model.id}/attachments`, {
+      method: 'POST',
+      body: formData,
+    })
+    message.success('Arquivo anexado ao prontuário.')
+    await loadConsultationAttachments()
+  } catch (error: any) {
+    message.error(error?.data?.message || 'Erro ao anexar arquivo ao prontuário.')
+  } finally {
+    uploadingConsultationAttachment.value = false
+    if (input) input.value = ''
+  }
+}
+
+const removeConsultationAttachment = async (attachmentId: number) => {
+  deletingConsultationAttachmentId.value = attachmentId
+  const api = useApi()
+  try {
+    await api(`/api/v1/consultations/attachments/${attachmentId}`, {
+      method: 'DELETE',
+    })
+    message.success('Anexo removido.')
+    await loadConsultationAttachments()
+  } catch (error: any) {
+    message.error(error?.data?.message || 'Erro ao remover anexo.')
+  } finally {
+    deletingConsultationAttachmentId.value = null
+  }
+}
+
+const openExamResultFilePicker = (examRequestId: number) => {
+  if (!model.id) {
+    message.warning('Salve a consulta antes de enviar resultados.')
+    return
+  }
+  pendingExamRequestIdForUpload.value = examRequestId
+  examResultFileInputRef.value?.click()
+}
+
+const handleExamResultFileSelected = async (event: Event) => {
+  const input = event.target as HTMLInputElement | null
+  const file = input?.files?.[0]
+  const examRequestId = pendingExamRequestIdForUpload.value
+  if (!file || !examRequestId) {
+    if (input) input.value = ''
+    pendingExamRequestIdForUpload.value = null
+    return
+  }
+
+  const api = useApi()
+  const formData = new FormData()
+  formData.append('examRequestId', String(examRequestId))
+  formData.append('completedAt', new Date().toISOString())
+  formData.append('file', file)
+
+  uploadingExamResult.value = true
+  try {
+    await api('/api/v1/exam-results', {
+      method: 'POST',
+      body: formData,
+    })
+    message.success('Resultado de exame anexado.')
+    await Promise.all([refreshExamRequestStatus(), loadExamResults()])
+  } catch (error: any) {
+    message.error(error?.data?.message || 'Erro ao anexar resultado de exame.')
+  } finally {
+    uploadingExamResult.value = false
+    pendingExamRequestIdForUpload.value = null
+    if (input) input.value = ''
+  }
+}
+
+const openExternalFile = (url?: string | null) => {
+  if (!process.client || !url) return
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+const formatDate = (value?: string | number | Date | null) => {
+  if (!value) return '—'
+
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+
+  return format(date, 'dd/MM/yyyy HH:mm')
+}
+
+const formatFileSize = (size?: number | null) => {
+  const numericSize = Number(size || 0)
+  if (numericSize < 1024) return `${numericSize} B`
+  if (numericSize < 1024 * 1024) return `${(numericSize / 1024).toFixed(1)} KB`
+  return `${(numericSize / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const normalizeExamRequestStatus = (status?: string | null) => {
+  const normalized = String(status || '').trim().toUpperCase()
+  if (normalized === 'COMPLETED') return 'Concluído'
+  if (normalized === 'PENDING') return 'Pendente'
+  return normalized || 'Pendente'
 }
 
 const openPrescriptionPrint = () => {
@@ -2272,6 +2594,7 @@ const confirmGenerateExamRequest = async () => {
     clinical.exams = selectedNames.join('; ')
     hasExistingExamRequest.value = true
     examRequestModalVisible.value = false
+    await refreshExamRequestStatus()
     if (process.client) {
       window.open(examRequestPath, '_blank', 'noopener,noreferrer')
       return
@@ -2311,6 +2634,8 @@ watch(
   () => {
     void refreshPrescriptionStatus()
     void refreshExamRequestStatus()
+    void loadConsultationAttachments()
+    void loadExamResults()
   },
   { immediate: true },
 )
@@ -2323,6 +2648,8 @@ onMounted(async () => {
   await loadConsultationFromRoute()
   await refreshPrescriptionStatus()
   await refreshExamRequestStatus()
+  await loadConsultationAttachments()
+  await loadExamResults()
   await fetchExamSupportData()
   if (!model.id) applySchedulingContextFromRoute()
 })
@@ -2670,6 +2997,102 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 }
 .quick-action-icon { font-size: 16px; line-height: 1; }
 
+.hidden-file-input {
+  display: none;
+}
+
+.artifact-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.artifact-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+}
+
+.artifact-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.artifact-section-head h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.artifact-section-head p {
+  margin: 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.artifact-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.artifact-empty {
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 18px 12px;
+  text-align: center;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.artifact-list,
+.exam-request-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.artifact-item,
+.exam-request-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+}
+
+.artifact-item-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.artifact-item-copy strong {
+  color: #0f172a;
+}
+
+.artifact-item-copy span,
+.artifact-item-copy small {
+  color: #64748b;
+}
+
+.artifact-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .step-nav { margin-top: 10px; display: flex; justify-content: space-between; gap: 8px; }
 .mobile-progress { margin-bottom: 10px; }
 .mobile-progress p { margin: 0 0 6px; font-size: 12px; color: #64748b; }
@@ -2692,6 +3115,16 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
   .grid, .suggestion-grid { grid-template-columns: 1fr; }
   .review-grid { grid-template-columns: 1fr; }
   .recording-hero { flex-direction: column; align-items: flex-start; }
+  .artifact-section-head,
+  .artifact-item,
+  .exam-request-item {
+    flex-direction: column;
+  }
+
+  .artifact-item-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 768px) {

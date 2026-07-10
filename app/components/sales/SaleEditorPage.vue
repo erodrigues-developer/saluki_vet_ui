@@ -5,7 +5,7 @@
         <n-button text class="back-link" @click="goBack">← Voltar para vendas</n-button>
         <p class="eyebrow">FINANCEIRO</p>
         <div class="title-row">
-          <h1>{{ isEdit ? `Venda #${model.id}` : 'Nova venda' }}</h1>
+          <h1>{{ isEdit ? `Venda #${model.id}` : 'Nova venda avulsa' }}</h1>
           <n-tag
             v-if="isEdit"
             :bordered="false"
@@ -17,7 +17,7 @@
         <p class="subhead">
           {{ isEdit
             ? `Criada em ${createdAtLabel} por ${createdByLabel}.`
-            : 'Registre produtos, serviços, descontos e recebimentos da clínica.' }}
+            : 'Registre produtos, serviços, descontos e recebimentos da venda avulsa.' }}
         </p>
       </div>
     </div>

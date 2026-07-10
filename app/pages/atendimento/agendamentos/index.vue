@@ -564,6 +564,7 @@ const showDetailDrawer = ref(false)
 const showMobileFilters = ref(false)
 const showMobileListFilters = ref(false)
 const selectedAppointment = ref<any | null>(null)
+const route = useRoute()
 const agendaGridWrapRef = ref<HTMLElement | null>(null)
 const mobileTimelineWrapRef = ref<HTMLElement | null>(null)
 const clinicBusinessHoursJson = ref<string | null>(null)
@@ -1527,6 +1528,24 @@ const syncSelectedAppointment = async (appointmentId?: number | null) => {
   }
 }
 
+const readAppointmentIdFromRoute = () => {
+  const raw = Array.isArray(route.query.appointmentId)
+    ? route.query.appointmentId[0]
+    : route.query.appointmentId
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+const openAppointmentFromRoute = async () => {
+  const appointmentId = readAppointmentIdFromRoute()
+  if (!appointmentId) return
+
+  await syncSelectedAppointment(appointmentId)
+  if (selectedAppointment.value) {
+    showDetailDrawer.value = true
+  }
+}
+
 const clearFilters = () => {
   filters.search = ''
   filters.period = null
@@ -1878,8 +1897,16 @@ onMounted(async () => {
   nowTickTimer = setInterval(() => { nowTs.value = Date.now() }, 30 * 1000)
   await Promise.all([loadLookups(), loadClinicSettings()])
   await Promise.all([fetchAppointments(), fetchAgendaAppointments()])
+  await openAppointmentFromRoute()
   await scrollAgendaToCurrentTime()
 })
+
+watch(
+  () => route.query.appointmentId,
+  async () => {
+    await openAppointmentFromRoute()
+  }
+)
 
 onBeforeUnmount(() => {
   if (nowTickTimer) clearInterval(nowTickTimer)

@@ -189,18 +189,100 @@
           </p>
         </div>
       </template>
+      <n-tabs
+        v-if="editingPet?.id"
+        v-model:value="activePetTab"
+        type="line"
+        animated
+        class="detail-tabs"
+        @update:value="handlePetTabChange"
+      >
+        <n-tab-pane name="details" tab="Cadastro">
+          <PetForm
+            ref="petFormRef"
+            :value="editingPet"
+            :loading="saving"
+            @submit="handleSubmit"
+          />
+        </n-tab-pane>
+        <n-tab-pane name="history" tab="Histórico">
+          <div class="history-panel">
+            <div class="history-summary-grid">
+              <n-card size="small" :bordered="false" class="history-summary-card">
+                <p class="summary-label">Atendimentos</p>
+                <strong class="summary-value">{{ petHistorySummary.appointments }}</strong>
+              </n-card>
+              <n-card size="small" :bordered="false" class="history-summary-card">
+                <p class="summary-label">Consultas</p>
+                <strong class="summary-value">{{ petHistorySummary.consultations }}</strong>
+              </n-card>
+              <n-card size="small" :bordered="false" class="history-summary-card">
+                <p class="summary-label">Serviços</p>
+                <strong class="summary-value">{{ petHistorySummary.services }}</strong>
+              </n-card>
+              <n-card size="small" :bordered="false" class="history-summary-card">
+                <p class="summary-label">Compras</p>
+                <strong class="summary-value">{{ petHistorySummary.purchases }}</strong>
+              </n-card>
+            </div>
+
+            <n-spin :show="petHistoryLoading">
+              <div v-if="!petHistoryData.length && !petHistoryLoading" class="history-empty">
+                Nenhum histórico encontrado para este pet.
+              </div>
+              <div v-else-if="isMobile" class="history-card-list">
+                <div
+                  v-for="item in petHistoryData"
+                  :key="item.id"
+                  :class="['history-card', { 'history-card-clickable': resolvePetHistoryTarget(item) }]"
+                  @click="handlePetHistoryRecordClick(item)"
+                >
+                  <div class="history-card-head">
+                    <p class="history-card-title">{{ historyTypeLabel(item.type) }}</p>
+                    <n-tag :bordered="false" :class="['history-chip', historyTypeClass(item.type)]">
+                      {{ historyTypeLabel(item.type) }}
+                    </n-tag>
+                  </div>
+                  <p class="history-card-line" :title="item.title">{{ truncateHistoryText(item.title) }}</p>
+                  <p class="history-card-line" :title="item.description || 'Sem descrição adicional.'">
+                    {{ truncateHistoryText(item.description || 'Sem descrição adicional.') }}
+                  </p>
+                  <p class="history-card-line">Data: {{ formatDate(item.occurredAt) }}</p>
+                  <p v-if="item.amount !== null && item.amount !== undefined" class="history-card-line">
+                    Valor: {{ formatCurrency(item.amount) }}
+                  </p>
+                  <p v-if="item.scope === 'CLIENT'" class="history-card-scope">Compra vinculada ao tutor do paciente.</p>
+                </div>
+              </div>
+              <n-data-table
+                v-else
+                class="history-table"
+                :columns="petHistoryColumns"
+                :data="petHistoryData"
+                :row-props="petHistoryRowProps"
+                :bordered="false"
+              />
+            </n-spin>
+          </div>
+        </n-tab-pane>
+      </n-tabs>
       <PetForm
+        v-else
         ref="petFormRef"
         :value="editingPet"
         :loading="saving"
         @submit="handleSubmit"
       />
       <template #footer>
-        <div class="modal-actions">
+        <div v-if="activePetTab === 'details' || !editingPet?.id" class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
           <n-button type="primary" :loading="saving" @click="submitPetForm">
             {{ editingPet ? 'Salvar alterações' : 'Criar pet' }}
           </n-button>
+        </div>
+        <div v-else class="modal-actions">
+          <n-button tertiary @click="closeModal">Fechar</n-button>
+          <n-button type="primary" secondary @click="activePetTab = 'details'">Editar cadastro</n-button>
         </div>
       </template>
     </n-modal>
@@ -229,6 +311,30 @@ interface SpeciesResponse {
   data: { id: number; name: string }[]
 }
 
+interface PetHistoryItem {
+  id: string
+  entityId?: number | null
+  relatedEntityId?: number | null
+  type: 'APPOINTMENT' | 'CONSULTATION' | 'SERVICE' | 'PURCHASE' | string
+  title: string
+  description?: string | null
+  occurredAt: string
+  status?: string | null
+  amount?: number | null
+  scope?: 'PET' | 'CLIENT' | string
+}
+
+interface PetHistoryResponse {
+  summary: {
+    appointments: number
+    consultations: number
+    services: number
+    purchases: number
+    total: number
+  }
+  data: PetHistoryItem[]
+}
+
 const message = useMessage()
 const dialog = useDialog()
 
@@ -246,6 +352,16 @@ const showModal = ref(false)
 const showMobileFilters = ref(false)
 const editingPet = ref<Pet | null>(null)
 const petFormRef = ref<{ submit: () => Promise<void> } | null>(null)
+const activePetTab = ref<'details' | 'history'>('details')
+const petHistoryLoading = ref(false)
+const petHistoryData = ref<PetHistoryItem[]>([])
+const petHistorySummary = reactive({
+  appointments: 0,
+  consultations: 0,
+  services: 0,
+  purchases: 0,
+  total: 0
+})
 const activeRequestId = ref(0)
 const isMobile = ref(false)
 let mediaQuery: MediaQueryList | null = null
@@ -277,6 +393,52 @@ const actionOptions = [
   { label: 'Histórico clínico', key: 'history' },
   { type: 'divider', key: 'divider' },
   { label: 'Excluir', key: 'delete' }
+]
+
+const truncateHistoryText = (value?: string | null) => (value || '').slice(0, 40)
+
+const petHistoryColumns = [
+  {
+    title: 'Tipo',
+    key: 'type',
+    render: (row: PetHistoryItem) =>
+      h(
+        NTag,
+        {
+          bordered: false,
+          class: ['history-chip', historyTypeClass(row.type)]
+        },
+        { default: () => historyTypeLabel(row.type) }
+      )
+  },
+  {
+    title: 'Evento',
+    key: 'title',
+    width: 240,
+    render: (row: PetHistoryItem) =>
+      h('div', { class: 'history-table-cell' }, [
+        h('strong', { class: 'history-table-title', title: row.title }, truncateHistoryText(row.title)),
+        h(
+          'p',
+          {
+            class: 'history-table-description',
+            title: row.description || 'Sem descrição adicional.'
+          },
+          truncateHistoryText(row.description || 'Sem descrição adicional.')
+        )
+      ])
+  },
+  {
+    title: 'Data',
+    key: 'occurredAt',
+    render: (row: PetHistoryItem) => formatDate(row.occurredAt)
+  },
+  {
+    title: 'Valor',
+    key: 'amount',
+    render: (row: PetHistoryItem) =>
+      row.amount === null || row.amount === undefined ? '—' : formatCurrency(row.amount)
+  }
 ]
 
 const summary = computed(() => {
@@ -316,8 +478,7 @@ const handleActionSelect = (key: string, pet: Pet) => {
   }
 
   if (key === 'history') {
-    message.info('Abra a ficha do pet para visualizar o histórico clínico.')
-    openEdit(pet)
+    openEdit(pet, 'history')
     return
   }
 
@@ -488,6 +649,43 @@ const submitPetForm = async () => {
   await petFormRef.value?.submit()
 }
 
+const resetPetHistory = () => {
+  petHistoryData.value = []
+  petHistorySummary.appointments = 0
+  petHistorySummary.consultations = 0
+  petHistorySummary.services = 0
+  petHistorySummary.purchases = 0
+  petHistorySummary.total = 0
+}
+
+const loadPetHistory = async (petId?: number) => {
+  if (!petId) return
+  petHistoryLoading.value = true
+  const api = useApi()
+  try {
+    const response = await api<PetHistoryResponse>(`/api/v1/pets/${petId}/history`)
+    petHistoryData.value = response.data || []
+    Object.assign(petHistorySummary, response.summary || {
+      appointments: 0,
+      consultations: 0,
+      services: 0,
+      purchases: 0,
+      total: 0
+    })
+  } catch (err: any) {
+    message.error(err?.data?.message || 'Erro ao carregar histórico do pet')
+  } finally {
+    petHistoryLoading.value = false
+  }
+}
+
+const handlePetTabChange = (tab: 'details' | 'history') => {
+  activePetTab.value = tab
+  if (tab === 'history') {
+    void loadPetHistory(editingPet.value?.id)
+  }
+}
+
 const confirmDelete = (pet: Pet) => {
   dialog.warning({
     title: 'Confirmar exclusão',
@@ -511,16 +709,82 @@ const confirmDelete = (pet: Pet) => {
 
 const openCreate = () => {
   editingPet.value = null
+  activePetTab.value = 'details'
+  resetPetHistory()
   showModal.value = true
 }
 
-const openEdit = (pet: Pet) => {
+const openEdit = (pet: Pet, tab: 'details' | 'history' = 'details') => {
   editingPet.value = pet
+  activePetTab.value = tab
   showModal.value = true
+  if (tab === 'history') {
+    void loadPetHistory(pet.id)
+  }
 }
 
 const closeModal = () => {
   showModal.value = false
+  activePetTab.value = 'details'
+  resetPetHistory()
+}
+
+const resolvePetHistoryTarget = (item: PetHistoryItem) => {
+  const entityId = Number(item.entityId || 0)
+  const relatedEntityId = Number(item.relatedEntityId || 0)
+
+  if (item.type === 'PURCHASE' && entityId > 0) {
+    return `/financeiro/vendas/${entityId}`
+  }
+
+  if (item.type === 'CONSULTATION' && entityId > 0) {
+    return {
+      path: '/consultas/novo-atendimento',
+      query: { id: String(entityId) }
+    }
+  }
+
+  if (item.type === 'SERVICE' && relatedEntityId > 0) {
+    return {
+      path: '/consultas/novo-atendimento',
+      query: { id: String(relatedEntityId) }
+    }
+  }
+
+  if (item.type === 'APPOINTMENT' && entityId > 0) {
+    return {
+      path: '/atendimento/agendamentos',
+      query: { appointmentId: String(entityId) }
+    }
+  }
+
+  return null
+}
+
+const openPetHistoryRecord = async (item: PetHistoryItem) => {
+  const target = resolvePetHistoryTarget(item)
+  if (!target) {
+    message.info('Registro sem destino disponível no momento.')
+    return
+  }
+
+  closeModal()
+  await navigateTo(target)
+}
+
+const handlePetHistoryRecordClick = (item: PetHistoryItem) => {
+  if (!resolvePetHistoryTarget(item)) return
+  void openPetHistoryRecord(item)
+}
+
+const petHistoryRowProps = (row: PetHistoryItem) => {
+  if (!resolvePetHistoryTarget(row)) return { style: 'cursor: pointer;' }
+
+  return {
+    class: 'history-row-clickable',
+    style: 'cursor: pointer;',
+    onClick: () => openPetHistoryRecord(row)
+  }
 }
 
 const handleClearFilters = () => {
@@ -654,6 +918,25 @@ const formatDate = (iso: string) => {
 const displayValue = (value?: string | null) => {
   const text = (value ?? '').trim()
   return text ? text : '—'
+}
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0))
+
+const historyTypeLabel = (type: string) => {
+  if (type === 'APPOINTMENT') return 'Atendimento'
+  if (type === 'CONSULTATION') return 'Consulta'
+  if (type === 'SERVICE') return 'Serviço'
+  if (type === 'PURCHASE') return 'Compra'
+  return type
+}
+
+const historyTypeClass = (type: string) => {
+  if (type === 'APPOINTMENT') return 'history-chip-info'
+  if (type === 'CONSULTATION') return 'history-chip-success'
+  if (type === 'SERVICE') return 'history-chip-warning'
+  if (type === 'PURCHASE') return 'history-chip-neutral'
+  return 'history-chip-neutral'
 }
 
 const displaySpeciesLabel = (value?: string | null) => {
@@ -1248,7 +1531,142 @@ h1 {
   justify-content: flex-end;
 }
 
+.pet-modal .detail-tabs :deep(.n-tabs-nav) {
+  margin-bottom: 14px;
+}
+
+.history-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.history-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.history-summary-card {
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.history-empty {
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  padding: 24px 16px;
+  text-align: center;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.history-card-list {
+  display: grid;
+  gap: 10px;
+}
+
+.history-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px;
+  background: #fff;
+}
+
+.history-card-clickable {
+  cursor: pointer;
+}
+
+.history-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.history-card-title,
+.history-card-line,
+.history-card-scope {
+  margin: 0;
+}
+
+.history-card-title {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.history-card-line {
+  color: #475569;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.history-card-scope {
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.history-chip-info {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.history-chip-success {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.history-chip-warning {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.history-chip-neutral {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.history-table-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.history-table-title,
+.history-table-description {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-table-title {
+  color: #0f172a;
+}
+
+.history-table-description {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+:deep(.history-row-clickable),
+:deep(.history-row-clickable td),
+.history-table :deep(.n-data-table-tr),
+.history-table :deep(.n-data-table-td) {
+  cursor: pointer;
+}
+
 @media (max-width: 768px) {
+  .history-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .pet-modal.n-card {
     width: 100% !important;
     max-width: calc(100vw - 24px) !important;
