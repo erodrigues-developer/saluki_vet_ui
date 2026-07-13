@@ -16,6 +16,7 @@
         <n-select v-model:value="filters.productId" :options="productOptions" placeholder="Produto" clearable filterable />
         <n-select v-model:value="filters.stockLocationId" :options="locationOptions" placeholder="Local" clearable />
         <n-select v-model:value="filters.movementType" :options="movementTypeOptions" placeholder="Tipo" clearable />
+        <n-select v-model:value="filters.expirationStatus" :options="expirationStatusOptions" placeholder="Validade" clearable />
         <div class="filter-actions">
           <n-button text class="btn-clear" @click="clearFilters">Limpar filtros</n-button>
           <n-button secondary strong class="btn-filter" @click="fetchHistory">Filtrar</n-button>
@@ -44,6 +45,8 @@
         <div class="card-meta">
           <p class="card-line"><span class="card-line-label">Data:</span> <span class="card-line-value">{{ formatDateTime(row.occurredAt) }}</span></p>
           <p class="card-line"><span class="card-line-label">Quantidade:</span> <span class="card-line-value">{{ formatQuantity(row.quantity) }}</span></p>
+          <p class="card-line"><span class="card-line-label">Lote:</span> <span class="card-line-value">{{ row.stockBatch?.lotCode || '—' }}</span></p>
+          <p class="card-line"><span class="card-line-label">Validade:</span> <span class="card-line-value">{{ formatDate(row.stockBatch?.expirationDate) }}</span></p>
           <p class="card-line"><span class="card-line-label">Custo:</span> <span class="card-line-value">{{ formatCurrency(row.unitCost) }}</span></p>
           <p class="card-line"><span class="card-line-label">Origem:</span> <span class="card-line-value">{{ referenceLabel(row) }}</span></p>
           <p class="card-line"><span class="card-line-label">Usuário:</span> <span class="card-line-value">{{ row.createdByUser?.name || 'Sistema' }}</span></p>
@@ -81,6 +84,7 @@
           <n-select v-model:value="filters.productId" :options="productOptions" placeholder="Produto" clearable filterable />
           <n-select v-model:value="filters.stockLocationId" :options="locationOptions" placeholder="Local" clearable />
           <n-select v-model:value="filters.movementType" :options="movementTypeOptions" placeholder="Tipo" clearable />
+          <n-select v-model:value="filters.expirationStatus" :options="expirationStatusOptions" placeholder="Validade" clearable />
           <div class="mobile-filter-actions">
             <n-button text class="btn-clear" @click="clearFilters">Limpar filtros</n-button>
             <n-button type="primary" @click="applyMobileFilters">Filtrar</n-button>
@@ -105,6 +109,7 @@ interface HistoryRow {
   referenceId?: number | null
   notes?: string | null
   reason?: string | null
+  stockBatch?: { lotCode?: string | null; expirationDate?: string | null } | null
   product?: { name?: string | null; productCategory?: { name?: string | null } | null } | null
   stockLocation?: { name?: string | null } | null
   createdByUser?: { name?: string | null } | null
@@ -131,7 +136,8 @@ let mediaQuery: MediaQueryList | null = null
 const filters = reactive({
   productId: null as number | null,
   stockLocationId: null as number | null,
-  movementType: null as string | null
+  movementType: null as string | null,
+  expirationStatus: null as string | null
 })
 
 const pagination = reactive({
@@ -147,6 +153,14 @@ const movementTypeOptions = [
   { label: 'Saída', value: 'OUT' },
   { label: 'Ajuste positivo', value: 'ADJUSTMENT_IN' },
   { label: 'Ajuste negativo', value: 'ADJUSTMENT_OUT' }
+]
+
+const expirationStatusOptions = [
+  { label: 'Sem filtro de validade', value: 'ALL' },
+  { label: 'Válido', value: 'VALID' },
+  { label: 'Próx. vencimento', value: 'EXPIRING' },
+  { label: 'Vencido', value: 'EXPIRED' },
+  { label: 'Sem controle', value: 'UNTRACKED' }
 ]
 
 const historyLabel = computed(() => {
@@ -168,7 +182,8 @@ const fetchHistory = async () => {
         limit: pagination.pageSize,
         productId: filters.productId || undefined,
         stockLocationId: filters.stockLocationId || undefined,
-        movementType: filters.movementType || undefined
+        movementType: filters.movementType || undefined,
+        expirationStatus: filters.expirationStatus || undefined
       }
     })
     data.value = response.data
@@ -210,6 +225,7 @@ const clearFilters = async () => {
   filters.productId = null
   filters.stockLocationId = null
   filters.movementType = null
+  filters.expirationStatus = null
   pagination.page = 1
   showMobileFilters.value = false
   await fetchHistory()
@@ -235,6 +251,11 @@ const onPageSizeChange = (pageSize: number) => {
 const formatDateTime = (value?: string | null) => {
   if (!value) return '—'
   return new Date(value).toLocaleString('pt-BR')
+}
+
+const formatDate = (value?: string | null) => {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('pt-BR')
 }
 
 const formatQuantity = (value?: number | null) =>
@@ -285,6 +306,8 @@ const columns = [
     })
   },
   { title: 'Quantidade', key: 'quantity', render: (row: HistoryRow) => formatQuantity(row.quantity) },
+  { title: 'Lote', key: 'stockBatch', render: (row: HistoryRow) => row.stockBatch?.lotCode || '—' },
+  { title: 'Validade', key: 'expirationDate', render: (row: HistoryRow) => formatDate(row.stockBatch?.expirationDate) },
   { title: 'Custo unitário', key: 'unitCost', render: (row: HistoryRow) => formatCurrency(row.unitCost) },
   { title: 'Origem / referência', key: 'referenceType', render: (row: HistoryRow) => referenceLabel(row) },
   { title: 'Usuário', key: 'createdByUser', render: (row: HistoryRow) => row.createdByUser?.name || 'Sistema' },
@@ -315,7 +338,7 @@ onBeforeUnmount(() => {
 .subhead { margin: 0; color: #6b7280; font-size: 14px; }
 .filters-card { border: 1px solid #e5e7eb; border-radius: 14px; background: #fff; }
 .filters-card :deep(.n-card__content) { padding: 14px 16px !important; }
-.filters-grid-history { display: grid; grid-template-columns: 1.4fr 1fr 1fr auto; gap: 10px; align-items: stretch; }
+.filters-grid-history { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr auto; gap: 10px; align-items: stretch; }
 .filters-grid-history :deep(.n-input),
 .filters-grid-history :deep(.n-base-selection) { min-height: 40px; }
 .filters-grid-history :deep(.n-input .n-input-wrapper),

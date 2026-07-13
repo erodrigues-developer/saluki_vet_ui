@@ -35,6 +35,29 @@
             />
           </n-form-item>
 
+          <n-form-item v-if="showBatchField" label="Lote" path="stockBatchId" required>
+            <n-select
+              v-model:value="model.stockBatchId"
+              :options="batchOptions"
+              placeholder="Selecione o lote"
+              filterable
+              clearable
+            />
+          </n-form-item>
+
+          <n-form-item v-if="mode === 'IN'" label="Código do lote" path="lotCode">
+            <n-input v-model:value="model.lotCode" placeholder="Ex.: LOTE-2026-001" />
+          </n-form-item>
+
+          <n-form-item v-if="mode === 'IN'" label="Validade" path="expirationDate">
+            <n-date-picker
+              v-model:value="expirationDateValue"
+              type="date"
+              clearable
+              style="width: 100%"
+            />
+          </n-form-item>
+
           <n-form-item v-if="mode !== 'ADJUST'" label="Quantidade" path="quantity" required>
             <n-input-number
               v-model:value="model.quantity"
@@ -112,6 +135,10 @@
             <span class="snapshot-label">Status</span>
             <strong class="snapshot-value">{{ stockStatusLabel }}</strong>
           </div>
+          <div v-if="tracksExpiration" class="snapshot-card">
+            <span class="snapshot-label">Próxima validade</span>
+            <strong class="snapshot-value">{{ stockSnapshot?.nextExpirationDate ? formatDate(stockSnapshot.nextExpirationDate) : '—' }}</strong>
+          </div>
         </div>
       </section>
     </div>
@@ -141,6 +168,9 @@ interface ReasonOption {
 interface StockSnapshot {
   currentStock: number
   minimumStock: number
+  tracksExpiration?: boolean
+  nextExpirationDate?: string | null
+  nextLotCode?: string | null
 }
 
 const props = defineProps<{
@@ -160,6 +190,7 @@ const message = useMessage()
 const formRef = ref<FormInst | null>(null)
 const productOptions = ref<{ label: string; value: number }[]>([])
 const locationOptions = ref<{ label: string; value: number }[]>([])
+const batchOptions = ref<{ label: string; value: number }[]>([])
 const reasonOptions = ref<ReasonOption[]>([
   { label: 'Uso em atendimento', value: 'Uso em atendimento' },
   { label: 'Perda', value: 'Perda' },
@@ -176,10 +207,16 @@ const model = reactive({
   quantity: 1,
   countedStock: 0,
   unitCost: null as number | null,
+  stockBatchId: null as number | null,
+  lotCode: '',
+  expirationDate: '',
   reason: null as string | null,
   notes: '',
   occurredAt: new Date().toISOString()
 })
+
+const tracksExpiration = computed(() => Boolean(stockSnapshot.value?.tracksExpiration))
+const showBatchField = computed(() => tracksExpiration.value && props.mode !== 'IN')
 
 const sectionTitle = computed(() => {
   if (props.mode === 'IN') return 'Entrada de estoque'
@@ -202,6 +239,31 @@ const rules: FormRules = {
   stockLocationId: {
     required: true,
     validator: (_rule, value) => value ? true : new Error('Selecione o local'),
+    trigger: ['change', 'blur']
+  },
+  stockBatchId: {
+    validator: () => {
+      if (!showBatchField.value) return true
+      return Number(model.stockBatchId || 0) > 0 || new Error('Selecione o lote')
+    },
+    trigger: ['change', 'blur']
+  },
+  lotCode: {
+    validator: () => {
+      if (props.mode !== 'IN') return true
+      const hasAny = String(model.lotCode || '').trim().length > 0 || String(model.expirationDate || '').trim().length > 0
+      if (!hasAny) return true
+      return String(model.lotCode || '').trim().length > 0 || new Error('Informe o código do lote')
+    },
+    trigger: ['change', 'blur']
+  },
+  expirationDate: {
+    validator: () => {
+      if (props.mode !== 'IN') return true
+      const hasAny = String(model.lotCode || '').trim().length > 0 || String(model.expirationDate || '').trim().length > 0
+      if (!hasAny) return true
+      return String(model.expirationDate || '').trim().length > 0 || new Error('Informe a validade')
+    },
     trigger: ['change', 'blur']
   },
   quantity: {
@@ -241,6 +303,20 @@ const occurredAtValue = computed({
   }
 })
 
+const expirationDateValue = computed({
+  get: () => {
+    const date = model.expirationDate ? new Date(model.expirationDate) : null
+    return date && !Number.isNaN(date.getTime()) ? date.getTime() : null
+  },
+  set: (value) => {
+    if (!value) {
+      model.expirationDate = ''
+      return
+    }
+    model.expirationDate = new Date(value).toISOString().slice(0, 10)
+  }
+})
+
 const stockStatusLabel = computed(() => {
   if (!stockSnapshot.value) return '—'
   if (stockSnapshot.value.currentStock <= 0) return 'Zerado'
@@ -263,6 +339,9 @@ watch(
     model.quantity = 1
     model.countedStock = 0
     model.unitCost = null
+    model.stockBatchId = null
+    model.lotCode = ''
+    model.expirationDate = ''
     model.reason = mode === 'ADJUST' ? 'Ajuste negativo' : null
     model.notes = ''
     model.occurredAt = new Date().toISOString()
@@ -290,14 +369,25 @@ watch(
 
       stockSnapshot.value = {
         currentStock: Number(response.currentStock || 0),
-        minimumStock: Number(response.minimumStock || 0)
+        minimumStock: Number(response.minimumStock || 0),
+        tracksExpiration: Boolean(response.tracksExpiration),
+        nextExpirationDate: response.nextExpirationDate || null,
+        nextLotCode: response.nextLotCode || null
       }
 
       if (props.mode === 'ADJUST') {
         model.countedStock = Number(response.currentStock || 0)
       }
+
+      if (response.tracksExpiration) {
+        await fetchBatches(productId, stockLocationId)
+      } else {
+        batchOptions.value = []
+        model.stockBatchId = null
+      }
     } catch (error: any) {
       stockSnapshot.value = null
+      batchOptions.value = []
       message.error(error?.data?.message || 'Erro ao consultar saldo atual.')
     } finally {
       loadingSnapshot.value = false
@@ -305,6 +395,30 @@ watch(
   },
   { immediate: true }
 )
+
+const fetchBatches = async (productId: number, stockLocationId: number) => {
+  const api = useApi()
+  try {
+    const response = await api<any[]>('/api/v1/stock-movements/batches', {
+      query: {
+        productId,
+        stockLocationId
+      }
+    })
+
+    batchOptions.value = (response || []).map((item: any) => ({
+      label: `${item.lotCode} · validade ${formatDate(item.expirationDate)} · saldo ${formatQuantity(item.remainingQuantity)}`,
+      value: Number(item.id)
+    }))
+
+    if (batchOptions.value.length === 1 && !model.stockBatchId && props.mode !== 'IN') {
+      model.stockBatchId = Number(batchOptions.value[0].value)
+    }
+  } catch (error: any) {
+    batchOptions.value = []
+    message.error(error?.data?.message || 'Erro ao carregar lotes.')
+  }
+}
 
 const fetchProducts = async () => {
   const api = useApi()
@@ -360,9 +474,17 @@ const handleSubmit = async () => {
     countedStock: props.mode === 'ADJUST' ? Number(model.countedStock) : undefined,
     unitCost: props.mode === 'IN' ? (model.unitCost != null ? Number(model.unitCost) : null) : undefined,
     reason: props.mode === 'IN' ? null : String(model.reason || '').trim(),
+    stockBatchId: showBatchField.value ? model.stockBatchId : null,
+    lotCode: props.mode === 'IN' ? (String(model.lotCode || '').trim() || null) : null,
+    expirationDate: props.mode === 'IN' ? (model.expirationDate || null) : null,
     notes: model.notes?.trim() || null,
     occurredAt: model.occurredAt
   })
+}
+
+const formatDate = (value?: string | null) => {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('pt-BR')
 }
 
 const formatQuantity = (value?: number | null) =>
@@ -426,7 +548,7 @@ defineExpose({ submit: handleSubmit })
 
 .snapshot-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 

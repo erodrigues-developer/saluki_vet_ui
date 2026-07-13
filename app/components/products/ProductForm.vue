@@ -93,31 +93,21 @@
         </div>
         <template v-if="!model.isService">
           <div class="section-grid">
-            <n-form-item label="Controlar estoque" path="trackStock">
-              <n-switch v-model:value="model.trackStock" />
-            </n-form-item>
-
             <n-form-item label="É vacina?" path="isVaccine">
               <n-switch v-model:value="model.isVaccine" />
             </n-form-item>
 
-            <template v-if="model.trackStock">
-              <n-form-item label="Estoque atual" path="currentStock" required>
-                <n-input-number v-model:value="model.currentStock" :min="0" :step="0.001" :precision="3" placeholder="0,000" style="width: 100%" />
-              </n-form-item>
+            <n-form-item label="Estoque mínimo" path="minimumStock">
+              <n-input-number v-model:value="model.minimumStock" :min="0" :step="0.001" :precision="3" placeholder="0,000" style="width: 100%" />
+            </n-form-item>
 
-              <n-form-item label="Estoque mínimo" path="minimumStock">
-                <n-input-number v-model:value="model.minimumStock" :min="0" :step="0.001" :precision="3" placeholder="0,000" style="width: 100%" />
-              </n-form-item>
+            <n-form-item label="Unidade" path="unit" required>
+              <n-input v-model:value="model.unit" placeholder="Ex: un, ml, kg" />
+            </n-form-item>
 
-              <n-form-item label="Unidade" path="unit" required>
-                <n-input v-model:value="model.unit" placeholder="Ex: un, ml, kg" />
-              </n-form-item>
-
-              <n-form-item label="Fornecedor" path="supplierName">
-                <n-input v-model:value="model.supplierName" placeholder="Opcional" />
-              </n-form-item>
-            </template>
+            <n-form-item label="Fornecedor" path="supplierName">
+              <n-input v-model:value="model.supplierName" placeholder="Opcional" />
+            </n-form-item>
           </div>
         </template>
         <p v-else class="service-stock-note">Serviços não possuem controle de estoque.</p>
@@ -147,7 +137,6 @@ export interface Product {
   isVaccine: boolean
   notes?: string | null
   isActive: boolean
-  currentStock?: number | null
   minimumStock?: number | null
   supplierName?: string | null
   productCategory?: any
@@ -185,7 +174,6 @@ const model = reactive<Product>({
   isVaccine: false,
   notes: '',
   isActive: true,
-  currentStock: 0,
   minimumStock: 0,
   supplierName: ''
 })
@@ -226,26 +214,16 @@ const rules: FormRules = {
     },
     trigger: ['blur', 'change']
   },
-  currentStock: {
-    validator: () => {
-      if (model.isService || !model.trackStock) return true
-      if (model.currentStock === null || model.currentStock === undefined) {
-        return new Error('Estoque atual é obrigatório quando controlar estoque')
-      }
-      return Number(model.currentStock) >= 0 || new Error('Estoque não pode ser negativo')
-    },
-    trigger: ['blur', 'change']
-  },
   minimumStock: {
     validator: () => {
-      if (model.isService || !model.trackStock) return true
+      if (model.isService) return true
       return Number(model.minimumStock ?? 0) >= 0 || new Error('Estoque mínimo não pode ser negativo')
     },
     trigger: ['blur', 'change']
   },
   unit: {
     validator: () => {
-      if (model.isService || !model.trackStock) return true
+      if (model.isService) return true
       return String(model.unit || '').trim().length > 0 || new Error('Unidade é obrigatória quando controlar estoque')
     },
     trigger: ['blur', 'change']
@@ -279,7 +257,6 @@ watch(
       isVaccine: val?.isVaccine ?? false,
       notes: val?.notes ?? '',
       isActive: val?.isActive ?? true,
-      currentStock: val?.currentStock !== undefined && val?.currentStock !== null ? Number(val.currentStock) : 0,
       minimumStock: val?.minimumStock !== undefined && val?.minimumStock !== null ? Number(val.minimumStock) : 0,
       supplierName: val?.supplierName ?? ''
     })
@@ -295,11 +272,11 @@ watch(
       model.barcode = null
       model.imgUrl = null
       model.trackStock = false
-      model.currentStock = null
       model.minimumStock = null
       model.unit = null
     } else {
       model.durationMinutes = null
+      model.trackStock = true
       if (!model.unit) {
         model.unit = 'un'
       }
@@ -335,9 +312,9 @@ const submit = async () => {
     notes: String(model.notes || '').trim() || null,
     supplierName: String(model.supplierName || '').trim() || null,
     durationMinutes: model.isService ? Number(model.durationMinutes ?? 0) : null,
-    unit: model.isService || !model.trackStock ? null : String(model.unit || '').trim() || 'un',
-    currentStock: model.isService || !model.trackStock ? null : Number(model.currentStock ?? 0),
-    minimumStock: model.isService || !model.trackStock ? null : Number(model.minimumStock ?? 0)
+    trackStock: !model.isService,
+    unit: model.isService ? null : String(model.unit || '').trim() || 'un',
+    minimumStock: model.isService ? null : Number(model.minimumStock ?? 0)
   }
 
   emit('submit', payload)

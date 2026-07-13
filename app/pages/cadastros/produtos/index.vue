@@ -4,7 +4,7 @@
       <div class="head-copy">
         <p class="eyebrow">CADASTROS</p>
         <h1>Produtos e serviços</h1>
-        <p class="subhead">Gerencie produtos, serviços, preços, categorias, estoque e disponibilidade da clínica.</p>
+        <p class="subhead">Gerencie produtos, serviços, preços, categorias e disponibilidade da clínica.</p>
       </div>
       <n-button v-if="!isMobile" type="primary" size="large" class="head-cta" @click="openCreate">Novo produto/serviço</n-button>
     </div>
@@ -41,7 +41,6 @@
         <n-select v-model:value="filters.categoryId" :options="categoryOptions" placeholder="Todas as categorias" clearable />
         <n-select v-model:value="filters.type" :options="typeOptions" placeholder="Tipo" />
         <n-select v-model:value="filters.status" :options="statusOptions" placeholder="Status" />
-        <n-select v-model:value="filters.stock" :options="stockOptions" placeholder="Estoque" />
         <div class="filter-actions">
           <n-button text class="btn-clear" @click="handleClearFilters">Limpar filtros</n-button>
           <n-button secondary strong class="btn-filter" @click="handleFilter">Filtrar</n-button>
@@ -75,7 +74,6 @@
             <p class="card-subtitle"><span class="card-line-label">Tipo:</span> {{ item.isService ? 'Serviço' : 'Produto' }}</p>
             <p class="card-subtitle"><span class="card-line-label">Duração:</span> {{ formatDuration(item) }}</p>
             <p class="card-subtitle"><span class="card-line-label">Preço:</span> {{ formatBRL(item.salePrice) }}</p>
-            <p class="card-subtitle"><span class="card-line-label">Estoque:</span> {{ formatStock(item) }}</p>
             <p class="card-subtitle card-status">
               <span class="card-line-label">Status:</span>
               <n-tag :bordered="false" class="status-chip" :style="statusTagStyle(item.isActive)">{{ item.isActive ? 'Ativo' : 'Inativo' }}</n-tag>
@@ -136,7 +134,6 @@
           <n-select v-model:value="filters.categoryId" :options="categoryOptions" placeholder="Todas as categorias" clearable />
           <n-select v-model:value="filters.type" :options="typeOptions" placeholder="Tipo" />
           <n-select v-model:value="filters.status" :options="statusOptions" placeholder="Status" />
-          <n-select v-model:value="filters.stock" :options="stockOptions" placeholder="Estoque" />
           <div class="mobile-filter-actions">
             <n-button text class="btn-clear" @click="handleClearFilters">Limpar filtros</n-button>
             <n-button type="primary" @click="applyMobileFilters">Aplicar filtros</n-button>
@@ -149,7 +146,7 @@
       <template #header>
         <div class="modal-head">
           <h3 class="modal-title">{{ editingItem ? 'Editar produto/serviço' : 'Novo produto/serviço' }}</h3>
-          <p class="modal-subtitle">{{ editingItem ? 'Atualize dados, preços, estoque e status do item.' : 'Cadastre um novo produto ou serviço para o catálogo da clínica.' }}</p>
+          <p class="modal-subtitle">{{ editingItem ? 'Atualize dados, preços e status do item.' : 'Cadastre um novo produto ou serviço para o catálogo da clínica.' }}</p>
         </div>
       </template>
       <ProductForm ref="productFormRef" :value="editingItem" :loading="saving" @submit="handleSubmit" />
@@ -201,8 +198,7 @@ const filters = reactive({
   sku: '',
   categoryId: null as number | null,
   type: 'all' as 'all' | 'product' | 'service',
-  status: 'all' as 'all' | 'active' | 'inactive',
-  stock: 'all' as 'all' | 'in_stock' | 'low' | 'out' | 'na'
+  status: 'all' as 'all' | 'active' | 'inactive'
 })
 
 const mobileSearch = ref('')
@@ -216,8 +212,7 @@ const pagination = reactive({
 const summary = reactive({
   total: 0,
   activeProducts: 0,
-  activeServices: 0,
-  criticalStock: 0
+  activeServices: 0
 })
 
 const typeOptions = [
@@ -232,19 +227,10 @@ const statusOptions = [
   { label: 'Inativo', value: 'inactive' }
 ]
 
-const stockOptions = [
-  { label: 'Todos', value: 'all' },
-  { label: 'Em estoque', value: 'in_stock' },
-  { label: 'Estoque baixo', value: 'low' },
-  { label: 'Sem estoque', value: 'out' },
-  { label: 'Não aplicável', value: 'na' }
-]
-
 const summaryCards = computed(() => [
   { label: 'ITENS CADASTRADOS', value: summary.total },
   { label: 'PRODUTOS ATIVOS', value: summary.activeProducts },
-  { label: 'SERVIÇOS ATIVOS', value: summary.activeServices },
-  { label: 'ESTOQUE CRÍTICO', value: summary.criticalStock }
+  { label: 'SERVIÇOS ATIVOS', value: summary.activeServices }
 ])
 
 const tablePagination = computed(() => ({
@@ -256,7 +242,7 @@ const tablePagination = computed(() => ({
 }))
 
 const hasActiveFilters = computed(() => (
-  Boolean(filters.name || filters.sku || filters.categoryId || filters.type !== 'all' || filters.status !== 'all' || filters.stock !== 'all')
+  Boolean(filters.name || filters.sku || filters.categoryId || filters.type !== 'all' || filters.status !== 'all')
 ))
 
 const emptyDescription = computed(() => hasActiveFilters.value
@@ -274,46 +260,6 @@ const formatDuration = (item: Product) => {
   if (!item.isService) return 'Não aplicável'
   const duration = Number(item.durationMinutes ?? 0)
   return duration > 0 ? `${duration} min` : '—'
-}
-
-const getStockState = (item: Product) => {
-  if (item.isService || !item.trackStock) return 'na'
-  const stock = Number(item.currentStock ?? 0)
-  const minimumStock = Number(item.minimumStock ?? 0)
-  if (stock <= 0) return 'out'
-  if (minimumStock > 0) {
-    if (stock <= minimumStock) return 'critical'
-    if (stock <= minimumStock * 2) return 'low'
-    return 'in_stock'
-  }
-  if (stock <= 3) return 'critical'
-  if (stock <= 10) return 'low'
-  return 'in_stock'
-}
-
-const stockStateLabel = (state: string) => {
-  if (state === 'critical') return 'Crítico'
-  if (state === 'low') return 'Baixo'
-  if (state === 'out') return 'Sem estoque'
-  return 'Em estoque'
-}
-
-const stockStateClass = (state: string) => {
-  if (state === 'critical' || state === 'out') return 'stock-danger'
-  if (state === 'low') return 'stock-warning'
-  if (state === 'na') return 'text-secondary'
-  return 'stock-ok'
-}
-
-const formatStock = (item: Product) => {
-  if (item.isService || !item.trackStock) return 'Não aplicável'
-  const qty = Number(item.currentStock ?? 0)
-  const unit = (item.unit || 'un').trim() || 'un'
-  const state = getStockState(item)
-  const formattedQty = Number.isInteger(qty)
-    ? String(qty)
-    : qty.toFixed(3).replace(/\.?0+$/, '')
-  return `${formattedQty} ${unit} · ${stockStateLabel(state)}`
 }
 
 const typeTagClass = (item: Product) => item.isService ? 'type-service' : 'type-product'
@@ -342,14 +288,6 @@ const columns = [
   },
   { title: 'Duração', key: 'durationMinutes', render: (row: Product) => formatDuration(row) },
   { title: 'Preço de venda', key: 'salePrice', render: (row: Product) => formatBRL(Number(row.salePrice || 0)) },
-  {
-    title: 'Estoque',
-    key: 'currentStock',
-    render: (row: Product) => {
-      const state = getStockState(row)
-      return h('span', { class: stockStateClass(state) }, formatStock(row))
-    }
-  },
   {
     title: 'Status',
     key: 'isActive',
@@ -398,20 +336,7 @@ const handleActionSelect = (key: string, item: Product) => {
   if (key === 'delete') return confirmDelete(item)
 }
 
-const matchesStockFilter = (item: Product) => {
-  if (filters.stock === 'all') return true
-  const state = getStockState(item)
-  if (filters.stock === 'na') return state === 'na'
-  if (filters.stock === 'out') return state === 'out'
-  if (filters.stock === 'low') return state === 'low' || state === 'critical'
-  if (filters.stock === 'in_stock') return state === 'in_stock'
-  return true
-}
-
-const applyClientSideFilters = (list: Product[]) => list.filter((item) => {
-  if (filters.stock !== 'all' && !matchesStockFilter(item)) return false
-  return true
-})
+const applyClientSideFilters = (list: Product[]) => list
 
 const fetchCategories = async () => {
   try {
@@ -444,12 +369,10 @@ const fetchSummary = async () => {
     summary.total = allItems.value.length
     summary.activeProducts = allItems.value.filter((item) => !item.isService && item.isActive).length
     summary.activeServices = allItems.value.filter((item) => item.isService && item.isActive).length
-    summary.criticalStock = allItems.value.filter((item) => !item.isService && ['critical', 'out'].includes(getStockState(item))).length
   } catch {
     summary.total = 0
     summary.activeProducts = 0
     summary.activeServices = 0
-    summary.criticalStock = 0
   } finally {
     loadingSummary.value = false
   }
@@ -476,11 +399,6 @@ const fetchItems = async () => {
     const filtered = applyClientSideFilters(res.data || [])
     items.value = filtered
     pagination.total = Number(res.meta.total || 0)
-
-    if (filters.stock !== 'all') {
-      const estimatedTotal = Math.max(filtered.length, Math.min(Number(res.meta.total || 0), pagination.page * pagination.limit))
-      pagination.total = estimatedTotal
-    }
 
     await fetchSummary()
   } catch (err: any) {
@@ -633,7 +551,6 @@ const handleClearFilters = () => {
   filters.categoryId = null
   filters.type = 'all'
   filters.status = 'all'
-  filters.stock = 'all'
   mobileSearch.value = ''
   pagination.page = 1
   showMobileFilters.value = false

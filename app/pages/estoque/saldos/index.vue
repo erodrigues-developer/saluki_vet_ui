@@ -24,12 +24,12 @@
         <strong class="summary-value">{{ summary.normal }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card">
-        <p class="summary-label">Baixo</p>
-        <strong class="summary-value">{{ summary.low }}</strong>
+        <p class="summary-label">Próx. vencimento</p>
+        <strong class="summary-value">{{ summary.expiring }}</strong>
       </n-card>
       <n-card size="small" :bordered="false" class="summary-card">
-        <p class="summary-label">Zerado</p>
-        <strong class="summary-value">{{ summary.zero }}</strong>
+        <p class="summary-label">Vencidos</p>
+        <strong class="summary-value">{{ summary.expired }}</strong>
       </n-card>
     </div>
 
@@ -39,6 +39,7 @@
         <n-select v-model:value="filters.stockLocationId" :options="locationOptions" placeholder="Local de estoque" clearable />
         <n-select v-model:value="filters.productCategoryId" :options="categoryOptions" placeholder="Categoria" clearable />
         <n-select v-model:value="filters.status" :options="statusOptions" placeholder="Status" clearable />
+        <n-select v-model:value="filters.expirationStatus" :options="expirationStatusOptions" placeholder="Validade" clearable />
         <div class="filter-actions">
           <n-button text class="btn-clear" @click="clearFilters">Limpar filtros</n-button>
           <n-button secondary strong class="btn-filter" @click="fetchBalance">Filtrar</n-button>
@@ -66,6 +67,7 @@
           <p class="card-line"><span class="card-line-label">Local:</span> <span class="card-line-value">{{ row.stockLocationName }}</span></p>
           <p class="card-line"><span class="card-line-label">Saldo:</span> <span class="card-line-value">{{ row.trackStock ? formatQuantity(row.currentStock) : '—' }}</span></p>
           <p class="card-line"><span class="card-line-label">Mínimo:</span> <span class="card-line-value">{{ row.trackStock ? formatQuantity(row.minimumStock) : '—' }}</span></p>
+          <p class="card-line"><span class="card-line-label">Próx. validade:</span> <span class="card-line-value">{{ formatDate(row.nextExpirationDate) }}</span></p>
           <p class="card-line"><span class="card-line-label">Custo:</span> <span class="card-line-value">{{ formatCurrency(row.costPrice) }}</span></p>
           <p class="card-line"><span class="card-line-label">Venda:</span> <span class="card-line-value">{{ formatCurrency(row.salePrice) }}</span></p>
         </div>
@@ -106,6 +108,7 @@
           <n-select v-model:value="filters.stockLocationId" :options="locationOptions" placeholder="Local de estoque" clearable />
           <n-select v-model:value="filters.productCategoryId" :options="categoryOptions" placeholder="Categoria" clearable />
           <n-select v-model:value="filters.status" :options="statusOptions" placeholder="Status" clearable />
+          <n-select v-model:value="filters.expirationStatus" :options="expirationStatusOptions" placeholder="Validade" clearable />
           <div class="mobile-filter-actions">
             <n-button text class="btn-clear" @click="clearFilters">Limpar filtros</n-button>
             <n-button type="primary" @click="applyMobileFilters">Filtrar</n-button>
@@ -152,9 +155,14 @@ interface BalanceRow {
   currentStock?: number | null
   minimumStock?: number | null
   status: string
+  expirationStatus?: string
+  nextExpirationDate?: string | null
+  expiringLotsCount?: number
+  expiredLotsCount?: number
   costPrice?: number | null
   salePrice?: number | null
   trackStock: boolean
+  tracksExpiration?: boolean
 }
 
 interface BalanceResponse {
@@ -169,6 +177,8 @@ interface BalanceResponse {
       low: number
       zero: number
       untracked: number
+      expiring: number
+      expired: number
     }
   }
 }
@@ -191,7 +201,8 @@ const filters = reactive({
   search: '',
   stockLocationId: null as number | null,
   productCategoryId: null as number | null,
-  status: null as string | null
+  status: null as string | null,
+  expirationStatus: null as string | null
 })
 
 const pagination = reactive({
@@ -207,7 +218,9 @@ const summary = reactive({
   normal: 0,
   low: 0,
   zero: 0,
-  untracked: 0
+  untracked: 0,
+  expiring: 0,
+  expired: 0
 })
 
 const statusOptions = [
@@ -215,6 +228,14 @@ const statusOptions = [
   { label: 'Baixo', value: 'LOW' },
   { label: 'Zerado', value: 'ZERO' },
   { label: 'Não rastreado', value: 'UNTRACKED' }
+]
+
+const expirationStatusOptions = [
+  { label: 'Sem filtro de validade', value: 'ALL' },
+  { label: 'Válido', value: 'VALID' },
+  { label: 'Próx. vencimento', value: 'EXPIRING' },
+  { label: 'Vencido', value: 'EXPIRED' },
+  { label: 'Sem controle', value: 'UNTRACKED' }
 ]
 
 const modalTitle = computed(() => {
@@ -244,7 +265,8 @@ const fetchBalance = async () => {
         search: filters.search || undefined,
         stockLocationId: filters.stockLocationId || undefined,
         productCategoryId: filters.productCategoryId || undefined,
-        status: filters.status || undefined
+        status: filters.status || undefined,
+        expirationStatus: filters.expirationStatus || undefined
       }
     })
 
@@ -289,6 +311,7 @@ const clearFilters = async () => {
   filters.stockLocationId = null
   filters.productCategoryId = null
   filters.status = null
+  filters.expirationStatus = null
   pagination.page = 1
   showMobileFilters.value = false
   await fetchBalance()
@@ -370,6 +393,11 @@ const formatCurrency = (value?: number | null) => {
   })
 }
 
+const formatDate = (value?: string | null) => {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('pt-BR')
+}
+
 const statusLabel = (status: string) => {
   if (status === 'LOW') return 'Baixo'
   if (status === 'ZERO') return 'Zerado'
@@ -397,6 +425,11 @@ const columns = [
     title: 'Estoque mínimo',
     key: 'minimumStock',
     render: (row: BalanceRow) => row.trackStock ? formatQuantity(row.minimumStock) : '—'
+  },
+  {
+    title: 'Próx. validade',
+    key: 'nextExpirationDate',
+    render: (row: BalanceRow) => formatDate(row.nextExpirationDate)
   },
   {
     title: 'Status',
@@ -466,7 +499,7 @@ onBeforeUnmount(() => {
 .summary-value { display: block; margin-top: 10px; font-size: 32px; font-weight: 700; color: #111827; line-height: 1; }
 .filters-card { border: 1px solid #e5e7eb; border-radius: 14px; background: #fff; }
 .filters-card :deep(.n-card__content) { padding: 14px 16px !important; }
-.filters-grid-stock { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr auto; gap: 10px; align-items: stretch; }
+.filters-grid-stock { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr auto; gap: 10px; align-items: stretch; }
 .filters-grid-stock :deep(.n-input),
 .filters-grid-stock :deep(.n-base-selection) { min-height: 40px; }
 .filters-grid-stock :deep(.n-input .n-input-wrapper),
