@@ -52,6 +52,17 @@
               />
             </n-form-item>
 
+            <n-form-item label="Meses futuros para contas recorrentes" path="accountsPayableRecurrenceHorizonMonths">
+              <n-input-number
+                v-model:value="model.accountsPayableRecurrenceHorizonMonths"
+                :min="1"
+                :max="36"
+                :step="1"
+                placeholder="Ex: 12"
+                style="width: 100%"
+              />
+            </n-form-item>
+
             <n-form-item label="URL da Logo" path="logoUrl" class="full-row">
               <n-input v-model:value="model.logoUrl" placeholder="https://..." />
             </n-form-item>
@@ -101,6 +112,7 @@ interface ClinicSettings {
   id?: number
   appointmentSlotDurationMinutes: number
   checkInToleranceMinutes: number
+  accountsPayableRecurrenceHorizonMonths: number
   businessHoursJson?: string | null
   logoUrl?: string | null
   defaultCurrency: string
@@ -116,6 +128,7 @@ const formRef = ref<FormInst | null>(null)
 const model = reactive<ClinicSettings>({
   appointmentSlotDurationMinutes: 30,
   checkInToleranceMinutes: 10,
+  accountsPayableRecurrenceHorizonMonths: 12,
   defaultCurrency: 'BRL',
   timezone: 'America/Sao_Paulo',
   notes: '',
@@ -156,6 +169,7 @@ const timezoneOptions = buildTimezoneOptions()
 const rules: FormRules = {
   appointmentSlotDurationMinutes: { type: 'number', required: true, message: 'Adicione a duração em minutos', trigger: ['blur', 'change'] },
   checkInToleranceMinutes: { type: 'number', required: true, message: 'Informe a tolerância de atraso', trigger: ['blur', 'change'] },
+  accountsPayableRecurrenceHorizonMonths: { type: 'number', required: true, message: 'Informe a janela futura das recorrências', trigger: ['blur', 'change'] },
   defaultCurrency: { required: true, message: 'Moeda é obrigatória', trigger: 'blur' },
   timezone: { required: true, message: 'Timezone é obrigatório', trigger: ['blur', 'change'] },
   businessHoursJson: {
@@ -181,6 +195,7 @@ const fetchSettings = async () => {
       id: data.id,
       appointmentSlotDurationMinutes: data.appointmentSlotDurationMinutes,
       checkInToleranceMinutes: Number((data as any).checkInToleranceMinutes ?? 10),
+      accountsPayableRecurrenceHorizonMonths: Number((data as any).accountsPayableRecurrenceHorizonMonths ?? 12),
       defaultCurrency: data.defaultCurrency || 'BRL',
       timezone: data.timezone || 'America/Sao_Paulo',
       notes: data.notes || '',
@@ -207,6 +222,7 @@ const handleSave = async () => {
       body: {
         appointmentSlotDurationMinutes: model.appointmentSlotDurationMinutes,
         checkInToleranceMinutes: model.checkInToleranceMinutes,
+        accountsPayableRecurrenceHorizonMonths: model.accountsPayableRecurrenceHorizonMonths,
         defaultCurrency: model.defaultCurrency,
         timezone: model.timezone || 'America/Sao_Paulo',
         notes: model.notes || null,

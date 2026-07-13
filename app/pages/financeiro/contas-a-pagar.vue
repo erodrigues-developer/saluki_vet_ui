@@ -104,6 +104,7 @@
             </div>
             <p class="card-subtitle"><span class="card-line-label">Favorecido: </span><span class="card-line-value">{{ resolvePayeeName(row) }}</span></p>
             <p class="card-subtitle"><span class="card-line-label">Categoria: </span><span class="card-line-value">{{ row.category || '-' }}</span></p>
+            <p v-if="row.recurrenceId" class="card-subtitle"><span class="card-line-label">Recorrência: </span><span class="card-line-value">{{ recurrenceSummary(row) }}</span></p>
             <p class="card-subtitle" :class="{ 'is-overdue': getEffectiveStatus(row) === 'OVERDUE' }">
               <span class="card-line-label">{{ getEffectiveStatus(row) === 'OVERDUE' ? 'Vencido em: ' : 'Vencimento: ' }}</span>
               <span :class="['card-line-value', { 'overdue-value': getEffectiveStatus(row) === 'OVERDUE' }]">{{ formatDateDisplay(row.dueDate) }}</span>
@@ -292,6 +293,44 @@
             </div>
           </section>
 
+          <section v-if="!isGeneratedCommissionAccount" class="form-section">
+            <div class="section-head">
+              <h4 class="section-title">Recorrência</h4>
+              <n-tag v-if="createForm.recurrenceEnabled" :bordered="false" class="status-chip badge-soft-neutral">
+                Série ativa
+              </n-tag>
+            </div>
+            <div class="form-grid">
+              <n-form-item label="Conta recorrente" class="full-row">
+                <n-switch v-model:value="createForm.recurrenceEnabled" />
+              </n-form-item>
+
+              <template v-if="createForm.recurrenceEnabled">
+                <n-form-item label="Periodicidade">
+                  <n-select v-model:value="createForm.recurrenceFrequency" :options="recurrenceFrequencyOptions" />
+                </n-form-item>
+                <n-form-item label="A cada">
+                  <n-input-number v-model:value="createForm.recurrenceIntervalCount" :min="1" :step="1" style="width: 100%" />
+                </n-form-item>
+                <n-form-item label="Data final da recorrência">
+                  <n-date-picker v-model:value="createForm.recurrenceEndsAt" type="date" clearable style="width: 100%" />
+                </n-form-item>
+                <n-form-item label="Quantidade total de parcelas">
+                  <n-input-number v-model:value="createForm.recurrenceOccurrencesLimit" :min="1" :step="1" clearable style="width: 100%" />
+                </n-form-item>
+                <n-form-item v-if="editingAccountId && createForm.recurrenceId" label="Aplicar alteração">
+                  <n-select v-model:value="createForm.recurrenceUpdateScope" :options="recurrenceScopeOptions" />
+                </n-form-item>
+                <p class="helper-line full-row">
+                  Use a data final quando souber até quando a cobrança vai existir, ou a quantidade total quando souber o número de parcelas. Se ambos forem preenchidos, vale o primeiro limite atingido.
+                </p>
+                <p class="helper-line full-row">
+                  O sistema manterá parcelas futuras geradas automaticamente conforme a janela configurada na clínica.
+                </p>
+              </template>
+            </div>
+          </section>
+
           <section class="form-section">
             <h4 class="section-title">Observações</h4>
             <div class="form-grid">
@@ -349,6 +388,17 @@ interface AccountPayableItem {
   originType?: string | null;
   originReferenceId?: number | null;
   notes?: string | null;
+  recurrenceId?: number | null;
+  recurrenceSequence?: number | null;
+  isRecurrenceGenerated?: boolean;
+  recurrence?: {
+    id: number;
+    frequency: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+    intervalCount: number;
+    endsAt?: string | null;
+    occurrencesLimit?: number | null;
+    isActive?: boolean;
+  } | null;
 }
 
 type FinancialStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELED';
@@ -436,6 +486,17 @@ const statusOptions = [
   { label: 'Cancelado', value: 'CANCELED' },
 ];
 
+const recurrenceFrequencyOptions = [
+  { label: 'Semanal', value: 'WEEKLY' },
+  { label: 'Mensal', value: 'MONTHLY' },
+  { label: 'Anual', value: 'YEARLY' },
+];
+
+const recurrenceScopeOptions = [
+  { label: 'Somente esta conta', value: 'THIS' },
+  { label: 'Esta e próximas pendentes', value: 'THIS_AND_NEXT' },
+];
+
 const createForm = reactive({
   description: '',
   supplierId: null as number | null,
@@ -443,6 +504,13 @@ const createForm = reactive({
   amount: 0,
   dueDate: Date.now(),
   notes: '',
+  recurrenceEnabled: false,
+  recurrenceFrequency: 'MONTHLY' as 'WEEKLY' | 'MONTHLY' | 'YEARLY',
+  recurrenceIntervalCount: 1,
+  recurrenceEndsAt: null as number | null,
+  recurrenceOccurrencesLimit: null as number | null,
+  recurrenceId: null as number | null,
+  recurrenceUpdateScope: 'THIS' as 'THIS' | 'THIS_AND_NEXT',
 });
 
 const createRules = {
@@ -588,6 +656,17 @@ const statusBadgeClass = (status: FinancialStatus) => {
 
 const resolvePayeeName = (row: AccountPayableItem) => {
   return row.supplier?.name || row.beneficiaryUser?.name || '-';
+};
+
+const recurrenceLabel = (frequency?: string | null) => {
+  if (frequency === 'WEEKLY') return 'Semanal';
+  if (frequency === 'YEARLY') return 'Anual';
+  return 'Mensal';
+};
+
+const recurrenceSummary = (row: AccountPayableItem) => {
+  if (!row.recurrenceId || !row.recurrence) return 'Recorrente';
+  return `${recurrenceLabel(row.recurrence.frequency)} a cada ${row.recurrence.intervalCount || 1}`;
 };
 
 const filteredPayables = computed(() => {
@@ -818,6 +897,13 @@ const openDuplicateModal = (row: AccountPayableItem) => {
   createForm.amount = Number(row.amount || 0);
   createForm.dueDate = Date.now();
   createForm.notes = row.notes || '';
+  createForm.recurrenceEnabled = false;
+  createForm.recurrenceFrequency = 'MONTHLY';
+  createForm.recurrenceIntervalCount = 1;
+  createForm.recurrenceEndsAt = null;
+  createForm.recurrenceOccurrencesLimit = null;
+  createForm.recurrenceId = null;
+  createForm.recurrenceUpdateScope = 'THIS';
   editingOriginalNotes.value = null;
 
   ensureSelectedSupplierOption(createForm.supplierId, row.supplier?.name);
@@ -935,6 +1021,13 @@ const resetCreateForm = () => {
   createForm.amount = 0;
   createForm.dueDate = Date.now();
   createForm.notes = '';
+  createForm.recurrenceEnabled = false;
+  createForm.recurrenceFrequency = 'MONTHLY';
+  createForm.recurrenceIntervalCount = 1;
+  createForm.recurrenceEndsAt = null;
+  createForm.recurrenceOccurrencesLimit = null;
+  createForm.recurrenceId = null;
+  createForm.recurrenceUpdateScope = 'THIS';
   editingOriginalNotes.value = null;
   modalBaseStatus.value = 'PENDING';
   modalHadPayment.value = false;
@@ -1000,6 +1093,15 @@ const openEditModal = (row: AccountPayableItem, options?: { openPayment?: boolea
   createForm.amount = Number(row.amount || 0);
   createForm.dueDate = toDatePickerValue(row.dueDate);
   createForm.notes = row.notes || '';
+  createForm.recurrenceEnabled = Boolean(row.recurrenceId);
+  createForm.recurrenceFrequency = row.recurrence?.frequency || 'MONTHLY';
+  createForm.recurrenceIntervalCount = Number(row.recurrence?.intervalCount || 1);
+  createForm.recurrenceEndsAt = row.recurrence?.endsAt ? toDatePickerValue(row.recurrence.endsAt) : null;
+  createForm.recurrenceOccurrencesLimit = row.recurrence?.occurrencesLimit != null
+    ? Number(row.recurrence.occurrencesLimit)
+    : null;
+  createForm.recurrenceId = row.recurrenceId || null;
+  createForm.recurrenceUpdateScope = 'THIS';
   editingOriginalNotes.value = normalizeOptionalNote(row.notes);
   modalBaseStatus.value = row.status || 'PENDING';
   modalHadPayment.value = Boolean(row.paidAt || row.paidAmount);
@@ -1049,9 +1151,28 @@ const handleSubmitAccount = async () => {
       dueDate: new Date(createForm.dueDate).toISOString().split('T')[0],
     };
 
+    if (createForm.recurrenceEnabled) {
+      payload.recurrence = {
+        enabled: true,
+        frequency: createForm.recurrenceFrequency,
+        intervalCount: Number(createForm.recurrenceIntervalCount || 1),
+        endsAt: createForm.recurrenceEndsAt
+          ? new Date(createForm.recurrenceEndsAt).toISOString().split('T')[0]
+          : undefined,
+        occurrencesLimit: createForm.recurrenceOccurrencesLimit || undefined,
+      };
+    } else if (editingAccountId.value && createForm.recurrenceId) {
+      payload.recurrence = {
+        enabled: false,
+      };
+    }
+
     if (editingAccountId.value) {
       if (normalizedNotes !== editingOriginalNotes.value) {
         payload.notes = normalizedNotes;
+      }
+      if (createForm.recurrenceId) {
+        payload.scope = createForm.recurrenceUpdateScope;
       }
 
       await api(`/api/v1/accounts-payable/${editingAccountId.value}`, {
@@ -1736,6 +1857,13 @@ h1 {
 
 .full-row {
   grid-column: 1 / -1;
+}
+
+.helper-line {
+  margin: -2px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #64748b;
 }
 
 .modal-head {
