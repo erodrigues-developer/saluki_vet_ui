@@ -163,6 +163,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   BadgePercent,
   BarChart3,
+  FileSpreadsheet,
   Building2,
   CalendarCog,
   CalendarDays,
@@ -357,6 +358,7 @@ const searchableItems = [
   { type: 'Financeiro', label: 'Contas a pagar', meta: 'Financeiro', to: '/financeiro/contas-a-pagar' },
   { type: 'Financeiro', label: 'Contas a receber', meta: 'Financeiro', to: '/financeiro/contas-a-receber' },
   { type: 'Financeiro', label: 'Comissões', meta: 'Financeiro', to: '/financeiro/comissoes' },
+  { type: 'Relatórios', label: 'Relatórios gerenciais', meta: 'Relatórios', to: '/relatorios' },
   { type: 'Fornecedores', label: 'Fornecedores', meta: 'Cadastros', to: '/cadastros/fornecedores' },
   { type: 'Agendamentos', label: 'Agendamentos', meta: 'Atendimentos', to: '/atendimento/agendamentos' },
   { type: 'Configurações', label: 'Escalas e Disponibilidade', meta: 'Configurações', to: '/configuracoes/escalas-disponibilidade' },
@@ -482,6 +484,11 @@ const menuItems = [
       { label: 'Vendas', icon: ShoppingCart, to: '/financeiro/vendas' },
       { label: 'Comissões', icon: BadgePercent, to: '/financeiro/comissoes' }
     ]
+  },
+  {
+    label: 'Relatórios',
+    icon: FileSpreadsheet,
+    to: '/relatorios'
   },
   {
     label: 'Estoque',
