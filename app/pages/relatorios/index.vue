@@ -121,7 +121,13 @@
       </n-drawer-content>
     </n-drawer>
 
-    <n-modal v-model:show="showGenerateModal" :mask-closable="false" preset="card" class="reports-modal" style="width: 760px">
+    <n-modal
+      v-model:show="showGenerateModal"
+      :mask-closable="false"
+      preset="card"
+      class="reports-modal"
+      style="width: 760px"
+    >
       <template #header>
         <div class="modal-head">
           <h3 class="modal-title">{{ currentCard?.label || 'Gerar relatório' }}</h3>
@@ -132,8 +138,10 @@
       <n-form label-placement="top" :show-require-mark="false">
         <div class="sections">
           <section class="form-section">
-            <h4 class="section-title">Filtros</h4>
-            <div class="form-grid">
+            <div class="section-head">
+              <h4 class="section-title">Filtros</h4>
+            </div>
+            <div class="section-grid">
               <n-form-item label="Período">
                 <n-date-picker
                   v-model:value="generateForm.period"
@@ -611,11 +619,15 @@ onBeforeUnmount(() => {
 }
 
 .summary-card,
-.report-card,
 .filters-card,
 .data-table-card {
   border-radius: 18px;
   box-shadow: 0 10px 30px rgba(31, 45, 33, 0.08);
+}
+
+.report-card {
+  border-radius: 18px;
+  box-shadow: none;
 }
 
 .summary-card :deep(.n-card__content),
@@ -653,6 +665,7 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 16px;
+  margin: 12px 0;
 }
 
 .reports-tabs :deep(.n-tabs-nav) {
@@ -768,37 +781,51 @@ onBeforeUnmount(() => {
 
 .modal-title {
   margin: 0;
-  font-size: 22px;
-  color: #18251a;
+  font-size: 24px;
+  line-height: 1.2;
+  color: #0f172a;
+  font-weight: 700;
 }
 
 .modal-subtitle {
   margin: 0;
-  color: #617064;
+  font-size: 13px;
+  color: #64748b;
 }
 
 .sections {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
 }
 
 .form-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.section-head {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 12px;
+  margin-bottom: 6px;
 }
 
 .section-title {
   margin: 0;
-  font-size: 15px;
-  color: #213223;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: #334155;
 }
 
-.form-grid {
+.section-grid {
   display: grid;
+  gap: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 16px;
 }
 
 @media (max-width: 900px) {
@@ -807,7 +834,7 @@ onBeforeUnmount(() => {
   }
 
   .summary-grid,
-  .form-grid,
+  .section-grid,
   .filters-grid-reports {
     grid-template-columns: 1fr;
   }
@@ -815,6 +842,124 @@ onBeforeUnmount(() => {
   .report-card-actions,
   .modal-actions {
     flex-direction: column;
+  }
+}
+</style>
+
+<style>
+:root .n-modal-container:has(.reports-modal) .n-modal-body-wrapper {
+  overflow: hidden !important;
+}
+
+:root .n-modal-container:has(.reports-modal) .n-modal-body-wrapper > .n-scrollbar,
+:root .n-modal-container:has(.reports-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container,
+:root .n-modal-container:has(.reports-modal) .n-modal-body-wrapper > .n-scrollbar > .n-scrollbar-container > .n-scrollbar-content {
+  max-height: 100vh !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
+}
+
+.reports-modal.n-card {
+  --n-padding-top: 0;
+  --n-padding-bottom: 0;
+  --n-padding-left: 0;
+  --n-padding-right: 0;
+  width: 760px !important;
+  max-width: calc(100vw - 24px) !important;
+  max-height: calc(100vh - 48px) !important;
+  max-height: calc(100dvh - 48px) !important;
+  margin: 0 auto !important;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.reports-modal.n-card .n-card-header {
+  flex: 0 0 auto;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 16px 20px 12px;
+  z-index: 4;
+}
+
+.reports-modal.n-card .n-card__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none !important;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 16px 20px;
+  scroll-padding-bottom: 88px;
+}
+
+.reports-modal.n-card .n-card__footer {
+  flex: 0 0 auto;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -6px 14px rgba(15, 23, 42, 0.05);
+  padding: 10px 16px;
+  z-index: 4;
+}
+
+.reports-modal .modal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reports-modal .modal-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.reports-modal .modal-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.reports-modal .modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 900px) {
+  .reports-modal.n-card {
+    width: 100% !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100vh - 48px) !important;
+    max-height: calc(100dvh - 48px) !important;
+  }
+
+  .reports-modal.n-card .n-card-header {
+    padding: 14px 14px 10px;
+  }
+
+  .reports-modal.n-card .n-card__content {
+    padding: 10px 12px 16px;
+    scroll-padding-bottom: 96px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .reports-modal.n-card .n-card__footer {
+    padding: 8px 12px;
+  }
+
+  .reports-modal .modal-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .reports-modal .modal-actions .n-button {
+    min-height: 44px;
+    width: 100%;
   }
 }
 </style>
