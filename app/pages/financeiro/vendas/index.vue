@@ -7,12 +7,12 @@
         <p class="subhead">Gerencie vendas, recebimentos, clientes e lançamentos financeiros.</p>
       </div>
       <n-button v-if="!isMobile" type="primary" size="large" class="head-cta" @click="openCreateModal">
-        Nova venda avulsa
+        Nova venda
       </n-button>
     </div>
 
     <n-button v-if="isMobile" type="primary" block class="mobile-primary-cta" @click="openCreateModal">
-      Nova venda avulsa
+      Nova venda
     </n-button>
 
     <div v-if="!isMobile" class="summary-grid">
@@ -181,6 +181,16 @@
                 />
               </n-form-item>
 
+              <n-form-item label="Meu caixa aberto" required>
+                <n-select
+                  v-model:value="checkoutForm.cashRegisterSessionId"
+                  :options="cashSessionOptions"
+                  placeholder="Caixa do operador"
+                  filterable
+                  :disabled="cashSessionOptions.length <= 1"
+                />
+              </n-form-item>
+
               <n-form-item label="Valor recebido" required>
                 <CurrencyInput v-model="checkoutForm.amount" />
               </n-form-item>
@@ -219,6 +229,7 @@
         </div>
       </template>
     </n-modal>
+
   </div>
 </template>
 
@@ -240,12 +251,14 @@ type SaleRow = {
 const message = useMessage();
 const dialog = useDialog();
 const router = useRouter();
+const route = useRoute();
 const loading = ref(false);
 const data = ref<SaleRow[]>([]);
 const showCheckoutModal = ref(false);
 const checkoutLoading = ref(false);
 const checkoutTargetSale = ref<SaleRow | null>(null);
 const paymentMethodOptions = ref<Array<{ label: string; value: number }>>([]);
+const cashSessionOptions = ref<Array<{ label: string; value: number }>>([]);
 const showMobileFilters = ref(false);
 const isMobile = ref(false);
 let mediaQuery: MediaQueryList | null = null;
@@ -264,6 +277,7 @@ const filters = reactive({
 
 const checkoutForm = reactive({
   paymentMethodId: null as number | null,
+  cashRegisterSessionId: null as number | null,
   amount: 0,
   paidAt: Date.now(),
   notes: '',
@@ -323,13 +337,23 @@ const summary = computed(() => {
 });
 
 const actionOptionsFor = (row: SaleRow) => {
-  return [
+  const options = [
     {
       label: 'Cancelar venda',
       key: 'cancel',
       disabled: row.status === 'CANCELED',
     },
   ];
+
+  if (row.status === 'PAID') {
+    options.unshift({
+      label: 'Reimprimir cupom',
+      key: 'printReceipt',
+      disabled: false,
+    });
+  }
+
+  return options;
 };
 
 const handleActionSelect = (key: string, row: SaleRow) => {
@@ -337,6 +361,55 @@ const handleActionSelect = (key: string, row: SaleRow) => {
     confirmCancelSale(row);
     return;
   }
+  if (key === 'printReceipt') {
+    handlePrintReceipt(row);
+    return;
+  }
+};
+
+const escapeReceiptHtml = (content: string) =>
+  content.replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[char] || char);
+
+const prepareReceiptPrintWindow = () => {
+  if (!process.client) return null;
+  const popup = window.open('', 'saluki-receipt-print', 'width=420,height=720');
+  if (!popup) return null;
+
+  popup.document.write(`
+    <html>
+      <head>
+        <title>Cupom não fiscal</title>
+        <style>
+          @page { size: 80mm auto; margin: 4mm; }
+          body { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; white-space: pre-wrap; }
+          pre { margin: 0; white-space: pre-wrap; }
+        </style>
+      </head>
+      <body><pre>Gerando cupom...</pre></body>
+    </html>
+  `);
+  popup.document.close();
+  return popup;
+};
+
+const printReceiptContent = (popup: Window, content: string) => {
+  popup.document.open();
+  popup.document.write(`
+    <html>
+      <head>
+        <title>Cupom não fiscal</title>
+        <style>
+          @page { size: 80mm auto; margin: 4mm; }
+          body { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; white-space: pre-wrap; }
+          pre { margin: 0; white-space: pre-wrap; }
+        </style>
+      </head>
+      <body><pre>${escapeReceiptHtml(content)}</pre></body>
+    </html>
+  `);
+  popup.document.close();
+  popup.focus();
+  popup.print();
 };
 
 const columns = [
@@ -521,9 +594,30 @@ const fetchPaymentMethods = async () => {
     }));
 };
 
+const fetchOpenCashSessions = async () => {
+  const api = useApi();
+  const response = await api('/api/v1/cash-registers/sessions/current');
+  const sessions = (Array.isArray(response) ? response : []) as Array<{
+    id: number;
+    terminal?: { name?: string };
+    openedByUser?: { name?: string };
+  }>;
+
+  cashSessionOptions.value = sessions.map((session) => ({
+    label: `${session.terminal?.name || 'Caixa'} · #${session.id}`,
+    value: Number(session.id),
+  }));
+};
+
 const checkoutTargetAmount = computed(() => Number(checkoutTargetSale.value?.totalAmount || 0));
 const checkoutClientName = computed(() => checkoutTargetSale.value?.client?.name || 'Venda balcão');
 const checkoutStatusLabel = computed(() => statusLabel(checkoutTargetSale.value?.status || 'OPEN'));
+const routeCashRegisterSessionId = computed(() => {
+  const value = route.query.cashRegisterSessionId;
+  const raw = Array.isArray(value) ? value[0] : value;
+  const id = Number(raw || 0);
+  return Number.isFinite(id) && id > 0 ? id : null;
+});
 
 const handlePageChange = (page: number) => {
   pagination.value.page = page;
@@ -554,8 +648,18 @@ const applyMobileFilters = () => {
   handleFilter();
 };
 
-const openCreateModal = () => {
-  router.push('/financeiro/vendas/nova');
+const openCreateModal = async () => {
+  try {
+    await fetchOpenCashSessions();
+    if (cashSessionOptions.value.length === 0) {
+      message.warning('Abra um caixa antes de iniciar uma venda.');
+      router.push('/financeiro/caixa');
+      return;
+    }
+    router.push(`/financeiro/vendas/nova?cashRegisterSessionId=${cashSessionOptions.value[0].value}`);
+  } catch (_error) {
+    message.error('Erro ao verificar caixa aberto');
+  }
 };
 
 const openViewModal = (sale: SaleRow) => {
@@ -570,19 +674,29 @@ const openCheckoutModal = async (sale: SaleRow) => {
 
   checkoutTargetSale.value = sale;
   checkoutForm.paymentMethodId = null;
+  checkoutForm.cashRegisterSessionId = null;
   checkoutForm.amount = Number(sale.totalAmount);
   checkoutForm.paidAt = Date.now();
   checkoutForm.notes = '';
 
   checkoutLoading.value = true;
   try {
-    await fetchPaymentMethods();
+    await Promise.all([fetchPaymentMethods(), fetchOpenCashSessions()]);
     if (paymentMethodOptions.value.length > 0) {
       checkoutForm.paymentMethodId = paymentMethodOptions.value[0].value;
     }
+    if (cashSessionOptions.value.length === 0) {
+      message.warning('Abra um caixa antes de receber vendas.');
+      return;
+    }
+    const preferredSessionId = routeCashRegisterSessionId.value;
+    const preferredOption = preferredSessionId
+      ? cashSessionOptions.value.find((option) => option.value === preferredSessionId)
+      : null;
+    checkoutForm.cashRegisterSessionId = preferredOption?.value || cashSessionOptions.value[0].value;
     showCheckoutModal.value = true;
   } catch (_error) {
-    message.error('Erro ao carregar formas de pagamento');
+    message.error('Erro ao carregar dados do recebimento');
   } finally {
     checkoutLoading.value = false;
   }
@@ -609,6 +723,10 @@ const handleCheckout = async () => {
     message.warning('Selecione a forma de pagamento.');
     return;
   }
+  if (!checkoutForm.cashRegisterSessionId) {
+    message.warning('Selecione o caixa aberto.');
+    return;
+  }
   if (Number(checkoutForm.amount || 0) <= 0) {
     message.warning('Informe um valor recebido maior que zero.');
     return;
@@ -629,6 +747,7 @@ const handleCheckout = async () => {
       method: 'POST',
       body: {
         paymentMethodId: checkoutForm.paymentMethodId,
+        cashRegisterSessionId: checkoutForm.cashRegisterSessionId,
         amount: Number(checkoutForm.amount),
         paidAt: new Date(checkoutForm.paidAt).toISOString(),
         notes: checkoutForm.notes || undefined,
@@ -638,10 +757,41 @@ const handleCheckout = async () => {
     updateSaleStatusLocally(Number((response as any).saleId), 'PAID');
     showCheckoutModal.value = false;
     message.success('Recebimento realizado com sucesso.');
+    await handlePrintReceipt({ ...checkoutTargetSale.value, status: 'PAID' } as SaleRow);
   } catch (error: any) {
     message.error(extractApiErrorMessage(error, 'Erro ao realizar recebimento.'));
   } finally {
     checkoutLoading.value = false;
+  }
+};
+
+const handlePrintReceipt = async (sale: SaleRow) => {
+  if (sale.status !== 'PAID') {
+    message.warning('Cupom disponível apenas para vendas pagas.');
+    return;
+  }
+
+  const popup = prepareReceiptPrintWindow();
+  try {
+    const api = useApi();
+    const response = await api(`/api/v1/sales/${sale.id}/print-receipt`, {
+      method: 'POST',
+      body: { copies: 1 },
+    });
+    const content = String((response as any).content || '');
+    if (!content) {
+      message.warning('Cupom gerado sem conteúdo para impressão.');
+      popup?.close();
+      return;
+    }
+    if (!popup) {
+      message.warning('Permita pop-ups para imprimir o cupom.');
+      return;
+    }
+    printReceiptContent(popup, content);
+  } catch (error: any) {
+    popup?.close();
+    message.error(extractApiErrorMessage(error, 'Erro ao gerar cupom.'));
   }
 };
 
@@ -1060,6 +1210,7 @@ h1 {
 .checkout-summary-card span { color: #64748b; }
 .checkout-amount-due strong { color: #0f172a; font-size: 16px; font-weight: 800; }
 .checkout-hint { margin: 8px 0 0; color: #64748b; font-size: 12px; }
+
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
 @media (max-width: 1280px) {

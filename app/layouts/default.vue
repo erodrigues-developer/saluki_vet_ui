@@ -482,6 +482,7 @@ const menuItems = [
       { label: 'Contas a pagar', icon: ReceiptText, to: '/financeiro/contas-a-pagar' },
       { label: 'Contas a receber', icon: CreditCard, to: '/financeiro/contas-a-receber' },
       { label: 'Vendas', icon: ShoppingCart, to: '/financeiro/vendas' },
+      { label: 'Caixa', icon: CircleDollarSign, to: '/financeiro/caixa' },
       { label: 'Comissões', icon: BadgePercent, to: '/financeiro/comissoes' }
     ]
   },

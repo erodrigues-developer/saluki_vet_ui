@@ -8,7 +8,7 @@
       :disabled="loading || readonly"
     >
       <div class="grid grid-cols-2 gap-4">
-        <n-form-item label="Cliente (Opcional - venda avulsa)" path="clientId">
+        <n-form-item label="Cliente (Opcional)" path="clientId">
           <n-select
             v-model:value="model.clientId"
             :options="clientOptions"
