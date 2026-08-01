@@ -350,14 +350,15 @@ const searchableItems = [
   { type: 'Clientes', label: 'Cadastro de clientes', meta: 'Clientes', to: '/clientes' },
   { type: 'Pets', label: 'Cadastro de pets', meta: 'Pets', to: '/pets' },
   { type: 'Boxes', label: 'Cadastro de boxes', meta: 'Cadastros', to: '/cadastros/boxes' },
-  { type: 'Vendas', label: 'Vendas', meta: 'Financeiro', to: '/financeiro/vendas' },
+  { type: 'Vendas', label: 'Vendas', meta: 'Vendas', to: '/financeiro/vendas' },
+  { type: 'Vendas', label: 'Caixa', meta: 'Vendas', to: '/financeiro/caixa' },
+  { type: 'Vendas', label: 'Comissões', meta: 'Vendas', to: '/financeiro/comissoes' },
   { type: 'Produtos', label: 'Produtos e serviços', meta: 'Cadastros', to: '/cadastros/produtos' },
   { type: 'Estoque', label: 'Saldos de estoque', meta: 'Estoque', to: '/estoque/saldos' },
   { type: 'Estoque', label: 'Histórico de movimentações', meta: 'Estoque', to: '/estoque/movimentacoes' },
   { type: 'Estoque', label: 'Locais de estoque', meta: 'Cadastros', to: '/cadastros/locais-estoque' },
   { type: 'Financeiro', label: 'Contas a pagar', meta: 'Financeiro', to: '/financeiro/contas-a-pagar' },
   { type: 'Financeiro', label: 'Contas a receber', meta: 'Financeiro', to: '/financeiro/contas-a-receber' },
-  { type: 'Financeiro', label: 'Comissões', meta: 'Financeiro', to: '/financeiro/comissoes' },
   { type: 'Relatórios', label: 'Relatórios gerenciais', meta: 'Relatórios', to: '/relatorios' },
   { type: 'Fornecedores', label: 'Fornecedores', meta: 'Cadastros', to: '/cadastros/fornecedores' },
   { type: 'Agendamentos', label: 'Agendamentos', meta: 'Atendimentos', to: '/atendimento/agendamentos' },
@@ -476,14 +477,28 @@ const menuItems = [
   },
   { label: 'Clientes', icon: Users, to: '/clientes' },
   {
+    label: 'Vendas',
+    icon: ShoppingCart,
+    children: [
+      { label: 'Vendas', icon: ShoppingCart, to: '/financeiro/vendas' },
+      { label: 'Caixa', icon: CircleDollarSign, to: '/financeiro/caixa' },
+      { label: 'Comissões', icon: BadgePercent, to: '/financeiro/comissoes' }
+    ]
+  },
+  {
     label: 'Financeiro',
     icon: CircleDollarSign,
     children: [
       { label: 'Contas a pagar', icon: ReceiptText, to: '/financeiro/contas-a-pagar' },
-      { label: 'Contas a receber', icon: CreditCard, to: '/financeiro/contas-a-receber' },
-      { label: 'Vendas', icon: ShoppingCart, to: '/financeiro/vendas' },
-      { label: 'Caixa', icon: CircleDollarSign, to: '/financeiro/caixa' },
-      { label: 'Comissões', icon: BadgePercent, to: '/financeiro/comissoes' }
+      { label: 'Contas a receber', icon: CreditCard, to: '/financeiro/contas-a-receber' }
+    ]
+  },
+  {
+    label: 'Fiscal',
+    icon: ShieldCheck,
+    children: [
+      { label: 'Documentos fiscais', icon: ReceiptText, to: '/fiscal/documentos' },
+      { label: 'Pendências fiscais', icon: ClipboardList, to: '/fiscal/pendencias' }
     ]
   },
   {

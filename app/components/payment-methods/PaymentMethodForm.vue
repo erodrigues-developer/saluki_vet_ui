@@ -28,23 +28,50 @@
             @update:value="onCodeInput"
           />
         </n-form-item>
+
+        <n-form-item label="Código fiscal NFC-e" path="fiscalPaymentTypeCode">
+          <n-select
+            v-model:value="model.fiscalPaymentTypeCode"
+            :options="fiscalPaymentTypeOptions"
+            :loading="loadingFiscalPaymentTypes"
+            placeholder="Selecione o código tPag"
+            filterable
+            clearable
+          />
+        </n-form-item>
+
+        <n-form-item label="Integração TEF" path="integrationType">
+          <n-select
+            v-model:value="model.integrationType"
+            :options="integrationTypeOptions"
+            placeholder="Selecione"
+            clearable
+          />
+        </n-form-item>
       </div>
     </section>
   </n-form>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInst, FormRules } from 'naive-ui'
 
 export interface PaymentMethod {
   id?: number
   name: string
   code: string
+  fiscalPaymentTypeCode?: string | null
+  integrationType?: string | null
   isActive: boolean
   updatedAt?: string
   createdAt?: string
   usagesCount?: number
+}
+
+interface FiscalPaymentType {
+  code: string
+  label: string
 }
 
 const props = defineProps<{
@@ -58,12 +85,54 @@ const emit = defineEmits<{
 }>()
 
 const formRef = ref<FormInst | null>(null)
+const loadingFiscalPaymentTypes = ref(false)
+const fiscalPaymentTypes = ref<FiscalPaymentType[]>([])
 const model = reactive<PaymentMethod>({
   id: undefined,
   name: '',
   code: '',
+  fiscalPaymentTypeCode: '',
+  integrationType: null,
   isActive: true
 })
+
+const integrationTypeOptions = [
+  { label: 'Não integrado', value: 'NOT_INTEGRATED' },
+  { label: 'Integrado/TEF', value: 'INTEGRATED' }
+]
+
+const fallbackFiscalPaymentTypes: FiscalPaymentType[] = [
+  { code: '01', label: 'Dinheiro' },
+  { code: '02', label: 'Cheque' },
+  { code: '03', label: 'Cartão de crédito' },
+  { code: '04', label: 'Cartão de débito' },
+  { code: '05', label: 'Cartão da loja / crediário' },
+  { code: '10', label: 'Vale alimentação' },
+  { code: '11', label: 'Vale refeição' },
+  { code: '12', label: 'Vale presente' },
+  { code: '13', label: 'Vale combustível' },
+  { code: '15', label: 'Boleto bancário' },
+  { code: '16', label: 'Depósito bancário' },
+  { code: '17', label: 'PIX dinâmico' },
+  { code: '18', label: 'Transferência bancária / TED' },
+  { code: '19', label: 'Programa de fidelidade / cashback / crédito virtual' },
+  { code: '20', label: 'PIX estático' },
+  { code: '21', label: 'Crédito em loja' },
+  { code: '22', label: 'Pagamento eletrônico não informado' },
+  { code: '23', label: 'PIX automático' },
+  { code: '24', label: 'TEF / Book Transfer' },
+  { code: '90', label: 'Sem pagamento' },
+  { code: '91', label: 'Pagamento posterior' },
+  { code: '99', label: 'Outros' }
+]
+
+const fiscalPaymentTypeOptions = computed(() =>
+  (fiscalPaymentTypes.value.length ? fiscalPaymentTypes.value : fallbackFiscalPaymentTypes)
+    .map((item) => ({
+      label: `${item.code} - ${item.label}`,
+      value: item.code
+    }))
+)
 
 watch(
   () => props.value,
@@ -72,6 +141,8 @@ watch(
       id: val?.id,
       name: val?.name ?? '',
       code: val?.code ?? '',
+      fiscalPaymentTypeCode: val?.fiscalPaymentTypeCode ?? '',
+      integrationType: val?.integrationType ?? null,
       isActive: val?.isActive ?? true
     })
   },
@@ -87,6 +158,19 @@ const normalizeCode = (value: string) =>
 
 const onCodeInput = (value: string) => {
   model.code = normalizeCode(value)
+}
+
+const fetchFiscalPaymentTypes = async () => {
+  loadingFiscalPaymentTypes.value = true
+  try {
+    const api = useApi()
+    const data = await api<FiscalPaymentType[]>('/api/v1/fiscal/payment-types')
+    fiscalPaymentTypes.value = Array.isArray(data) ? data : []
+  } catch {
+    fiscalPaymentTypes.value = fallbackFiscalPaymentTypes
+  } finally {
+    loadingFiscalPaymentTypes.value = false
+  }
 }
 
 const rules: FormRules = {
@@ -114,12 +198,18 @@ const isValidLocal = computed(() => {
 
 watch(isValidLocal, (valid) => emit('validity-change', valid), { immediate: true })
 
+onMounted(() => {
+  fetchFiscalPaymentTypes()
+})
+
 const submit = async () => {
   await formRef.value?.validate()
   emit('submit', {
     ...model,
     name: model.name.trim(),
-    code: normalizeCode(model.code)
+    code: normalizeCode(model.code),
+    fiscalPaymentTypeCode: String(model.fiscalPaymentTypeCode || '').trim() || null,
+    integrationType: String(model.integrationType || '').trim() || null
   })
 }
 

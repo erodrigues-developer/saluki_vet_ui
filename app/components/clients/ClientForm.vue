@@ -99,6 +99,41 @@
       </section>
 
       <section class="form-section">
+        <h4 class="section-title">Fiscal</h4>
+        <div class="form-grid">
+          <n-form-item label="Tipo de pessoa" path="personType">
+            <n-select v-model:value="model.personType" :options="personTypeOptions" clearable />
+          </n-form-item>
+          <n-form-item v-if="isPessoaJuridica" label="Indicador IE" path="stateTaxpayerType">
+            <n-select
+              v-model:value="model.stateTaxpayerType"
+              :options="stateTaxpayerTypeOptions"
+              clearable
+            />
+          </n-form-item>
+          <n-form-item v-if="isPessoaJuridica" label="Inscrição estadual" path="stateTaxId">
+            <n-input v-model:value="model.stateTaxId" placeholder="IE ou ISENTO" />
+          </n-form-item>
+          <n-form-item v-if="isPessoaJuridica" label="Inscrição municipal" path="municipalTaxId">
+            <n-input v-model:value="model.municipalTaxId" />
+          </n-form-item>
+          <n-form-item label="Código IBGE município" path="ibgeCityCode">
+            <n-auto-complete
+              v-model:value="model.ibgeCityCode"
+              :options="municipioOptions"
+              :loading="loadingMunicipios"
+              placeholder="Digite a cidade ou o código"
+              clearable
+              @update:value="handleMunicipioInput"
+            />
+          </n-form-item>
+          <n-form-item label="E-mail fiscal" path="taxEmail">
+            <n-input v-model:value="model.taxEmail" placeholder="fiscal@email.com" />
+          </n-form-item>
+        </div>
+      </section>
+
+      <section class="form-section">
         <h4 class="section-title">Observações</h4>
         <div class="form-grid">
           <n-form-item label="Observações" path="notes" class="field-span-2">
@@ -127,6 +162,15 @@ export interface Client {
   id?: number
   name: string
   document?: string | null
+  personType?: string | null
+  stateTaxId?: string | null
+  municipalTaxId?: string | null
+  stateTaxpayerType?: string | null
+  suframa?: string | null
+  ibgeCityCode?: string | null
+  countryCode?: string | null
+  countryName?: string | null
+  taxEmail?: string | null
   phone?: string | null
   mobilePhone?: string | null
   email: string
@@ -152,6 +196,9 @@ const emit = defineEmits<{
 
 const message = useMessage()
 const zipLoading = ref(false)
+const municipioOptions = ref<{ label: string; value: string; nome: string; uf: string }[]>([])
+const loadingMunicipios = ref(false)
+let municipioSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const formRef = ref<FormInst | null>(null)
 const stateOptions: SelectOption[] = [
@@ -163,10 +210,28 @@ const stateOptions: SelectOption[] = [
   { label: 'RS', value: 'RS' }, { label: 'RO', value: 'RO' }, { label: 'RR', value: 'RR' }, { label: 'SC', value: 'SC' },
   { label: 'SP', value: 'SP' }, { label: 'SE', value: 'SE' }, { label: 'TO', value: 'TO' }
 ]
+const personTypeOptions = [
+  { label: 'Pessoa física', value: 'PF' },
+  { label: 'Pessoa jurídica', value: 'PJ' }
+]
+const stateTaxpayerTypeOptions = [
+  { label: 'Contribuinte ICMS', value: 'TAXPAYER' },
+  { label: 'Contribuinte isento', value: 'EXEMPT' },
+  { label: 'Não contribuinte', value: 'NON_TAXPAYER' }
+]
 const model = reactive<Client>({
   id: undefined,
   name: '',
   document: '',
+  personType: null,
+  stateTaxId: '',
+  municipalTaxId: '',
+  stateTaxpayerType: null,
+  suframa: '',
+  ibgeCityCode: '',
+  countryCode: '1058',
+  countryName: 'Brasil',
+  taxEmail: '',
   phone: '',
   mobilePhone: '',
   email: '',
@@ -180,6 +245,8 @@ const model = reactive<Client>({
   notes: '',
   isActive: true
 })
+
+const isPessoaJuridica = computed(() => model.personType === 'PJ')
 
 const rules: FormRules = {
   name: { required: true, message: 'Nome é obrigatório', trigger: 'blur' },
@@ -202,12 +269,33 @@ const rules: FormRules = {
 }
 
 watch(
+  () => model.personType,
+  (personType) => {
+    if (personType !== 'PJ') {
+      model.stateTaxId = ''
+      model.municipalTaxId = ''
+      model.stateTaxpayerType = null
+      model.suframa = ''
+    }
+  }
+)
+
+watch(
   () => props.value,
   (val) => {
     Object.assign(model, {
       id: val?.id,
       name: val?.name ?? '',
       document: formatDocument(val?.document ?? ''),
+      personType: val?.personType ?? null,
+      stateTaxId: val?.stateTaxId ?? '',
+      municipalTaxId: val?.municipalTaxId ?? '',
+      stateTaxpayerType: val?.stateTaxpayerType ?? null,
+      suframa: val?.suframa ?? '',
+      ibgeCityCode: val?.ibgeCityCode ?? '',
+      countryCode: val?.countryCode ?? '1058',
+      countryName: val?.countryName ?? 'Brasil',
+      taxEmail: val?.taxEmail ?? '',
       phone: formatBrazilPhone(val?.phone ?? ''),
       mobilePhone: formatBrazilPhone(val?.mobilePhone ?? ''),
       email: val?.email ?? '',
@@ -227,12 +315,81 @@ watch(
 
 const handleSubmit = async () => {
   await formRef.value?.validate()
-  emit('submit', { ...model })
+  const isPj = model.personType === 'PJ'
+  emit('submit', {
+    ...model,
+    email: String(model.email || '').trim() || null,
+    phone: String(model.phone || '').trim() || null,
+    mobilePhone: String(model.mobilePhone || '').trim() || null,
+    personType: model.personType || null,
+    stateTaxId: isPj ? String(model.stateTaxId || '').trim() || null : null,
+    municipalTaxId: isPj ? String(model.municipalTaxId || '').trim() || null : null,
+    stateTaxpayerType: isPj ? model.stateTaxpayerType || null : null,
+    suframa: isPj ? String(model.suframa || '').trim() || null : null,
+    ibgeCityCode: normalizeIbgeCityCode(model.ibgeCityCode) || null,
+    countryCode: String(model.countryCode || '').trim() || '1058',
+    countryName: String(model.countryName || '').trim() || 'Brasil',
+    taxEmail: String(model.taxEmail || '').trim() || null
+  })
 }
 defineExpose({ submit: handleSubmit })
 
 function digitsOnly(val: string) {
   return (val || '').replace(/\D+/g, '')
+}
+
+const normalizeIbgeCityCode = (value: unknown) =>
+  String(value || '')
+    .replace(/\D/g, '')
+    .slice(0, 7)
+
+const handleMunicipioInput = (value: string) => {
+  const selected = municipioOptions.value.find((option) => option.value === value)
+  if (selected) {
+    model.ibgeCityCode = selected.value
+    model.city = selected.nome
+    model.state = selected.uf || model.state
+    return
+  }
+
+  if (municipioSearchTimer) clearTimeout(municipioSearchTimer)
+  const search = String(value || '').trim()
+  if (search.length < 2) {
+    municipioOptions.value = []
+    return
+  }
+  municipioSearchTimer = setTimeout(() => searchMunicipios(search), 300)
+}
+
+const searchMunicipios = async (search: string) => {
+  const uf = String(model.state || '').trim().toUpperCase()
+  const api = useApi()
+  loadingMunicipios.value = true
+  try {
+    const params = new URLSearchParams({ search })
+    if (/^[A-Z]{2}$/.test(uf)) params.set('uf', uf)
+    const data = await api<any[]>(
+      `/api/v1/fiscal/municipios?${params.toString()}`
+    )
+    municipioOptions.value = (Array.isArray(data) ? data : [])
+      .map((item: any) => {
+        const code = normalizeIbgeCityCode(item.codigoIbge)
+        const nome = String(item.nome || '').trim()
+        const optionUf = String(item.uf || '').trim().toUpperCase()
+        return {
+          label: `${nome} / ${optionUf} - ${code}`,
+          value: code,
+          nome,
+          uf: optionUf
+        }
+      })
+      .filter((item) => item.value.length === 7 && item.nome && item.uf)
+      .slice(0, 30)
+  } catch {
+    municipioOptions.value = []
+  } finally {
+    loadingMunicipios.value = false
+  }
 }
 
 const onPhoneInput = (val: string) => {
@@ -241,6 +398,13 @@ const onPhoneInput = (val: string) => {
 
 const onMobileInput = (val: string) => {
   model.mobilePhone = formatBrazilPhone(val)
+}
+
+const onDocumentInput = (val: string) => {
+  model.document = formatDocument(val)
+  const digits = digitsOnly(model.document || '')
+  if (digits.length === 11) model.personType = 'PF'
+  if (digits.length === 14) model.personType = 'PJ'
 }
 
 function formatDocument(val: string) {

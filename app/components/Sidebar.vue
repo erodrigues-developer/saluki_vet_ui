@@ -405,26 +405,13 @@ const handleNavigate = () => {
   overflow-x: hidden;
   padding: 2px 4px 18px 0;
   min-height: 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .menu::-webkit-scrollbar {
-  width: 8px;
-}
-
-.menu::-webkit-scrollbar-track {
-  background: var(--app-scrollbar-track);
-}
-
-.menu::-webkit-scrollbar-thumb {
-  background: var(--app-scrollbar-thumb);
-  border-radius: 999px;
-  border: 2px solid var(--app-scrollbar-track);
-}
-
-.menu:hover::-webkit-scrollbar-thumb {
-  background: var(--app-scrollbar-thumb-hover);
+  width: 0;
+  height: 0;
 }
 .menu-group {
   display: grid;

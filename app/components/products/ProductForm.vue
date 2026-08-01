@@ -236,6 +236,124 @@
           Serviços não possuem controle de estoque.
         </p>
       </section>
+
+      <section class="form-section">
+        <div class="section-head">
+          <div>
+            <h4 class="section-title">Fiscal NFC-e</h4>
+          </div>
+          <n-tag :bordered="false" :type="fiscalStatus.type">
+            {{ fiscalStatus.label }}
+          </n-tag>
+        </div>
+        <template v-if="!model.isService">
+          <div class="section-grid">
+            <n-form-item label="Faturável na NFC-e" path="fiscalIsBillable">
+              <n-switch v-model:value="model.fiscalIsBillable" />
+            </n-form-item>
+
+            <n-form-item label="Origem" path="fiscalOrigin">
+              <n-select
+                v-model:value="model.fiscalOrigin"
+                :options="fiscalOriginOptions"
+                placeholder="Selecione"
+                clearable
+              />
+            </n-form-item>
+
+            <n-form-item label="NCM" path="fiscalNcm">
+              <n-auto-complete
+                v-model:value="model.fiscalNcm"
+                :options="ncmOptions"
+                :loading="loadingNcm"
+                placeholder="Digite a descrição ou o código"
+                clearable
+                @update:value="handleNcmInput"
+              />
+            </n-form-item>
+
+            <n-form-item label="CEST" path="fiscalCest">
+              <n-input
+                v-model:value="model.fiscalCest"
+                placeholder="Opcional"
+                maxlength="10"
+              />
+            </n-form-item>
+
+            <n-form-item label="CFOP NFC-e" path="fiscalCfopNfceDefault">
+              <n-auto-complete
+                v-model:value="model.fiscalCfopNfceDefault"
+                :options="cfopOptions"
+                :loading="loadingCfop"
+                placeholder="Digite a operação ou o código"
+                clearable
+                @update:value="handleCfopInput"
+              />
+            </n-form-item>
+
+            <n-form-item label="Unidade tributável" path="fiscalUnitTributable">
+              <n-input
+                v-model:value="model.fiscalUnitTributable"
+                placeholder="Ex: UN, KG"
+              />
+            </n-form-item>
+
+            <n-form-item
+              label="Fator conversão tributável"
+              path="fiscalConversionFactor"
+            >
+              <n-input-number
+                v-model:value="model.fiscalConversionFactor"
+                :min="0.000001"
+                :step="1"
+                :precision="6"
+                placeholder="1,000000"
+                style="width: 100%"
+              />
+            </n-form-item>
+
+            <n-form-item label="EAN comercial" path="fiscalEan">
+              <n-input
+                v-model:value="model.fiscalEan"
+                placeholder="SEM GTIN ou código"
+              />
+            </n-form-item>
+
+            <n-form-item label="EAN tributável" path="fiscalEanTributable">
+              <n-input
+                v-model:value="model.fiscalEanTributable"
+                placeholder="SEM GTIN ou código"
+              />
+            </n-form-item>
+
+            <n-form-item label="CST ICMS" path="fiscalIcmsCst">
+              <n-input v-model:value="model.fiscalIcmsCst" placeholder="Ex: 00" />
+            </n-form-item>
+
+            <n-form-item label="CSOSN ICMS" path="fiscalIcmsCsosn">
+              <n-input
+                v-model:value="model.fiscalIcmsCsosn"
+                placeholder="Ex: 102"
+              />
+            </n-form-item>
+
+            <n-form-item label="CST PIS" path="fiscalPisCst">
+              <n-input v-model:value="model.fiscalPisCst" placeholder="Ex: 49" />
+            </n-form-item>
+
+            <n-form-item label="CST COFINS" path="fiscalCofinsCst">
+              <n-input
+                v-model:value="model.fiscalCofinsCst"
+                placeholder="Ex: 49"
+              />
+            </n-form-item>
+          </div>
+        </template>
+        <p v-else class="service-stock-note">
+          Serviços não entram na NFC-e do MVP fiscal. Eles ficarão pendentes até
+          a etapa de NFS-e.
+        </p>
+      </section>
     </div>
   </n-form>
 </template>
@@ -270,6 +388,19 @@ export interface Product {
   isActive: boolean;
   minimumStock?: number | null;
   supplierName?: string | null;
+  fiscalNcm?: string | null;
+  fiscalCest?: string | null;
+  fiscalOrigin?: string | null;
+  fiscalCfopNfceDefault?: string | null;
+  fiscalEan?: string | null;
+  fiscalEanTributable?: string | null;
+  fiscalUnitTributable?: string | null;
+  fiscalConversionFactor?: number | null;
+  fiscalIcmsCst?: string | null;
+  fiscalIcmsCsosn?: string | null;
+  fiscalPisCst?: string | null;
+  fiscalCofinsCst?: string | null;
+  fiscalIsBillable?: boolean;
   productCategory?: any;
   updatedAt?: string;
 }
@@ -287,7 +418,13 @@ const formRef = ref<FormInst | null>(null);
 const imageInputRef = ref<HTMLInputElement | null>(null);
 const message = useMessage();
 const categoryOptions = ref<{ label: string; value: number }[]>([]);
+const ncmOptions = ref<{ label: string; value: string }[]>([]);
+const cfopOptions = ref<{ label: string; value: string }[]>([]);
 const uploadingImage = ref(false);
+const loadingNcm = ref(false);
+const loadingCfop = ref(false);
+let ncmSearchTimer: ReturnType<typeof setTimeout> | null = null;
+let cfopSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
 const model = reactive<Product>({
   id: undefined,
@@ -313,6 +450,19 @@ const model = reactive<Product>({
   isActive: true,
   minimumStock: 0,
   supplierName: "",
+  fiscalNcm: "",
+  fiscalCest: "",
+  fiscalOrigin: null,
+  fiscalCfopNfceDefault: "",
+  fiscalEan: "SEM GTIN",
+  fiscalEanTributable: "SEM GTIN",
+  fiscalUnitTributable: "UN",
+  fiscalConversionFactor: 1,
+  fiscalIcmsCst: "",
+  fiscalIcmsCsosn: "",
+  fiscalPisCst: "",
+  fiscalCofinsCst: "",
+  fiscalIsBillable: true,
 });
 
 const rules: FormRules = {
@@ -399,6 +549,124 @@ const scaleBarcodeTypeOptions = [
   { label: "Preço embutido", value: "PRICE" },
 ];
 
+const fiscalOriginOptions = [
+  { label: "0 - Nacional", value: "0" },
+  { label: "1 - Estrangeira importação direta", value: "1" },
+  { label: "2 - Estrangeira adquirida no mercado interno", value: "2" },
+  { label: "3 - Nacional com conteúdo importado > 40%", value: "3" },
+  { label: "4 - Nacional conforme processos produtivos", value: "4" },
+  { label: "5 - Nacional com conteúdo importado <= 40%", value: "5" },
+  { label: "6 - Estrangeira importação direta sem similar", value: "6" },
+  { label: "7 - Estrangeira mercado interno sem similar", value: "7" },
+  { label: "8 - Nacional com conteúdo importado > 70%", value: "8" },
+];
+
+const fiscalStatus = computed(() => {
+  if (model.isService) {
+    return { label: "Não elegível NFC-e", type: "warning" as const };
+  }
+  const required = [
+    normalizeNcm(model.fiscalNcm).length === 8 ? model.fiscalNcm : "",
+    model.fiscalOrigin,
+    normalizeCfop(model.fiscalCfopNfceDefault).length === 4
+      ? model.fiscalCfopNfceDefault
+      : "",
+    model.fiscalUnitTributable,
+    model.fiscalConversionFactor,
+    model.fiscalPisCst,
+    model.fiscalCofinsCst,
+  ];
+  const hasIcms = Boolean(model.fiscalIcmsCst || model.fiscalIcmsCsosn);
+  const complete =
+    Boolean(model.fiscalIsBillable) &&
+    hasIcms &&
+    required.every((value) => String(value ?? "").trim().length > 0);
+  return complete
+    ? { label: "Fiscal completo", type: "success" as const }
+    : { label: "Fiscal incompleto", type: "error" as const };
+});
+
+const handleNcmInput = (value: string) => {
+  if (ncmSearchTimer) clearTimeout(ncmSearchTimer);
+  const search = String(value || "").trim();
+  if (search.length < 3) {
+    ncmOptions.value = [];
+    return;
+  }
+  ncmSearchTimer = setTimeout(() => searchNcm(search), 350);
+};
+
+const searchNcm = async (search: string) => {
+  const api = useApi();
+  loadingNcm.value = true;
+  try {
+    const data = await api<any[]>(
+      `/api/v1/fiscal/ncm?search=${encodeURIComponent(search)}`,
+    );
+    ncmOptions.value = (Array.isArray(data) ? data : [])
+      .map((item: any) => {
+        const code = normalizeNcm(item.codigo);
+        const formattedCode = String(item.codigo || code);
+        const description = String(item.descricao || "").trim();
+        return {
+          label: `${formattedCode} - ${description}`.slice(0, 180),
+          value: code,
+        };
+      })
+      .filter((item: any) => item.value.length === 8)
+      .slice(0, 20);
+  } catch {
+    ncmOptions.value = [];
+  } finally {
+    loadingNcm.value = false;
+  }
+};
+
+const normalizeNcm = (value: unknown) =>
+  String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 8);
+
+const handleCfopInput = (value: string) => {
+  if (cfopSearchTimer) clearTimeout(cfopSearchTimer);
+  const search = String(value || "").trim();
+  if (search.length < 2) {
+    cfopOptions.value = [];
+    return;
+  }
+  cfopSearchTimer = setTimeout(() => searchCfop(search), 250);
+};
+
+const searchCfop = async (search: string) => {
+  const api = useApi();
+  loadingCfop.value = true;
+  try {
+    const data = await api<any[]>(
+      `/api/v1/fiscal/cfops?direction=OUT&search=${encodeURIComponent(search)}`,
+    );
+    cfopOptions.value = (Array.isArray(data) ? data : [])
+      .map((item: any) => {
+        const code = normalizeCfop(item.codigo);
+        const description = String(item.descricao || "").trim();
+        return {
+          label: `${code} - ${description}`.slice(0, 180),
+          value: code,
+        };
+      })
+      .filter((item: any) => item.value.length === 4)
+      .slice(0, 30);
+  } catch {
+    cfopOptions.value = [];
+  } finally {
+    loadingCfop.value = false;
+  }
+};
+
+const normalizeCfop = (value: unknown) =>
+  String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 4);
+
 watch(
   () => props.value,
   (val) => {
@@ -440,6 +708,23 @@ watch(
           ? Number(val.minimumStock)
           : 0,
       supplierName: val?.supplierName ?? "",
+      fiscalNcm: val?.fiscalNcm ?? "",
+      fiscalCest: val?.fiscalCest ?? "",
+      fiscalOrigin: val?.fiscalOrigin ?? null,
+      fiscalCfopNfceDefault: val?.fiscalCfopNfceDefault ?? "",
+      fiscalEan: val?.fiscalEan ?? "SEM GTIN",
+      fiscalEanTributable: val?.fiscalEanTributable ?? "SEM GTIN",
+      fiscalUnitTributable: val?.fiscalUnitTributable ?? "UN",
+      fiscalConversionFactor:
+        val?.fiscalConversionFactor !== undefined &&
+        val?.fiscalConversionFactor !== null
+          ? Number(val.fiscalConversionFactor)
+          : 1,
+      fiscalIcmsCst: val?.fiscalIcmsCst ?? "",
+      fiscalIcmsCsosn: val?.fiscalIcmsCsosn ?? "",
+      fiscalPisCst: val?.fiscalPisCst ?? "",
+      fiscalCofinsCst: val?.fiscalCofinsCst ?? "",
+      fiscalIsBillable: val?.fiscalIsBillable ?? !val?.isService,
     });
   },
   { immediate: true },
@@ -461,12 +746,16 @@ watch(
       model.scaleBarcodePrefix = null;
       model.scaleBarcodeProductCode = null;
       model.scaleBarcodeType = null;
+      model.fiscalIsBillable = false;
     } else {
       model.durationMinutes = null;
       model.trackStock = true;
+      model.fiscalIsBillable = true;
       if (!model.unit) {
         model.unit = "un";
       }
+      if (!model.fiscalUnitTributable) model.fiscalUnitTributable = "UN";
+      if (!model.fiscalConversionFactor) model.fiscalConversionFactor = 1;
     }
   },
 );
@@ -561,6 +850,43 @@ const submit = async () => {
         ? "kg"
         : String(model.unit || "").trim() || "un",
     minimumStock: model.isService ? null : Number(model.minimumStock ?? 0),
+    fiscalNcm: model.isService
+      ? null
+      : normalizeNcm(model.fiscalNcm) || null,
+    fiscalCest: model.isService
+      ? null
+      : String(model.fiscalCest || "").trim() || null,
+    fiscalOrigin: model.isService
+      ? null
+      : String(model.fiscalOrigin || "").trim() || null,
+    fiscalCfopNfceDefault: model.isService
+      ? null
+      : normalizeCfop(model.fiscalCfopNfceDefault) || null,
+    fiscalEan: model.isService
+      ? null
+      : String(model.fiscalEan || "").trim() || null,
+    fiscalEanTributable: model.isService
+      ? null
+      : String(model.fiscalEanTributable || "").trim() || null,
+    fiscalUnitTributable: model.isService
+      ? null
+      : String(model.fiscalUnitTributable || "").trim() || null,
+    fiscalConversionFactor: model.isService
+      ? null
+      : Number(model.fiscalConversionFactor || 0) || null,
+    fiscalIcmsCst: model.isService
+      ? null
+      : String(model.fiscalIcmsCst || "").trim() || null,
+    fiscalIcmsCsosn: model.isService
+      ? null
+      : String(model.fiscalIcmsCsosn || "").trim() || null,
+    fiscalPisCst: model.isService
+      ? null
+      : String(model.fiscalPisCst || "").trim() || null,
+    fiscalCofinsCst: model.isService
+      ? null
+      : String(model.fiscalCofinsCst || "").trim() || null,
+    fiscalIsBillable: model.isService ? false : Boolean(model.fiscalIsBillable),
   };
 
   emit("submit", payload);
