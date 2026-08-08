@@ -22,6 +22,14 @@ export const useApi = () => {
     onResponseError({ response }) {
       if (response.status === 401) {
         authStore.logout()
+        return
+      }
+
+      if (response.status === 403 && process.client) {
+        const route = useRoute()
+        if (route.path !== '/403') {
+          navigateTo('/403')
+        }
       }
     }
   })

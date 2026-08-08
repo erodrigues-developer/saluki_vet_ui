@@ -14,7 +14,7 @@
           <template #label>
             <div class="field-label-row">
               <span>Cliente *</span>
-              <button type="button" class="inline-action" @click="$emit('quick-create')">+ Novo cliente</button>
+              <button v-if="allowQuickCreate" type="button" class="inline-action" @click="$emit('quick-create')">+ Novo cliente</button>
             </div>
           </template>
           <n-select
@@ -31,7 +31,7 @@
           <template #label>
             <div class="field-label-row">
               <span>Paciente/Pet *</span>
-              <button type="button" class="inline-action" @click="$emit('quick-create')">+ Novo pet</button>
+              <button v-if="allowQuickCreate" type="button" class="inline-action" @click="$emit('quick-create')">+ Novo pet</button>
             </div>
           </template>
           <n-select
@@ -153,6 +153,7 @@ export interface AppointmentPayload {
 const props = defineProps<{
   value?: AppointmentPayload | null
   loading?: boolean
+  allowQuickCreate?: boolean
 }>()
 
 const emit = defineEmits<{

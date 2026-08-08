@@ -7,8 +7,8 @@
         <p class="subhead">Gerencie a agenda da clínica, horários disponíveis, veterinários, check-ins e próximos atendimentos.</p>
       </div>
       <n-space class="head-actions">
-        <n-button type="primary" size="large" @click="openCreate">Novo agendamento</n-button>
-        <n-button secondary size="large" @click="openQuickCreate">Cadastro rápido</n-button>
+        <n-button v-if="canCreateAppointments" type="primary" size="large" @click="openCreate">Novo agendamento</n-button>
+        <n-button v-if="canQuickCreateAppointments" secondary size="large" @click="openQuickCreate">Cadastro rápido</n-button>
       </n-space>
     </div>
 
@@ -61,7 +61,7 @@
                     }"
                     @click="handleSlotClick({ date: agendaStartDate, veterinarianId: selectedVetIdSingle }, slot)"
                   >
-                    <span class="mobile-slot-add">+ Agendar</span>
+                    <span v-if="canCreateAppointments" class="mobile-slot-add">+ Agendar</span>
                   </button>
                 </div>
               </div>
@@ -176,7 +176,7 @@
                   }"
                   @click="handleSlotClick(header, slot)"
                 >
-                  <span v-if="slotEvents(header, slot).length === 0 && !isSlotCovered(header, slot)" class="slot-hover-label">+ Agendar</span>
+                  <span v-if="canCreateAppointments && slotEvents(header, slot).length === 0 && !isSlotCovered(header, slot)" class="slot-hover-label">+ Agendar</span>
                 </button>
 
                 <button
@@ -224,12 +224,13 @@
             <p>Motivo: {{ selectedAppointment.reason || '-' }}</p>
             <p>Observações: {{ selectedAppointment.notes || '-' }}</p>
             <div class="detail-actions">
-              <n-button type="primary" @click="runPrimaryAction(selectedAppointment)">{{ primaryActionLabel(selectedAppointment) }}</n-button>
-              <n-button @click="openEdit(selectedAppointment)">Reagendar/Editar</n-button>
-              <n-button @click="handleActionSelect('cancel', selectedAppointment)">
+              <n-button v-if="canRunPrimaryAction(selectedAppointment)" type="primary" @click="runPrimaryAction(selectedAppointment)">{{ primaryActionLabel(selectedAppointment) }}</n-button>
+              <n-button v-if="canUpdateAppointments" @click="openEdit(selectedAppointment)">Reagendar/Editar</n-button>
+              <n-button v-if="canCancelAppointments" @click="handleActionSelect('cancel', selectedAppointment)">
                 Cancelar agendamento
               </n-button>
               <n-button
+                v-if="canConfirmAppointments"
                 :disabled="!canConfirmAppointment(selectedAppointment)"
                 :title="confirmBlockedReason(selectedAppointment) || undefined"
                 @click="handleActionSelect('confirm', selectedAppointment)"
@@ -237,6 +238,7 @@
                 Confirmar agendamento
               </n-button>
               <n-button
+                v-if="canCancelAppointments"
                 :disabled="!canMarkNoShow(selectedAppointment)"
                 :title="noShowBlockedReason(selectedAppointment) || undefined"
                 @click="handleActionSelect('no_show', selectedAppointment)"
@@ -370,8 +372,8 @@
               <p class="card-summary">{{ eventTypeLabel(row) }} · Triagem: {{ triageLabel(row.triageRisk || null) }}</p>
             </button>
             <div class="card-actions">
-              <n-button size="small" secondary type="primary" @click.stop="runPrimaryAction(row)">{{ primaryActionLabel(row) }}</n-button>
-              <n-dropdown trigger="click" :options="actionOptionsFor(row)" @select="(key: string) => handleActionSelect(key, row)">
+              <n-button v-if="canRunPrimaryAction(row)" size="small" secondary type="primary" @click.stop="runPrimaryAction(row)">{{ primaryActionLabel(row) }}</n-button>
+              <n-dropdown v-if="actionOptionsFor(row).length > 1" trigger="click" :options="actionOptionsFor(row)" @select="(key: string) => handleActionSelect(key, row)">
                 <n-button size="small" quaternary class="menu-button" @click.stop>
                   <AppIcon name="ellipsis" :size="16" :stroke-width="2" />
                 </n-button>
@@ -420,6 +422,7 @@
         ref="appointmentFormRef"
         :value="editingAppointment"
         :loading="saving"
+        :allow-quick-create="canQuickCreateAppointments"
         @submit="handleSubmit"
         @quick-create="openQuickCreate"
       />
@@ -434,7 +437,7 @@
           >
             Criar encaixe
           </n-button>
-          <n-button v-else type="primary" :loading="saving" @click="submitAppointmentForm">{{ editingAppointment ? 'Salvar alterações' : 'Agendar' }}</n-button>
+          <n-button v-else-if="!editingAppointment || canUpdateAppointments" type="primary" :loading="saving" @click="submitAppointmentForm">{{ editingAppointment ? 'Salvar alterações' : 'Agendar' }}</n-button>
         </div>
       </template>
     </n-modal>
@@ -525,9 +528,20 @@ import { addDays, format, isSameDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import AppointmentForm, { type AppointmentPayload } from '~/components/appointments/AppointmentForm.vue'
 import { formatBrazilPhone } from '~/composables/useBrazilPhone'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 const message = useMessage()
 const dialog = useDialog()
+const authStore = useAuthStore()
+const canCreateAppointments = computed(() => authStore.hasPermission(PERMISSIONS.appointmentsCreate))
+const canUpdateAppointments = computed(() => authStore.hasPermission(PERMISSIONS.appointmentsUpdate))
+const canCancelAppointments = computed(() => authStore.hasPermission(PERMISSIONS.appointmentsCancel))
+const canDeleteAppointments = computed(() => authStore.hasPermission(PERMISSIONS.appointmentsCancel))
+const canConfirmAppointments = computed(() => authStore.hasPermission(PERMISSIONS.appointmentsConfirm))
+const canCheckInAppointments = computed(() => authStore.hasPermission(PERMISSIONS.appointmentsCheckin))
+const canQuickCreateAppointments = computed(() => authStore.hasPermission(PERMISSIONS.appointmentsQuickCreate))
+const canCreateConsultations = computed(() => authStore.hasPermission(PERMISSIONS.consultationsCreate))
 
 const mode = ref<'agenda' | 'list' | 'flow'>('agenda')
 const viewTabs = [
@@ -979,8 +993,12 @@ const parsedBusinessHours = computed<Record<number, Array<[number, number]>>>(()
       const dayIndex = dayAliases[String(key).toLowerCase()]
       if (dayIndex === undefined || !Array.isArray(ranges)) return
       for (const range of ranges) {
-        if (typeof range !== 'string') continue
-        const [startRaw, endRaw] = range.split('-')
+        const [startRaw, endRaw] = typeof range === 'string'
+          ? range.split('-')
+          : [
+              (range as any)?.start,
+              (range as any)?.end
+            ]
         const start = parseHourToMinutes(String(startRaw || '').trim())
         const end = parseHourToMinutes(String(endRaw || '').trim())
         if (start === null || end === null || end <= start) continue
@@ -1134,6 +1152,7 @@ const isSlotCovered = (header: any, slot: string) => {
 }
 
 const handleSlotClick = (header: any, slot: string) => {
+  if (!canCreateAppointments.value) return
   if (isSlotCovered(header, slot)) return
   const absence = findAbsenceAtDate(header)
   if (absence) {
@@ -1253,11 +1272,17 @@ const primaryActionLabel = (row: any) => {
   if (code === 'COMPLETED') return 'Ver prontuário'
   return 'Ver detalhes'
 }
+const canRunPrimaryAction = (row: any) => {
+  const action = primaryActionLabel(row)
+  if (action === 'Check-in' || action === 'Iniciar triagem') return canCheckInAppointments.value && canCheckIn(row)
+  if (action === 'Iniciar atendimento') return canCreateConsultations.value
+  return true
+}
 const runPrimaryAction = (row: any) => {
   const action = primaryActionLabel(row)
-  if (action === 'Check-in') openCheckIn(row)
-  else if (action === 'Iniciar triagem') openCheckIn(row)
-  else if (action === 'Iniciar atendimento') openClinicalCare(row)
+  if (action === 'Check-in' && canCheckInAppointments.value) openCheckIn(row)
+  else if (action === 'Iniciar triagem' && canCheckInAppointments.value) openCheckIn(row)
+  else if (action === 'Iniciar atendimento' && canCreateConsultations.value) openClinicalCare(row)
   else if (action === 'Ver detalhes' || action === 'Ver atendimento' || action === 'Ver prontuário') openDetail(row)
   else message.info('Ação contextual será integrada com o fluxo clínico.')
 }
@@ -1333,12 +1358,11 @@ const displayAppointments = computed(() => {
 
 const actionOptionsFor = (row?: any) => [
   { label: 'Ver detalhes', key: 'view' },
-  { label: 'Editar', key: 'edit' },
-  { label: 'Reagendar', key: 'reschedule' },
-  ...(row ? [{ label: 'Confirmar agendamento', key: 'confirm', disabled: !canConfirmAppointment(row) }] : []),
-  ...(row ? [{ label: 'Não compareceu', key: 'no_show', disabled: !canMarkNoShow(row) }] : []),
-  { label: 'Cancelar agendamento', key: 'cancel' },
-  { label: 'Excluir', key: 'delete' }
+  ...(canUpdateAppointments.value ? [{ label: 'Editar', key: 'edit' }, { label: 'Reagendar', key: 'reschedule' }] : []),
+  ...(row && canConfirmAppointments.value ? [{ label: 'Confirmar agendamento', key: 'confirm', disabled: !canConfirmAppointment(row) }] : []),
+  ...(row && canCancelAppointments.value ? [{ label: 'Não compareceu', key: 'no_show', disabled: !canMarkNoShow(row) }] : []),
+  ...(canCancelAppointments.value ? [{ label: 'Cancelar agendamento', key: 'cancel' }] : []),
+  ...(canDeleteAppointments.value ? [{ label: 'Excluir', key: 'delete' }] : [])
 ]
 
 const columns = [
@@ -1361,7 +1385,22 @@ const columns = [
       ]),
   },
   { title: () => h('span', { class: 'th-nowrap' }, 'Triagem'), key: 'triageRisk', width: 140, render: (row: any) => h('span', { class: ['triage-pill', getTriageMeta(row.triageRisk || null).className] }, [h('span', { class: 'triage-dot' }), h('span', triageLabel(row.triageRisk || null))]) },
-  { title: () => h('span', { class: 'th-nowrap' }, 'Ações'), key: 'actions', width: 170, render: (row: any) => h('div', { class: 'actions', style: 'justify-content: flex-end;' }, [h(NButton, { size: 'small', secondary: true, type: 'primary', disabled: !canCheckIn(row), title: checkInBlockedReason(row) || undefined, onClick: (e) => { e.stopPropagation(); openCheckIn(row) } }, { default: () => 'Check-in' }), h(NDropdown, { trigger: 'click', options: actionOptionsFor(row), onSelect: (key: string) => handleActionSelect(key, row) }, { default: () => h(NButton, { size: 'small', quaternary: true, class: 'menu-button', onClick: (e) => e.stopPropagation() }, { default: () => '⋯' }) })]) }
+  {
+    title: () => h('span', { class: 'th-nowrap' }, 'Ações'),
+    key: 'actions',
+    width: 170,
+    render: (row: any) => {
+      const options = actionOptionsFor(row)
+      return h('div', { class: 'actions', style: 'justify-content: flex-end;' }, [
+        canCheckInAppointments.value
+          ? h(NButton, { size: 'small', secondary: true, type: 'primary', disabled: !canCheckIn(row), title: checkInBlockedReason(row) || undefined, onClick: (e) => { e.stopPropagation(); openCheckIn(row) } }, { default: () => 'Check-in' })
+          : null,
+        options.length > 1
+          ? h(NDropdown, { trigger: 'click', options, onSelect: (key: string) => handleActionSelect(key, row) }, { default: () => h(NButton, { size: 'small', quaternary: true, class: 'menu-button', onClick: (e) => e.stopPropagation() }, { default: () => '⋯' }) })
+          : h(NButton, { size: 'small', secondary: true, onClick: (e) => { e.stopPropagation(); openDetail(row) } }, { default: () => 'Ver' })
+      ])
+    }
+  }
 ]
 
 const loadLookups = async () => {
@@ -1711,6 +1750,7 @@ const handleActionSelect = (key: string, row: any) => {
 }
 
 const openCreate = () => {
+  if (!canCreateAppointments.value) return
   appointmentFormRef.value?.clearStartsAtConflictError?.()
   showFitInAction.value = false
   pendingFitInPayload.value = null
@@ -1718,6 +1758,7 @@ const openCreate = () => {
   showModal.value = true
 }
 const openQuickCreate = () => {
+  if (!canQuickCreateAppointments.value) return
   Object.assign(quickForm.client, { name: '', document: '', mobilePhone: '', email: '' })
   Object.assign(quickForm.pet, { name: '', speciesId: null, breedId: null, sex: null })
   Object.assign(quickForm.appointment, { appointmentTypeId: appointmentTypeOptions.value[0]?.value ?? null, veterinarianId: null, startsAt: Date.now(), reason: '' })
@@ -1725,6 +1766,7 @@ const openQuickCreate = () => {
 }
 
 const openCreateFromSlot = (day: Date, slot: string, veterinarianId: number | null) => {
+  if (!canCreateAppointments.value) return
   const [hh, mm] = slot.split(':').map(Number)
   const starts = new Date(day)
   starts.setHours(hh, mm, 0, 0)
@@ -1771,6 +1813,7 @@ const handleQuickSubmit = async () => {
 }
 
 const openCheckIn = async (appointment: any) => {
+  if (!canCheckInAppointments.value) return
   const api = useApi()
   let latest = appointment
   try {
@@ -1831,6 +1874,10 @@ const handleCheckIn = async () => {
 }
 
 const openEdit = (appointment: any) => {
+  if (!canUpdateAppointments.value) {
+    openDetail(appointment)
+    return
+  }
   appointmentFormRef.value?.clearStartsAtConflictError?.()
   showFitInAction.value = false
   pendingFitInPayload.value = null

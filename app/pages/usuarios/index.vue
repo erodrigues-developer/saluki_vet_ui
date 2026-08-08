@@ -3,12 +3,20 @@
     <div class="page-head">
       <div class="head-copy">
         <p class="eyebrow">CONFIGURAÇÕES</p>
-        <h1>Usuários e permissões</h1>
-        <p class="subhead">Gerencie usuários, papéis de acesso e permissões da clínica.</p>
+        <h1>Usuários</h1>
+        <p class="subhead">Gerencie usuários, papéis de acesso e status da clínica.</p>
       </div>
-      <n-button type="primary" size="large" class="head-cta" @click="openCreate">
-        Novo usuário
-      </n-button>
+      <div class="head-actions">
+        <n-button
+          v-if="canCreateUsers"
+          type="primary"
+          size="large"
+          class="head-cta"
+          @click="openCreate"
+        >
+          Novo usuário
+        </n-button>
+      </div>
     </div>
 
     <div v-if="!isMobile" class="summary-grid">
@@ -125,7 +133,7 @@
 
         <div class="card-actions" @click.stop>
           <n-button size="small" secondary type="primary" @click="openEdit(item)">Ver usuário</n-button>
-          <n-dropdown trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
+          <n-dropdown v-if="buildActionOptions(item).length" trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
             <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
           </n-dropdown>
         </div>
@@ -207,6 +215,7 @@
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
           <n-button
+            v-if="editingUser ? canUpdateUsers : canCreateUsers"
             type="primary"
             :loading="saving"
             :disabled="isMobile && !canSubmitUserForm"
@@ -217,6 +226,7 @@
         </div>
       </template>
     </n-modal>
+
   </div>
 </template>
 
@@ -225,6 +235,7 @@ import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { NButton, NDropdown, NTag, useMessage, useDialog } from 'naive-ui'
 import UserForm, { type User, type Role } from '~/components/users/UserForm.vue'
 import { useAuthStore } from '~/stores/auth'
+import { PERMISSIONS } from '~/constants/permissions'
 
 interface UsersResponse {
   data: User[]
@@ -275,6 +286,10 @@ const statusOptions = [
   { label: 'Ativos', value: true },
   { label: 'Inativos', value: false }
 ]
+
+const canCreateUsers = computed(() => authStore.hasPermission(PERMISSIONS.usersCreate))
+const canUpdateUsers = computed(() => authStore.hasPermission(PERMISSIONS.usersUpdate))
+const canDeleteUsers = computed(() => authStore.hasPermission(PERMISSIONS.usersDelete))
 
 const tablePagination = computed(() => ({
   page: pagination.page,
@@ -382,7 +397,7 @@ const columns = [
           },
           { default: () => 'Ver usuário' }
         ),
-        h(
+        buildActionOptions(row).length ? h(
           NDropdown,
           {
             trigger: 'click',
@@ -402,7 +417,7 @@ const columns = [
                 { default: () => '⋯' }
               )
           }
-        )
+        ) : null
       ])
   }
 ]
@@ -419,16 +434,21 @@ const sortedRoles = (user: User) => {
 
 const buildActionOptions = (user: User) => {
   const toggleLabel = user.isActive ? 'Inativar' : 'Ativar'
-  return [
-    { label: 'Editar', key: 'edit' },
-    { label: 'Editar permissões', key: 'edit-permissions' },
-    { type: 'divider', key: 'divider-1' },
-    { label: 'Reenviar convite', key: 'resend-invite' },
-    { label: 'Redefinir senha', key: 'reset-password' },
-    { type: 'divider', key: 'divider-2' },
-    { label: toggleLabel, key: 'toggle-active' },
-    { label: 'Excluir', key: 'delete' }
-  ]
+  const options: Array<{ label?: string; key: string; type?: 'divider' }> = []
+  if (canUpdateUsers.value) {
+    options.push({ label: 'Editar', key: 'edit' })
+    options.push({ label: 'Editar permissões', key: 'edit-permissions' })
+    options.push({ type: 'divider', key: 'divider-1' })
+    options.push({ label: 'Reenviar convite', key: 'resend-invite' })
+    options.push({ label: 'Redefinir senha', key: 'reset-password' })
+    options.push({ type: 'divider', key: 'divider-2' })
+    options.push({ label: toggleLabel, key: 'toggle-active' })
+  }
+  if (canDeleteUsers.value) {
+    if (options.length) options.push({ type: 'divider', key: 'divider-3' })
+    options.push({ label: 'Excluir', key: 'delete' })
+  }
+  return options
 }
 
 const buildQuery = () => {
@@ -601,6 +621,7 @@ const canModifyTarget = async (user: User, action: 'delete' | 'deactivate') => {
 }
 
 const confirmDelete = (user: User) => {
+  if (!canDeleteUsers.value) return
   dialog.warning({
     title: 'Confirmar exclusão',
     content: `Deseja excluir o usuário ${user.name}? Esta ação não poderá ser desfeita.`,
@@ -621,6 +642,7 @@ const confirmDelete = (user: User) => {
 }
 
 const toggleUserStatus = (user: User) => {
+  if (!canUpdateUsers.value) return
   const willActivate = !user.isActive
   const actionLabel = willActivate ? 'ativar' : 'inativar'
 
@@ -648,6 +670,7 @@ const toggleUserStatus = (user: User) => {
 
 const handleActionSelect = (key: string, user: User) => {
   if (key === 'edit' || key === 'edit-permissions') {
+    if (!canUpdateUsers.value) return
     openEdit(user)
     return
   }
@@ -663,22 +686,26 @@ const handleActionSelect = (key: string, user: User) => {
   }
 
   if (key === 'toggle-active') {
+    if (!canUpdateUsers.value) return
     toggleUserStatus(user)
     return
   }
 
   if (key === 'delete') {
+    if (!canDeleteUsers.value) return
     confirmDelete(user)
   }
 }
 
 const openCreate = () => {
+  if (!canCreateUsers.value) return
   editingUser.value = null
   canSubmitUserForm.value = false
   showModal.value = true
 }
 
 const openEdit = (user: User) => {
+  if (!canUpdateUsers.value) return
   editingUser.value = user
   canSubmitUserForm.value = false
   showModal.value = true
@@ -689,6 +716,7 @@ const closeModal = () => {
 }
 
 const submitUserForm = async () => {
+  if (editingUser.value ? !canUpdateUsers.value : !canCreateUsers.value) return
   await userFormRef.value?.submit()
 }
 
@@ -780,6 +808,14 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .eyebrow {
@@ -1220,6 +1256,12 @@ h1 {
 
   .head-cta {
     width: 100%;
+  }
+
+  .head-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   h1 {

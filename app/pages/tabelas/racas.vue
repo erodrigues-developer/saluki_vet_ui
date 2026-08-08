@@ -6,7 +6,7 @@
         <h1>Raças</h1>
         <p class="subhead">Gerencie raças vinculadas às espécies para classificação dos pets.</p>
       </div>
-      <n-button type="primary" size="large" class="head-cta" @click="openCreate">Nova raça</n-button>
+      <n-button v-if="canCreateBreeds" type="primary" size="large" class="head-cta" @click="openCreate">Nova raça</n-button>
     </div>
 
     <div :class="isMobile ? 'summary-grid-mobile summary-grid' : 'summary-grid'">
@@ -72,7 +72,7 @@
             <p class="card-subtitle card-subtitle-muted"><span class="card-line-label">Atualizado em:</span> {{ formatDate(item.updatedAt || '') || '—' }}</p>
             <div class="card-actions" @click.stop>
               <n-button size="small" secondary type="primary" @click="openEdit(item)">Ver raça</n-button>
-              <n-dropdown trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
+              <n-dropdown v-if="buildActionOptions(item).length" trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
                 <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
               </n-dropdown>
             </div>
@@ -91,7 +91,7 @@
         </template>
         <n-empty v-else description="Nenhuma raça encontrada.">
           <template #extra>
-            <n-button type="primary" @click="openCreate">Nova raça</n-button>
+            <n-button v-if="canCreateBreeds" type="primary" @click="openCreate">Nova raça</n-button>
           </template>
         </n-empty>
       </div>
@@ -110,7 +110,7 @@
         />
         <n-empty v-else description="Nenhuma raça encontrada.">
           <template #extra>
-            <n-button type="primary" @click="openCreate">Nova raça</n-button>
+            <n-button v-if="canCreateBreeds" type="primary" @click="openCreate">Nova raça</n-button>
           </template>
         </n-empty>
       </template>
@@ -156,7 +156,7 @@
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" :disabled="!canSubmitForm" @click="submitForm">
+          <n-button v-if="canSaveBreed" type="primary" :loading="saving" :disabled="!canSubmitForm" @click="submitForm">
             {{ editingItem ? 'Salvar alterações' : 'Criar raça' }}
           </n-button>
         </div>
@@ -170,6 +170,8 @@ import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { format } from 'date-fns'
 import { NButton, NDropdown, NTag, useDialog, useMessage } from 'naive-ui'
 import BreedForm, { type Breed } from '~/components/breeds/BreedForm.vue'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 interface BreedsResponse {
   data: Breed[]
@@ -186,6 +188,7 @@ interface SpeciesResponse {
 
 const message = useMessage()
 const dialog = useDialog()
+const authStore = useAuthStore()
 
 const breeds = ref<Breed[]>([])
 const speciesOptions = ref<{ label: string; value: number }[]>([])
@@ -240,6 +243,10 @@ const tablePagination = computed(() => ({
   pageSizes: [10, 20, 50]
 }))
 
+const canCreateBreeds = computed(() => authStore.hasPermission(PERMISSIONS.breedsCreate))
+const canUpdateBreeds = computed(() => authStore.hasPermission(PERMISSIONS.breedsUpdate))
+const canDeleteBreeds = computed(() => authStore.hasPermission(PERMISSIONS.breedsDelete))
+const canSaveBreed = computed(() => editingItem.value ? canUpdateBreeds.value : canCreateBreeds.value)
 
 const formatDate = (value: string) => {
   if (!value) return ''
@@ -251,13 +258,17 @@ const getSpeciesLabel = (item: Breed) => item.species?.name || speciesNameMap.va
 const hasLinks = (row: Breed) => Number((row as any).petsCount || 0) > 0
 
 const buildActionOptions = (row: Breed) => {
-  const options: Array<{ label?: string; key: string; type?: 'divider' }> = [
-    { label: 'Editar', key: 'edit' },
-    { label: row.isActive ? 'Inativar' : 'Ativar', key: 'toggleStatus' }
-  ]
+  const options: Array<{ label?: string; key: string; type?: 'divider' }> = []
 
-  if (!hasLinks(row)) {
-    options.push({ type: 'divider', key: `divider-${row.id}` })
+  if (canUpdateBreeds.value) {
+    options.push({ label: 'Editar', key: 'edit' })
+    options.push({ label: row.isActive ? 'Inativar' : 'Ativar', key: 'toggleStatus' })
+  }
+
+  if (canDeleteBreeds.value && !hasLinks(row)) {
+    if (options.length) {
+      options.push({ type: 'divider', key: `divider-${row.id}` })
+    }
     options.push({ label: 'Excluir', key: 'delete' })
   }
 
@@ -296,6 +307,7 @@ const columns = [
         }
       }, { default: () => 'Ver raça' }),
       h(NDropdown, {
+        style: buildActionOptions(row).length ? undefined : 'display: none',
         trigger: 'click',
         options: buildActionOptions(row),
         onSelect: (key: string) => handleActionSelect(key, row)
@@ -356,6 +368,7 @@ const fetchBreeds = async () => {
 }
 
 const handleSubmit = async (payload: Breed) => {
+  if ((payload.id && !canUpdateBreeds.value) || (!payload.id && !canCreateBreeds.value)) return
   saving.value = true
   try {
     const api = useApi()
@@ -381,6 +394,7 @@ const handleSubmit = async (payload: Breed) => {
 }
 
 const confirmDelete = (item: Breed) => {
+  if (!canDeleteBreeds.value) return
   if (hasLinks(item)) {
     message.warning('Não é possível excluir raças com vínculos existentes.')
     return
@@ -405,6 +419,7 @@ const confirmDelete = (item: Breed) => {
 }
 
 const toggleStatus = (item: Breed) => {
+  if (!canUpdateBreeds.value) return
   const actionLabel = item.isActive ? 'inativar' : 'ativar'
   dialog.warning({
     title: `Confirmar ${actionLabel}`,
@@ -428,6 +443,7 @@ const toggleStatus = (item: Breed) => {
 }
 
 const openCreate = () => {
+  if (!canCreateBreeds.value) return
   editingItem.value = null
   canSubmitForm.value = false
   showModal.value = true
@@ -444,6 +460,7 @@ const closeModal = () => {
 }
 
 const submitForm = async () => {
+  if (!canSaveBreed.value) return
   await formRef.value?.submit()
 }
 

@@ -6,7 +6,7 @@
         <h1>Tipos de agendamento</h1>
         <p class="subhead">Gerencie tipos de atendimento, duração padrão e status de disponibilidade.</p>
       </div>
-      <n-button type="primary" size="large" class="head-cta" @click="openCreate">Novo tipo</n-button>
+      <n-button v-if="canCreateAppointmentTypes" type="primary" size="large" class="head-cta" @click="openCreate">Novo tipo</n-button>
     </div>
 
     <div :class="isMobile ? 'summary-grid-mobile summary-grid' : 'summary-grid'">
@@ -60,7 +60,7 @@
         <p class="card-subtitle card-subtitle-muted"><span class="card-line-label">Atualizado em:</span> {{ formatDate(item.updatedAt || '') || '—' }}</p>
         <div class="card-actions" @click.stop>
           <n-button size="small" secondary type="primary" @click="openEdit(item)">Ver tipo</n-button>
-          <n-dropdown trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
+          <n-dropdown v-if="buildActionOptions(item).length" trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
             <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
           </n-dropdown>
         </div>
@@ -126,7 +126,7 @@
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" @click="submitAppointmentTypeForm">
+          <n-button v-if="canSaveAppointmentType" type="primary" :loading="saving" @click="submitAppointmentTypeForm">
             {{ editingType ? 'Salvar alterações' : 'Criar tipo' }}
           </n-button>
         </div>
@@ -140,9 +140,12 @@ import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { NButton, NDropdown, NTag, useDialog, useMessage } from 'naive-ui'
 import { format } from 'date-fns'
 import AppointmentTypeForm, { type AppointmentType } from '~/components/appointment-types/AppointmentTypeForm.vue'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 const message = useMessage()
 const dialog = useDialog()
+const authStore = useAuthStore()
 
 const filters = reactive({
   search: '',
@@ -215,16 +218,23 @@ const tablePagination = computed(() => ({
   pageSizes: [10, 20, 50]
 }))
 
+const canCreateAppointmentTypes = computed(() => authStore.hasPermission(PERMISSIONS.appointmentTypesCreate))
+const canUpdateAppointmentTypes = computed(() => authStore.hasPermission(PERMISSIONS.appointmentTypesUpdate))
+const canDeleteAppointmentTypes = computed(() => authStore.hasPermission(PERMISSIONS.appointmentTypesDelete))
+const canSaveAppointmentType = computed(() => editingType.value ? canUpdateAppointmentTypes.value : canCreateAppointmentTypes.value)
+
 const canDeleteType = (row: AppointmentType) => !blockedDeleteIds.value.has(Number(row.id))
 
 const buildActionOptions = (row: AppointmentType) => {
-  const options: Array<{ label?: string; key: string; type?: 'divider' }> = [
-    { label: 'Editar', key: 'edit' },
-    { label: row.isActive ? 'Inativar' : 'Ativar', key: 'toggleStatus' }
-  ]
+  const options: Array<{ label?: string; key: string; type?: 'divider' }> = []
 
-  if (canDeleteType(row)) {
-    options.push({ type: 'divider', key: `divider-${row.id}` })
+  if (canUpdateAppointmentTypes.value) {
+    options.push({ label: 'Editar', key: 'edit' })
+    options.push({ label: row.isActive ? 'Inativar' : 'Ativar', key: 'toggleStatus' })
+  }
+
+  if (canDeleteAppointmentTypes.value && canDeleteType(row)) {
+    if (options.length) options.push({ type: 'divider', key: `divider-${row.id}` })
     options.push({ label: 'Excluir', key: 'delete' })
   }
 
@@ -303,6 +313,7 @@ const fetchTypes = async () => {
 }
 
 const handleSubmit = async (payload: AppointmentType) => {
+  if ((payload.id && !canUpdateAppointmentTypes.value) || (!payload.id && !canCreateAppointmentTypes.value)) return
   const duplicateActive = types.value.some((item) => {
     if (payload.id && Number(item.id) === Number(payload.id)) return false
     return item.isActive && payload.isActive && item.name.trim().toLowerCase() === payload.name.trim().toLowerCase()
@@ -333,10 +344,12 @@ const handleSubmit = async (payload: AppointmentType) => {
 }
 
 const submitAppointmentTypeForm = async () => {
+  if (!canSaveAppointmentType.value) return
   await appointmentTypeFormRef.value?.submit()
 }
 
 const toggleStatus = (type: AppointmentType) => {
+  if (!canUpdateAppointmentTypes.value) return
   const label = type.isActive ? 'inativar' : 'ativar'
   dialog.warning({
     title: `Confirmar ${label}`,
@@ -360,6 +373,7 @@ const toggleStatus = (type: AppointmentType) => {
 }
 
 const confirmDelete = (type: AppointmentType) => {
+  if (!canDeleteAppointmentTypes.value) return
   dialog.warning({
     title: 'Confirmar exclusão',
     content: `Deseja excluir o tipo ${type.name}?`,
@@ -415,6 +429,7 @@ const handleDeleteBlocked = async (type: AppointmentType, messageText?: string) 
 }
 
 const openCreate = () => {
+  if (!canCreateAppointmentTypes.value) return
   editingType.value = null
   showModal.value = true
 }

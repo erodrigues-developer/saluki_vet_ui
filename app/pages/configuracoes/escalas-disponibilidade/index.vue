@@ -59,7 +59,7 @@
                     Nenhum dia disponível configurado para este veterinário.
                   </div>
                 </div>
-                <n-button type="primary" size="small" :disabled="!canManage || !hasWeeklyChanges" @click="saveWeeklySchedule">Salvar escala</n-button>
+                <n-button v-if="canManage" type="primary" size="small" :disabled="!hasWeeklyChanges" @click="saveWeeklySchedule">Salvar escala</n-button>
               </header>
 
               <div class="weekly-list">
@@ -103,19 +103,17 @@
                     </div>
                     <div class="row-actions">
                       <n-button
-                        v-if="day.isAvailable"
+                        v-if="canManage && day.isAvailable"
                         tertiary
                         size="small"
-                        :disabled="!canManage"
                         @click="openPeriodModal(day)"
                       >
                         + Adicionar período
                       </n-button>
                       <n-button
-                        v-if="day.isAvailable && day.periods.length"
+                        v-if="canManage && day.isAvailable && day.periods.length"
                         quaternary
                         size="small"
-                        :disabled="!canManage"
                         @click="openPeriodModal(day, true, 0)"
                       >
                         Editar
@@ -134,13 +132,13 @@
                   <h3>Bloqueios pontuais</h3>
                   <p>Cadastre bloqueios específicos por data e horário.</p>
                 </div>
-                <n-button type="primary" size="small" :disabled="!canManage" @click="openBlockModal()">Novo bloqueio</n-button>
+                <n-button v-if="canManage" type="primary" size="small" @click="openBlockModal()">Novo bloqueio</n-button>
               </header>
 
               <n-empty v-if="!blocks.length" description="Nenhum bloqueio pontual cadastrado.">
                 <template #extra>
                   <p class="empty-subtext">Use bloqueios para impedir agendamentos em horários específicos, como reuniões ou compromissos externos.</p>
-                  <n-button type="primary" size="small" :disabled="!canManage" @click="openBlockModal()">Novo bloqueio</n-button>
+                  <n-button v-if="canManage" type="primary" size="small" @click="openBlockModal()">Novo bloqueio</n-button>
                 </template>
               </n-empty>
 
@@ -152,8 +150,8 @@
                   </div>
                   <p class="list-secondary">{{ item.reason }}</p>
                   <n-space>
-                    <n-button size="small" :disabled="!canManage" @click="openBlockModal(item)">Editar</n-button>
-                    <n-button size="small" tertiary :disabled="!canManage" @click="deleteBlock(item)">Excluir</n-button>
+                    <n-button v-if="canManage" size="small" @click="openBlockModal(item)">Editar</n-button>
+                    <n-button v-if="canManage" size="small" tertiary @click="deleteBlock(item)">Excluir</n-button>
                   </n-space>
                 </div>
               </div>
@@ -167,13 +165,13 @@
                   <h3>Ausências/Férias</h3>
                   <p>Cadastre períodos em que o veterinário ficará indisponível.</p>
                 </div>
-                <n-button type="primary" size="small" :disabled="!canManage" @click="openAbsenceModal()">Nova ausência</n-button>
+                <n-button v-if="canManage" type="primary" size="small" @click="openAbsenceModal()">Nova ausência</n-button>
               </header>
 
               <n-empty v-if="!absences.length" description="Nenhuma ausência cadastrada.">
                 <template #extra>
                   <p class="empty-subtext">Use ausências para bloquear períodos maiores, como férias, folgas ou afastamentos.</p>
-                  <n-button type="primary" size="small" :disabled="!canManage" @click="openAbsenceModal()">Nova ausência</n-button>
+                  <n-button v-if="canManage" type="primary" size="small" @click="openAbsenceModal()">Nova ausência</n-button>
                 </template>
               </n-empty>
 
@@ -185,8 +183,8 @@
                   </div>
                   <p class="list-secondary">{{ item.reason }}</p>
                   <n-space>
-                    <n-button size="small" :disabled="!canManage" @click="openAbsenceModal(item)">Editar</n-button>
-                    <n-button size="small" tertiary :disabled="!canManage" @click="deleteAbsence(item)">Excluir</n-button>
+                    <n-button v-if="canManage" size="small" @click="openAbsenceModal(item)">Editar</n-button>
+                    <n-button v-if="canManage" size="small" tertiary @click="deleteAbsence(item)">Excluir</n-button>
                   </n-space>
                 </div>
               </div>
@@ -220,10 +218,10 @@
       </div>
       <template #footer>
         <div class="modal-footer split">
-          <n-button v-if="periodEditor.editingIndex !== null" tertiary @click="removeEditingPeriod">Remover período</n-button>
+          <n-button v-if="canManage && periodEditor.editingIndex !== null" tertiary @click="removeEditingPeriod">Remover período</n-button>
           <div class="modal-actions">
             <n-button @click="showPeriodModal = false">Cancelar</n-button>
-            <n-button type="primary" @click="savePeriod">Salvar período</n-button>
+            <n-button v-if="canManage" type="primary" @click="savePeriod">Salvar período</n-button>
           </div>
         </div>
       </template>
@@ -251,7 +249,7 @@
       <template #footer>
         <div class="modal-footer">
           <n-button @click="showBlockModal = false">Cancelar</n-button>
-          <n-button type="primary" @click="saveBlock">{{ blockForm.id ? 'Salvar alterações' : 'Criar bloqueio' }}</n-button>
+          <n-button v-if="canManage" type="primary" @click="saveBlock">{{ blockForm.id ? 'Salvar alterações' : 'Criar bloqueio' }}</n-button>
         </div>
       </template>
     </n-modal>
@@ -279,7 +277,7 @@
       <template #footer>
         <div class="modal-footer">
           <n-button @click="showAbsenceModal = false">Cancelar</n-button>
-          <n-button type="primary" @click="saveAbsence">{{ absenceForm.id ? 'Salvar alterações' : 'Criar ausência' }}</n-button>
+          <n-button v-if="canManage" type="primary" @click="saveAbsence">{{ absenceForm.id ? 'Salvar alterações' : 'Criar ausência' }}</n-button>
         </div>
       </template>
     </n-modal>
@@ -290,9 +288,12 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { format } from 'date-fns'
 import { useMessage } from 'naive-ui'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 const message = useMessage()
-const canManage = computed(() => true)
+const authStore = useAuthStore()
+const canManage = computed(() => authStore.hasPermission(PERMISSIONS.availabilityUpdate))
 
 const activeTab = ref('weekly')
 const selectedVeterinarianId = ref<number | null>(null)
@@ -390,6 +391,7 @@ const validatePeriod = (weekday: number, startTime: string, endTime: string, edi
 }
 
 const openPeriodModal = (day: any, editMode = false, index = 0) => {
+  if (!canManage.value) return
   const editingIndex = editMode ? index : null
   periodEditor.value = {
     weekday: Number(day.weekday),
@@ -402,6 +404,7 @@ const openPeriodModal = (day: any, editMode = false, index = 0) => {
 }
 
 const savePeriod = () => {
+  if (!canManage.value) return
   const { weekday, startTime, endTime, editingIndex } = periodEditor.value
   if (!validatePeriod(weekday, startTime, endTime, editingIndex)) return
   const day = weeklySchedule.value.find((row) => Number(row.weekday) === Number(weekday))
@@ -417,6 +420,7 @@ const savePeriod = () => {
 }
 
 const removeEditingPeriod = () => {
+  if (!canManage.value) return
   const { weekday, editingIndex } = periodEditor.value
   if (editingIndex === null) return
   const day = weeklySchedule.value.find((row) => Number(row.weekday) === Number(weekday))
@@ -446,6 +450,7 @@ const loadAvailability = async () => {
 }
 
 const saveWeeklySchedule = async () => {
+  if (!canManage.value) return
   if (!selectedVeterinarianId.value || !hasWeeklyChanges.value) return
 
   const hasInvalidAvailableDay = weeklySchedule.value.some((day) => day.isAvailable && (!Array.isArray(day.periods) || !day.periods.length))
@@ -472,6 +477,7 @@ const saveWeeklySchedule = async () => {
 }
 
 const openBlockModal = (item?: any) => {
+  if (!canManage.value) return
   if (!item) {
     blockForm.value = { id: null, date: null, startTime: null, endTime: null, reason: '', notes: '', active: true }
   } else {
@@ -489,6 +495,7 @@ const openBlockModal = (item?: any) => {
 }
 
 const saveBlock = async () => {
+  if (!canManage.value) return
   if (!selectedVeterinarianId.value) return
   if (!blockForm.value.date) {
     message.warning('Informe a data do bloqueio.')
@@ -527,6 +534,7 @@ const saveBlock = async () => {
 }
 
 const deleteBlock = async (item: any) => {
+  if (!canManage.value) return
   if (!selectedVeterinarianId.value) return
   const api = useApi()
   await api(`/api/v1/veterinarian-availability/${selectedVeterinarianId.value}/blocks/${item.id}`, { method: 'DELETE' })
@@ -534,6 +542,7 @@ const deleteBlock = async (item: any) => {
 }
 
 const openAbsenceModal = (item?: any) => {
+  if (!canManage.value) return
   if (!item) {
     absenceForm.value = { id: null, startDate: null, endDate: null, reason: '', notes: '', active: true }
   } else {
@@ -550,6 +559,7 @@ const openAbsenceModal = (item?: any) => {
 }
 
 const saveAbsence = async () => {
+  if (!canManage.value) return
   if (!selectedVeterinarianId.value) return
   if (!absenceForm.value.startDate || !absenceForm.value.endDate) {
     message.warning('Informe data inicial e data final.')
@@ -581,6 +591,7 @@ const saveAbsence = async () => {
 }
 
 const deleteAbsence = async (item: any) => {
+  if (!canManage.value) return
   if (!selectedVeterinarianId.value) return
   const api = useApi()
   await api(`/api/v1/veterinarian-availability/${selectedVeterinarianId.value}/absences/${item.id}`, { method: 'DELETE' })

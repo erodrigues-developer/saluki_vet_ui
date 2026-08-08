@@ -774,6 +774,7 @@ import type { FormInst, FormRules } from "naive-ui";
 import { NButton, NSelect, NTag, useDialog, useMessage } from "naive-ui";
 import CurrencyInput from "../common/CurrencyInput.vue";
 import { format } from "date-fns";
+import { PERMISSIONS } from "~/constants/permissions";
 import { useAuthStore } from "~/stores/auth";
 
 const props = defineProps<{ saleId?: number | null }>();
@@ -993,27 +994,42 @@ const validItemsCount = computed(() => {
 
 const canReceiveNow = computed(() => {
   return (
+    auth.hasPermission(PERMISSIONS.salesCheckout) &&
     Boolean(model.veterinarianId) &&
     hasValidItems.value &&
     totalAmount.value > 0
   );
 });
 const canSaveNow = computed(() => {
-  return Boolean(model.veterinarianId) && hasValidItems.value;
+  const hasMutationPermission = isNew.value
+    ? auth.hasPermission(PERMISSIONS.salesCreate)
+    : auth.hasPermission(PERMISSIONS.salesUpdate);
+  return hasMutationPermission && Boolean(model.veterinarianId) && hasValidItems.value;
 });
 
-const canShowSave = computed(() => isNew.value || model.status === "OPEN");
+const canShowSave = computed(() => {
+  if (isNew.value) return auth.hasPermission(PERMISSIONS.salesCreate);
+  return model.status === "OPEN" && auth.hasPermission(PERMISSIONS.salesUpdate);
+});
 const canShowReceiveButton = computed(
-  () => isNew.value || model.status === "OPEN",
+  () => auth.hasPermission(PERMISSIONS.salesCheckout) && (isNew.value || model.status === "OPEN"),
 );
 const canShowCancelSale = computed(
-  () => isEdit.value && model.status === "OPEN",
+  () => auth.hasPermission(PERMISSIONS.salesCancel) && isEdit.value && model.status === "OPEN",
 );
 const canShowUndoPayment = computed(
-  () => isEdit.value && model.status === "PAID",
+  () => auth.hasPermission(PERMISSIONS.salesUndoCheckout) && isEdit.value && model.status === "PAID",
 );
 const canShowReprintReceipt = computed(
-  () => isEdit.value && model.status === "PAID",
+  () => auth.hasPermission(PERMISSIONS.salesReceiptPrint) && isEdit.value && model.status === "PAID",
+);
+const canViewClients = computed(() => auth.hasPermission(PERMISSIONS.clientsView));
+const canViewUsers = computed(() => auth.hasPermission(PERMISSIONS.usersView));
+const canViewProducts = computed(() => auth.hasPermission(PERMISSIONS.productsView));
+const canViewProcedures = computed(() => auth.hasPermission(PERMISSIONS.proceduresView));
+const canViewPaymentMethods = computed(() => auth.hasPermission(PERMISSIONS.paymentMethodsView));
+const canViewCurrentCashRegister = computed(() =>
+  auth.hasPermission(PERMISSIONS.cashRegistersCurrent),
 );
 const currentUserOption = computed(() => {
   const user = auth.user;
@@ -1195,11 +1211,21 @@ const loadLookups = async () => {
   const api = useApi();
   const [clientsRes, usersRes, productsRes, proceduresRes, paymentMethodsRes] =
     await Promise.all([
-      api<any>("/api/v1/clients?limit=500"),
-      api<any>("/api/v1/users?limit=100"),
-      api<any>("/api/v1/products?limit=500"),
-      api<any>("/api/v1/procedures?limit=500"),
-      api<any>("/api/v1/payment-methods?page=1&limit=100"),
+      canViewClients.value
+        ? api<any>("/api/v1/clients?limit=500")
+        : Promise.resolve({ data: [] }),
+      canViewUsers.value
+        ? api<any>("/api/v1/users?limit=100")
+        : Promise.resolve({ data: [] }),
+      canViewProducts.value
+        ? api<any>("/api/v1/products?limit=500")
+        : Promise.resolve({ data: [] }),
+      canViewProcedures.value
+        ? api<any>("/api/v1/procedures?limit=500")
+        : Promise.resolve({ data: [] }),
+      canViewPaymentMethods.value
+        ? api<any>("/api/v1/payment-methods?page=1&limit=100")
+        : Promise.resolve({ data: [] }),
     ]);
 
   clientOptions.value = (clientsRes.data || []).map((i: any) => ({
@@ -1231,6 +1257,11 @@ const applyOperatorFromSession = (session: any) => {
 };
 
 const fetchOpenCashSessions = async () => {
+  if (!canViewCurrentCashRegister.value) {
+    cashSessionOptions.value = [];
+    return [];
+  }
+
   const api = useApi();
   const response = await api<any[]>("/api/v1/cash-registers/sessions/current");
   const sessions = Array.isArray(response) ? response : [];
@@ -2439,6 +2470,7 @@ const handleCheckout = async () => {
 };
 
 const confirmCancelSale = () => {
+  if (!auth.hasPermission(PERMISSIONS.salesCancel)) return;
   if (!model.id) return;
   dialog.warning({
     title: "Cancelar venda",
@@ -2459,6 +2491,7 @@ const confirmCancelSale = () => {
 };
 
 const confirmUndoPayment = () => {
+  if (!auth.hasPermission(PERMISSIONS.salesUndoCheckout)) return;
   if (!model.id) return;
   dialog.warning({
     title: "Estornar pagamento",
@@ -2498,7 +2531,9 @@ onMounted(async () => {
       await loadSale();
     } else {
       applyOperatorDefaults();
-      await fetchOpenCashSessions();
+      if (canViewCurrentCashRegister.value) {
+        await fetchOpenCashSessions();
+      }
       await focusQuickEntry();
     }
   } catch {

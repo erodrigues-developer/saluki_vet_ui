@@ -6,10 +6,10 @@
         <h1>Status de agendamento</h1>
         <p class="subhead">Gerencie os status utilizados no fluxo de agendamentos da clínica.</p>
       </div>
-      <n-button v-if="!isMobile" type="primary" size="large" @click="openCreate">Novo status</n-button>
+      <n-button v-if="!isMobile && canCreateStatuses" type="primary" size="large" @click="openCreate">Novo status</n-button>
     </div>
 
-    <n-button v-if="isMobile" type="primary" size="large" block class="mobile-head-cta" @click="openCreate">Novo status</n-button>
+    <n-button v-if="isMobile && canCreateStatuses" type="primary" size="large" block class="mobile-head-cta" @click="openCreate">Novo status</n-button>
 
     <div :class="isMobile ? 'summary-grid-mobile summary-grid' : 'summary-grid'">
       <n-card size="small" :bordered="false" class="summary-card">
@@ -65,7 +65,7 @@
             <p class="card-subtitle card-subtitle-muted"><span class="card-line-label">Atualizado em:</span> {{ formatDate(item.updatedAt || '') || '—' }}</p>
             <div class="card-actions" @click.stop>
               <n-button size="small" secondary type="primary" @click="openEdit(item)">Ver status</n-button>
-              <n-dropdown trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
+              <n-dropdown v-if="buildActionOptions(item).length" trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
                 <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
               </n-dropdown>
             </div>
@@ -85,7 +85,7 @@
         <n-empty v-else :description="emptyDescription">
           <template #extra>
             <n-button v-if="hasActiveFilters" @click="handleClearFilters">Limpar filtros</n-button>
-            <n-button v-else type="primary" @click="openCreate">Novo status</n-button>
+            <n-button v-else-if="canCreateStatuses" type="primary" @click="openCreate">Novo status</n-button>
           </template>
         </n-empty>
       </div>
@@ -104,7 +104,7 @@
         <n-empty v-else :description="emptyDescription">
           <template #extra>
             <n-button v-if="hasActiveFilters" @click="handleClearFilters">Limpar filtros</n-button>
-            <n-button v-else type="primary" @click="openCreate">Novo status</n-button>
+            <n-button v-else-if="canCreateStatuses" type="primary" @click="openCreate">Novo status</n-button>
           </template>
         </n-empty>
       </template>
@@ -135,7 +135,7 @@
           <n-button v-if="editingStatus?.isSystem" type="primary" @click="closeModal">Fechar</n-button>
           <template v-else>
             <n-button tertiary @click="closeModal" :disabled="saving">Cancelar</n-button>
-            <n-button type="primary" :loading="saving" @click="submitAppointmentStatusForm">
+            <n-button v-if="canSaveStatus" type="primary" :loading="saving" @click="submitAppointmentStatusForm">
               {{ editingStatus ? 'Salvar alterações' : 'Criar status' }}
             </n-button>
           </template>
@@ -150,9 +150,12 @@ import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { format } from 'date-fns'
 import { NButton, NDropdown, NTag, useDialog, useMessage } from 'naive-ui'
 import AppointmentStatusForm, { type AppointmentStatus } from '~/components/appointment-statuses/AppointmentStatusForm.vue'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 const message = useMessage()
 const dialog = useDialog()
+const authStore = useAuthStore()
 
 const statuses = ref<AppointmentStatus[]>([])
 const loading = ref(false)
@@ -221,10 +224,22 @@ const modalSubtitle = computed(() => {
   if (editingStatus.value.isSystem) return 'Consulte as informações deste status de agendamento.'
   return 'Atualize nome, código e disponibilidade do status.'
 })
+const canCreateStatuses = computed(() => authStore.hasPermission(PERMISSIONS.appointmentStatusesCreate))
+const canUpdateStatuses = computed(() => authStore.hasPermission(PERMISSIONS.appointmentStatusesUpdate))
+const canDeleteStatuses = computed(() => authStore.hasPermission(PERMISSIONS.appointmentStatusesDelete))
+const canSaveStatus = computed(() => editingStatus.value ? canUpdateStatuses.value : canCreateStatuses.value)
 
 const buildActionOptions = (item: AppointmentStatus) => {
   if (item.isSystem) return [{ label: 'Ver detalhes', key: 'view' }]
-  return [{ label: 'Editar', key: 'edit' }, { type: 'divider', key: `divider-${item.id}` }, { label: 'Excluir', key: 'delete' }]
+  const options: Array<{ label?: string; key: string; type?: 'divider' }> = []
+  if (canUpdateStatuses.value) {
+    options.push({ label: 'Editar', key: 'edit' })
+  }
+  if (canDeleteStatuses.value) {
+    if (options.length) options.push({ type: 'divider', key: `divider-${item.id}` })
+    options.push({ label: 'Excluir', key: 'delete' })
+  }
+  return options
 }
 
 const handleActionSelect = (key: string, item: AppointmentStatus) => {
@@ -266,6 +281,7 @@ const fetchStatuses = async () => {
 }
 
 const handleSubmit = async (payload: AppointmentStatus) => {
+  if ((payload.id && !canUpdateStatuses.value) || (!payload.id && !canCreateStatuses.value)) return
   saving.value = true
   try {
     const api = useApi()
@@ -287,10 +303,12 @@ const handleSubmit = async (payload: AppointmentStatus) => {
 
 const submitAppointmentStatusForm = async () => {
   if (editingStatus.value?.isSystem) return
+  if (!canSaveStatus.value) return
   await appointmentStatusFormRef.value?.submit()
 }
 
 const confirmDelete = (status: AppointmentStatus) => {
+  if (!canDeleteStatuses.value) return
   if (status.isSystem) {
     message.warning('Status nativo do sistema não pode ser excluído.')
     return
@@ -313,7 +331,11 @@ const confirmDelete = (status: AppointmentStatus) => {
   })
 }
 
-const openCreate = () => { editingStatus.value = null; showModal.value = true }
+const openCreate = () => {
+  if (!canCreateStatuses.value) return
+  editingStatus.value = null
+  showModal.value = true
+}
 const openEdit = (status: AppointmentStatus) => { editingStatus.value = status; showModal.value = true }
 const closeModal = () => { showModal.value = false }
 

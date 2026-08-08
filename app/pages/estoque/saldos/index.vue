@@ -7,10 +7,10 @@
         <p class="subhead">Acompanhe saldo por produto e local, alertas de estoque e registre movimentações manuais.</p>
       </div>
       <div class="head-actions">
-        <n-button tertiary size="large" @click="navigateTo('/estoque/movimentacoes')">Histórico</n-button>
-        <n-button secondary size="large" @click="openMovement('OUT')">Saída</n-button>
-        <n-button secondary size="large" @click="openMovement('ADJUST')">Ajustar</n-button>
-        <n-button type="primary" size="large" @click="openMovement('IN')">Entrada</n-button>
+        <n-button v-if="canViewStockMovements" tertiary size="large" @click="navigateTo('/estoque/movimentacoes')">Histórico</n-button>
+        <n-button v-if="canStockOut" secondary size="large" @click="openMovement('OUT')">Saída</n-button>
+        <n-button v-if="canStockAdjust" secondary size="large" @click="openMovement('ADJUST')">Ajustar</n-button>
+        <n-button v-if="canStockIn" type="primary" size="large" @click="openMovement('IN')">Entrada</n-button>
       </div>
     </div>
 
@@ -71,10 +71,10 @@
           <p class="card-line"><span class="card-line-label">Custo:</span> <span class="card-line-value">{{ formatCurrency(row.costPrice) }}</span></p>
           <p class="card-line"><span class="card-line-label">Venda:</span> <span class="card-line-value">{{ formatCurrency(row.salePrice) }}</span></p>
         </div>
-        <div class="card-actions">
-          <n-button size="small" secondary :disabled="!row.trackStock" @click="openMovement('IN', row)">Entrada</n-button>
-          <n-button size="small" secondary :disabled="!row.trackStock" @click="openMovement('OUT', row)">Saída</n-button>
-          <n-button size="small" quaternary :disabled="!row.trackStock" @click="openMovement('ADJUST', row)">Ajustar</n-button>
+        <div v-if="canStockIn || canStockOut || canStockAdjust" class="card-actions">
+          <n-button v-if="canStockIn" size="small" secondary :disabled="!row.trackStock" @click="openMovement('IN', row)">Entrada</n-button>
+          <n-button v-if="canStockOut" size="small" secondary :disabled="!row.trackStock" @click="openMovement('OUT', row)">Saída</n-button>
+          <n-button v-if="canStockAdjust" size="small" quaternary :disabled="!row.trackStock" @click="openMovement('ADJUST', row)">Ajustar</n-button>
         </div>
       </div>
       <div class="pagination">
@@ -134,7 +134,7 @@
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeMovementModal">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" @click="submitMovementForm">Confirmar</n-button>
+          <n-button v-if="canSubmitCurrentMovement" type="primary" :loading="saving" @click="submitMovementForm">Confirmar</n-button>
         </div>
       </template>
     </n-modal>
@@ -145,6 +145,7 @@
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { NButton, NTag, useMessage } from 'naive-ui'
 import StockMovementForm from '~/components/stock/StockMovementForm.vue'
+import { PERMISSIONS } from '~/constants/permissions'
 
 interface BalanceRow {
   productId: number
@@ -184,6 +185,7 @@ interface BalanceResponse {
 }
 
 const message = useMessage()
+const authStore = useAuthStore()
 const loading = ref(false)
 const saving = ref(false)
 const showMobileFilters = ref(false)
@@ -248,6 +250,15 @@ const modalSubtitle = computed(() => {
   if (movementMode.value === 'IN') return 'Registre uma entrada manual no local selecionado.'
   if (movementMode.value === 'OUT') return 'Registre uma baixa manual respeitando o saldo disponível.'
   return 'Informe o saldo contado e o sistema calculará a diferença.'
+})
+const canViewStockMovements = computed(() => authStore.hasPermission(PERMISSIONS.stockMovementsView))
+const canStockIn = computed(() => authStore.hasPermission(PERMISSIONS.stockMovementsIn))
+const canStockOut = computed(() => authStore.hasPermission(PERMISSIONS.stockMovementsOut))
+const canStockAdjust = computed(() => authStore.hasPermission(PERMISSIONS.stockMovementsAdjust))
+const canSubmitCurrentMovement = computed(() => {
+  if (movementMode.value === 'IN') return canStockIn.value
+  if (movementMode.value === 'OUT') return canStockOut.value
+  return canStockAdjust.value
 })
 
 const updateIsMobile = () => {
@@ -324,6 +335,11 @@ const applyMobileFilters = async () => {
 }
 
 const openMovement = (mode: 'IN' | 'OUT' | 'ADJUST', row?: BalanceRow) => {
+  if (
+    (mode === 'IN' && !canStockIn.value) ||
+    (mode === 'OUT' && !canStockOut.value) ||
+    (mode === 'ADJUST' && !canStockAdjust.value)
+  ) return
   movementMode.value = mode
   movementPreset.value = row
     ? {
@@ -340,10 +356,12 @@ const closeMovementModal = () => {
 }
 
 const submitMovementForm = async () => {
+  if (!canSubmitCurrentMovement.value) return
   await movementFormRef.value?.submit()
 }
 
 const handleMovementSubmit = async (payload: Record<string, any>) => {
+  if (!canSubmitCurrentMovement.value) return
   saving.value = true
   const api = useApi()
   try {
@@ -412,7 +430,7 @@ const statusStyle = (status: string) => {
   return { background: '#dcfce7', color: '#166534' }
 }
 
-const columns = [
+const columns = computed(() => [
   { title: 'Produto', key: 'productName' },
   { title: 'Categoria', key: 'categoryName', render: (row: BalanceRow) => row.categoryName || '—' },
   { title: 'Local', key: 'stockLocationName' },
@@ -446,27 +464,27 @@ const columns = [
     key: 'actions',
     width: 240,
     render: (row: BalanceRow) => h('div', { class: 'table-actions' }, [
-      h(NButton, {
+      canStockIn.value ? h(NButton, {
         size: 'small',
         secondary: true,
         disabled: !row.trackStock,
         onClick: () => openMovement('IN', row)
-      }, { default: () => 'Entrada' }),
-      h(NButton, {
+      }, { default: () => 'Entrada' }) : null,
+      canStockOut.value ? h(NButton, {
         size: 'small',
         secondary: true,
         disabled: !row.trackStock,
         onClick: () => openMovement('OUT', row)
-      }, { default: () => 'Saída' }),
-      h(NButton, {
+      }, { default: () => 'Saída' }) : null,
+      canStockAdjust.value ? h(NButton, {
         size: 'small',
         quaternary: true,
         disabled: !row.trackStock,
         onClick: () => openMovement('ADJUST', row)
-      }, { default: () => 'Ajustar' })
-    ])
+      }, { default: () => 'Ajustar' }) : null
+    ].filter(Boolean))
   }
-]
+])
 
 onMounted(() => {
   if (typeof window !== 'undefined') {

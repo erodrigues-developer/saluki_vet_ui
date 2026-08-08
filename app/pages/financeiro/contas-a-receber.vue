@@ -6,12 +6,12 @@
         <h1>Contas a receber</h1>
         <p class="subhead">Gerencie recebimentos, vencimentos, clientes e pendências financeiras.</p>
       </div>
-      <n-button v-if="!isMobile" type="primary" size="large" class="head-cta" @click="openCreateModal">
+      <n-button v-if="!isMobile && canCreateAccountsReceivable" type="primary" size="large" class="head-cta" @click="openCreateModal">
         Nova conta
       </n-button>
     </div>
 
-    <n-button v-if="isMobile" type="primary" block class="mobile-primary-cta" @click="openCreateModal">
+    <n-button v-if="isMobile && canCreateAccountsReceivable" type="primary" block class="mobile-primary-cta" @click="openCreateModal">
       Nova conta
     </n-button>
 
@@ -102,7 +102,7 @@
           </p>
           <div class="empty-actions">
             <n-button v-if="hasActiveFilters" tertiary @click="handleClearFilters">Limpar filtros</n-button>
-            <n-button type="primary" @click="openCreateModal">Adicionar conta</n-button>
+            <n-button v-if="canCreateAccountsReceivable" type="primary" @click="openCreateModal">Adicionar conta</n-button>
           </div>
         </div>
       </template>
@@ -123,7 +123,7 @@
             <p class="card-subtitle card-value-line"><span class="card-line-label">Valor: </span><span class="card-line-value financial-value">{{ formatCurrency(Number(row.amount)) }}</span></p>
             <div class="card-actions" @click.stop @mousedown.stop>
               <n-button size="small" secondary type="primary" @click.stop="openEditModal(row)">Ver conta</n-button>
-              <n-dropdown trigger="click" :options="buildActionOptions(row)" @select="(key: string) => handleActionSelect(key, row)">
+              <n-dropdown v-if="buildActionOptions(row).length" trigger="click" :options="buildActionOptions(row)" @select="(key: string) => handleActionSelect(key, row)">
                 <n-button size="small" quaternary class="menu-button" @click.stop @mousedown.stop><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
               </n-dropdown>
             </div>
@@ -142,7 +142,7 @@
         </p>
         <div class="empty-actions">
           <n-button v-if="hasActiveFilters" tertiary @click="handleClearFilters">Limpar filtros</n-button>
-          <n-button type="primary" @click="openCreateModal">Adicionar conta</n-button>
+          <n-button v-if="canCreateAccountsReceivable" type="primary" @click="openCreateModal">Adicionar conta</n-button>
         </div>
       </div>
       <n-data-table
@@ -274,12 +274,12 @@
                 <p><span class="card-line-label">Data de recebimento: </span><span class="card-line-value">{{ formatDateTimeDisplay(registeredReceipt.paidAt) }}</span></p>
                 <p><span class="card-line-label">Valor recebido: </span><span class="card-line-value">{{ formatCurrency(Number(registeredReceipt.paidAmount || 0)) }}</span></p>
                 <p><span class="card-line-label">Forma de pagamento: </span><span class="card-line-value">{{ registeredReceipt.paymentMethodName || '-' }}</span></p>
-                <n-button v-if="!isManagedBySale" size="small" tertiary @click="handleUndoInlineReceipt">Estornar recebimento</n-button>
+                <n-button v-if="canReverseAccountsReceivable && !isManagedBySale" size="small" tertiary @click="handleUndoInlineReceipt">Estornar recebimento</n-button>
               </div>
 
               <template v-else-if="!isManagedBySale">
                 <n-button
-                  v-if="!showInlineReceiptForm"
+                  v-if="canReceiveAccountsReceivable && !showInlineReceiptForm"
                   size="small"
                   secondary
                   type="primary"
@@ -341,6 +341,7 @@
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeCreateModal">Cancelar</n-button>
           <n-button
+            v-if="canRunPrimaryAction"
             type="primary"
             :loading="primaryActionLoading"
             :disabled="primaryActionDisabled"
@@ -357,6 +358,8 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { NButton, NDropdown, NTag, useMessage } from 'naive-ui';
+import { PERMISSIONS } from '~/constants/permissions';
+import { useAuthStore } from '~/stores/auth';
 
 definePageMeta({ layout: 'default' });
 
@@ -398,6 +401,7 @@ type AccountOrigin = 'MANUAL' | 'SALE';
 
 const router = useRouter();
 const message = useMessage();
+const authStore = useAuthStore();
 const loading = ref(false);
 const saving = ref(false);
 const savingInlineReceipt = ref(false);
@@ -604,6 +608,15 @@ const modalCurrentStatus = computed<FinancialStatus>(() =>
 const isManagedBySale = computed(
   () => createForm.originType === 'SALE' || linkedSaleId.value !== null,
 );
+const canCreateAccountsReceivable = computed(() => authStore.hasPermission(PERMISSIONS.accountsReceivableCreate));
+const canUpdateAccountsReceivable = computed(() => authStore.hasPermission(PERMISSIONS.accountsReceivableUpdate));
+const canReceiveAccountsReceivable = computed(() => authStore.hasPermission(PERMISSIONS.accountsReceivableReceive));
+const canReverseAccountsReceivable = computed(() => authStore.hasPermission(PERMISSIONS.accountsReceivableReverse));
+const canRunPrimaryAction = computed(() => {
+  if (isManagedBySale.value) return true;
+  if (editingAccountId.value && showInlineReceiptForm.value) return canReceiveAccountsReceivable.value && canUpdateAccountsReceivable.value;
+  return editingAccountId.value ? canUpdateAccountsReceivable.value : canCreateAccountsReceivable.value;
+});
 
 const primaryActionLabel = computed(() => {
   if (isManagedBySale.value) {
@@ -849,6 +862,7 @@ const columns = [
               {
                 trigger: 'click',
                 options: buildActionOptions(row),
+                style: buildActionOptions(row).length ? undefined : 'display: none',
                 onSelect: (key: string) => handleActionSelect(key, row),
               },
               {
@@ -881,12 +895,16 @@ const tableRowProps = (row: AccountReceivableItem) => {
 };
 
 const buildActionOptions = (row: AccountReceivableItem) => {
-  const options: Array<{ label: string; key: string }> = [
-    { label: row.saleId ? 'Visualizar' : 'Editar', key: 'edit' },
-  ];
+  const options: Array<{ label: string; key: string }> = [];
 
-  if (!row.saleId && getEffectiveStatus(row) !== 'PAID') {
+  if (row.saleId || canUpdateAccountsReceivable.value) {
+    options.push({ label: row.saleId ? 'Visualizar' : 'Editar', key: 'edit' });
+  }
+
+  if (canReceiveAccountsReceivable.value && !row.saleId && getEffectiveStatus(row) !== 'PAID') {
     options.push({ label: 'Registrar recebimento', key: 'receive' });
+  }
+  if (canCreateAccountsReceivable.value && !row.saleId) {
     options.push({ label: 'Duplicar', key: 'duplicate' });
   }
 
@@ -1049,6 +1067,7 @@ const closeCreateModal = () => {
 };
 
 const openCreateModal = () => {
+  if (!canCreateAccountsReceivable.value) return;
   editingAccountId.value = null;
   resetCreateForm();
   showCreateModal.value = true;
@@ -1188,6 +1207,7 @@ const handleSubmitAccount = async () => {
 };
 
 const openInlineReceiptForm = () => {
+  if (!canReceiveAccountsReceivable.value) return;
   inlineReceiptForm.paidAt = Date.now();
   inlineReceiptForm.paidAmount = Number(createForm.amount || 0);
   inlineReceiptForm.paymentMethodId = paymentMethodOptions.value[0]?.value || null;
@@ -1203,6 +1223,7 @@ const collapseInlineReceiptForm = () => {
 };
 
 const handlePrimaryModalAction = async () => {
+  if (!canRunPrimaryAction.value) return;
   if (isManagedBySale.value) {
     openSale(linkedSaleId.value);
     return;
@@ -1268,6 +1289,7 @@ const confirmInlineReceipt = async () => {
 };
 
 const handleUndoInlineReceipt = async () => {
+  if (!canReverseAccountsReceivable.value) return;
   if (!editingAccountId.value || isManagedBySale.value) return;
   savingInlineReceipt.value = true;
   const api = useApi();

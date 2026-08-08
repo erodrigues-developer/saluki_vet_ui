@@ -40,8 +40,8 @@
             <p class="report-card-text">{{ card.description }}</p>
             <p class="report-card-meta">Última geração: {{ resolveLastGeneration(card.type) }}</p>
             <div class="report-card-actions">
-              <n-button secondary @click="openGenerateModal(card.type)">Configurar</n-button>
-              <n-button type="primary" :loading="generatingType === card.type" @click="generate(card.type)">Gerar</n-button>
+              <n-button v-if="canGenerateReports" secondary @click="openGenerateModal(card.type)">Configurar</n-button>
+              <n-button v-if="canGenerateReports" type="primary" :loading="generatingType === card.type" @click="generate(card.type)">Gerar</n-button>
             </div>
           </n-card>
         </div>
@@ -85,7 +85,7 @@
             <p class="card-subtitle">Linhas: {{ item.rowCount || 0 }} · Tamanho: {{ formatFileSize(item.fileSize) }}</p>
             <p class="card-subtitle filters-preview">{{ summarizeFilters(item.filtersJson) }}</p>
             <div class="card-actions">
-              <n-button size="small" secondary @click="downloadReport(item)">Baixar</n-button>
+              <n-button v-if="canDownloadReports" size="small" secondary @click="downloadReport(item)">Baixar</n-button>
             </div>
           </div>
         </div>
@@ -187,7 +187,7 @@
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary :disabled="Boolean(generatingType)" @click="showGenerateModal = false">Cancelar</n-button>
-          <n-button type="primary" :loading="Boolean(generatingType)" @click="confirmGenerate">Gerar relatório</n-button>
+          <n-button v-if="canGenerateReports" type="primary" :loading="Boolean(generatingType)" @click="confirmGenerate">Gerar relatório</n-button>
         </div>
       </template>
     </n-modal>
@@ -197,6 +197,8 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { NButton, useMessage } from 'naive-ui'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 type CatalogItem = {
   type: string
@@ -218,6 +220,7 @@ type ReportHistoryItem = {
 }
 
 const message = useMessage()
+const authStore = useAuthStore()
 const loadingCatalog = ref(false)
 const loadingHistory = ref(false)
 const generatingType = ref<string | null>(null)
@@ -254,6 +257,8 @@ const reportTypeOptions = computed(() =>
 const currentCard = computed(() =>
   cards.value.find((item) => item.type === selectedType.value) || null,
 )
+const canGenerateReports = computed(() => authStore.hasPermission(PERMISSIONS.reportsGenerate))
+const canDownloadReports = computed(() => authStore.hasPermission(PERMISSIONS.reportsDownload))
 
 const generatedToday = computed(() => {
   const today = new Date().toISOString().slice(0, 10)
@@ -345,6 +350,7 @@ const columns = [
       h(
         NButton,
         {
+          style: canDownloadReports.value ? undefined : 'display: none',
           size: 'small',
           secondary: true,
           onClick: () => downloadReport(row),
@@ -364,6 +370,7 @@ const updateIsMobile = () => {
 }
 
 const openGenerateModal = (type?: string | null) => {
+  if (!canGenerateReports.value) return
   if (!type) return
   selectedType.value = type
   resetGenerateForm()
@@ -461,6 +468,7 @@ const fetchHistory = async () => {
 }
 
 const generate = async (type: string) => {
+  if (!canGenerateReports.value) return
   generatingType.value = type
   const api = useApi()
 
@@ -482,11 +490,13 @@ const generate = async (type: string) => {
 }
 
 const confirmGenerate = async () => {
+  if (!canGenerateReports.value) return
   if (!selectedType.value) return
   await generate(selectedType.value)
 }
 
 const downloadReport = (item: ReportHistoryItem) => {
+  if (!canDownloadReports.value) return
   if (!item.fileUrl) {
     message.error('Arquivo indisponível para download')
     return

@@ -10,7 +10,7 @@
         </p>
       </div>
       <n-button
-        v-if="!isMobile"
+        v-if="!isMobile && canCreateProducts"
         type="primary"
         size="large"
         class="head-cta"
@@ -20,7 +20,7 @@
     </div>
 
     <n-button
-      v-if="isMobile"
+      v-if="isMobile && canCreateProducts"
       type="primary"
       size="large"
       block
@@ -201,6 +201,7 @@
                 >Ver item</n-button
               >
               <n-dropdown
+                v-if="buildActionOptions(item).length"
                 trigger="click"
                 :options="buildActionOptions(item)"
                 @select="(key: string) => handleActionSelect(key, item)"
@@ -228,7 +229,7 @@
             <n-button v-if="hasActiveFilters" @click="handleClearFilters"
               >Limpar filtros</n-button
             >
-            <n-button v-else type="primary" @click="openCreate"
+            <n-button v-else-if="canCreateProducts" type="primary" @click="openCreate"
               >Novo produto/serviço</n-button
             >
           </template>
@@ -253,7 +254,7 @@
             <n-button v-if="hasActiveFilters" @click="handleClearFilters"
               >Limpar filtros</n-button
             >
-            <n-button v-else type="primary" @click="openCreate"
+            <n-button v-else-if="canCreateProducts" type="primary" @click="openCreate"
               >Novo produto/serviço</n-button
             >
           </template>
@@ -332,6 +333,7 @@
             >Cancelar</n-button
           >
           <n-button
+            v-if="canSaveProduct"
             type="primary"
             :loading="saving"
             @click="submitProductForm"
@@ -352,6 +354,8 @@ import { NButton, NDropdown, NTag, useDialog, useMessage } from "naive-ui";
 import ProductForm, {
   type Product,
 } from "~/components/products/ProductForm.vue";
+import { PERMISSIONS } from "~/constants/permissions";
+import { useAuthStore } from "~/stores/auth";
 
 interface ProductsResponse {
   data: Product[];
@@ -364,6 +368,7 @@ interface ProductsResponse {
 
 const message = useMessage();
 const dialog = useDialog();
+const authStore = useAuthStore();
 
 const items = ref<Product[]>([]);
 const allItems = ref<Product[]>([]);
@@ -445,6 +450,10 @@ const emptyDescription = computed(() =>
     ? "Nenhum item encontrado com os filtros aplicados."
     : "Nenhum produto ou serviço encontrado.",
 );
+const canCreateProducts = computed(() => authStore.hasPermission(PERMISSIONS.productsCreate));
+const canUpdateProducts = computed(() => authStore.hasPermission(PERMISSIONS.productsUpdate));
+const canDeleteProducts = computed(() => authStore.hasPermission(PERMISSIONS.productsDelete));
+const canSaveProduct = computed(() => editingItem.value ? canUpdateProducts.value : canCreateProducts.value);
 
 const formatDate = (value: string) =>
   value ? format(new Date(value), "dd/MM/yyyy HH:mm") : "";
@@ -564,6 +573,7 @@ const columns = [
           {
             trigger: "click",
             options: buildActionOptions(row),
+            style: buildActionOptions(row).length ? undefined : "display: none",
             onSelect: (key: string) => handleActionSelect(key, row),
           },
           {
@@ -584,12 +594,18 @@ const columns = [
   },
 ];
 
-const buildActionOptions = (item: Product) => [
-  { label: "Editar", key: "edit" },
-  { label: item.isActive ? "Inativar" : "Ativar", key: "toggleStatus" },
-  { type: "divider", key: `divider-${item.id}` },
-  { label: "Excluir", key: "delete" },
-];
+const buildActionOptions = (item: Product) => {
+  const options: Array<{ label?: string; key: string; type?: "divider" }> = [];
+  if (canUpdateProducts.value) {
+    options.push({ label: "Editar", key: "edit" });
+    options.push({ label: item.isActive ? "Inativar" : "Ativar", key: "toggleStatus" });
+  }
+  if (canDeleteProducts.value) {
+    if (options.length) options.push({ type: "divider", key: `divider-${item.id}` });
+    options.push({ label: "Excluir", key: "delete" });
+  }
+  return options;
+};
 
 const handleActionSelect = (key: string, item: Product) => {
   if (key === "edit") return openEdit(item);
@@ -685,6 +701,7 @@ const fetchItems = async () => {
 };
 
 const handleSubmit = async (payload: Product) => {
+  if ((payload.id && !canUpdateProducts.value) || (!payload.id && !canCreateProducts.value)) return;
   saving.value = true;
   const api = useApi();
 
@@ -719,10 +736,12 @@ const handleSubmit = async (payload: Product) => {
 };
 
 const submitProductForm = async () => {
+  if (!canSaveProduct.value) return;
   await productFormRef.value?.submit();
 };
 
 const confirmDeactivate = (item: Product) => {
+  if (!canUpdateProducts.value) return;
   if (!item.id) return;
 
   dialog.warning({
@@ -747,6 +766,7 @@ const confirmDeactivate = (item: Product) => {
 };
 
 const confirmReactivate = (item: Product) => {
+  if (!canUpdateProducts.value) return;
   if (!item.id) return;
 
   dialog.success({
@@ -771,6 +791,7 @@ const confirmReactivate = (item: Product) => {
 };
 
 const confirmDelete = (item: Product) => {
+  if (!canDeleteProducts.value) return;
   if (!item.id) return;
 
   dialog.warning({
@@ -792,6 +813,7 @@ const confirmDelete = (item: Product) => {
 };
 
 const openCreate = () => {
+  if (!canCreateProducts.value) return;
   editingItem.value = null;
   showModal.value = true;
 };

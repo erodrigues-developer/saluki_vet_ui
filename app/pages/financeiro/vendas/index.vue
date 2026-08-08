@@ -6,12 +6,12 @@
         <h1>Vendas</h1>
         <p class="subhead">Gerencie vendas, recebimentos, clientes e lançamentos financeiros.</p>
       </div>
-      <n-button v-if="!isMobile" type="primary" size="large" class="head-cta" @click="openCreateModal">
+      <n-button v-if="!isMobile && canCreateSales" type="primary" size="large" class="head-cta" @click="openCreateModal">
         Nova venda
       </n-button>
     </div>
 
-    <n-button v-if="isMobile" type="primary" block class="mobile-primary-cta" @click="openCreateModal">
+    <n-button v-if="isMobile && canCreateSales" type="primary" block class="mobile-primary-cta" @click="openCreateModal">
       Nova venda
     </n-button>
 
@@ -92,17 +92,16 @@
 
         <div class="card-actions">
           <n-button
+            v-if="canCheckoutSales && row.status === 'OPEN'"
             size="small"
             type="primary"
             :secondary="row.status === 'OPEN'"
-            :disabled="row.status !== 'OPEN'"
-            :aria-disabled="row.status !== 'OPEN' ? 'true' : 'false'"
-            :class="['receive-btn', row.status === 'OPEN' ? 'receive-btn-active' : 'receive-btn-disabled']"
+            class="receive-btn receive-btn-active"
             @click.stop="openCheckoutModal(row)"
           >
             Receber
           </n-button>
-          <n-dropdown trigger="click" :options="actionOptionsFor(row)" @select="(key: string) => handleActionSelect(key, row)">
+          <n-dropdown v-if="actionOptionsFor(row).length" trigger="click" :options="actionOptionsFor(row)" @select="(key: string) => handleActionSelect(key, row)">
             <n-button size="small" quaternary class="menu-button" @click.stop><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
           </n-dropdown>
         </div>
@@ -223,7 +222,7 @@
           <n-button :disabled="checkoutLoading" @click="showCheckoutModal = false">
             Cancelar
           </n-button>
-          <n-button type="primary" :loading="checkoutLoading" @click="handleCheckout">
+          <n-button v-if="canCheckoutSales" type="primary" :loading="checkoutLoading" @click="handleCheckout">
             Confirmar recebimento
           </n-button>
         </div>
@@ -238,6 +237,8 @@ import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { NButton, NDropdown, NTag, useDialog, useMessage } from 'naive-ui';
 import { format, subDays } from 'date-fns';
 import CurrencyInput from '../../../components/common/CurrencyInput.vue';
+import { PERMISSIONS } from '~/constants/permissions';
+import { useAuthStore } from '~/stores/auth';
 
 type SaleRow = {
   id: number;
@@ -252,6 +253,7 @@ const message = useMessage();
 const dialog = useDialog();
 const router = useRouter();
 const route = useRoute();
+const authStore = useAuthStore();
 const loading = ref(false);
 const data = ref<SaleRow[]>([]);
 const showCheckoutModal = ref(false);
@@ -335,18 +337,23 @@ const summary = computed(() => {
     { totalPeriod: 0, received: 0, toReceive: 0, canceledCount: 0 },
   );
 });
+const canCreateSales = computed(() => authStore.hasPermission(PERMISSIONS.salesCreate));
+const canCheckoutSales = computed(() => authStore.hasPermission(PERMISSIONS.salesCheckout));
+const canCancelSales = computed(() => authStore.hasPermission(PERMISSIONS.salesCancel));
+const canPrintSalesReceipt = computed(() => authStore.hasPermission(PERMISSIONS.salesReceiptPrint));
 
 const actionOptionsFor = (row: SaleRow) => {
-  const options = [
-    {
+  const options: Array<{ label: string; key: string; disabled?: boolean }> = [];
+  if (canCancelSales.value && row.status !== 'CANCELED') {
+    options.push({
       label: 'Cancelar venda',
       key: 'cancel',
-      disabled: row.status === 'CANCELED',
-    },
-  ];
+      disabled: false,
+    });
+  }
 
-  if (row.status === 'PAID') {
-    options.unshift({
+  if (canPrintSalesReceipt.value && row.status === 'PAID') {
+    options.push({
       label: 'Reimprimir cupom',
       key: 'printReceipt',
       disabled: false,
@@ -487,9 +494,8 @@ const columns = [
                   size: 'small',
                   type: 'primary',
                   secondary: isReceivable,
-                  disabled: !isReceivable,
-                  'aria-disabled': !isReceivable ? 'true' : 'false',
-                  class: ['receive-btn', isReceivable ? 'receive-btn-active' : 'receive-btn-disabled'],
+                  style: canCheckoutSales.value && isReceivable ? undefined : 'display: none',
+                  class: ['receive-btn', 'receive-btn-active'],
                   onClick: (e: MouseEvent) => {
                     e.stopPropagation();
                     openCheckoutModal(row);
@@ -504,6 +510,7 @@ const columns = [
             {
               trigger: 'click',
               options: actionOptionsFor(row),
+              style: actionOptionsFor(row).length ? undefined : 'display: none',
               onSelect: (key: string) => handleActionSelect(key, row),
             },
             {
@@ -649,6 +656,7 @@ const applyMobileFilters = () => {
 };
 
 const openCreateModal = async () => {
+  if (!canCreateSales.value) return;
   try {
     await fetchOpenCashSessions();
     if (cashSessionOptions.value.length === 0) {
@@ -667,6 +675,7 @@ const openViewModal = (sale: SaleRow) => {
 };
 
 const openCheckoutModal = async (sale: SaleRow) => {
+  if (!canCheckoutSales.value) return;
   if (sale.status !== 'OPEN') {
     message.warning('Recebimento disponível apenas para vendas abertas.');
     return;
@@ -718,6 +727,7 @@ const extractApiErrorMessage = (error: any, fallback: string) => {
 };
 
 const handleCheckout = async () => {
+  if (!canCheckoutSales.value) return;
   if (!checkoutTargetSale.value) return;
   if (!checkoutForm.paymentMethodId) {
     message.warning('Selecione a forma de pagamento.');
@@ -766,6 +776,7 @@ const handleCheckout = async () => {
 };
 
 const handlePrintReceipt = async (sale: SaleRow) => {
+  if (!canPrintSalesReceipt.value) return;
   if (sale.status !== 'PAID') {
     message.warning('Cupom disponível apenas para vendas pagas.');
     return;
@@ -796,6 +807,7 @@ const handlePrintReceipt = async (sale: SaleRow) => {
 };
 
 const cancelSale = async (sale: SaleRow) => {
+  if (!canCancelSales.value) return;
   try {
     const api = useApi();
     await api(`/api/v1/sales/${sale.id}/cancel`, { method: 'POST' });
@@ -807,6 +819,7 @@ const cancelSale = async (sale: SaleRow) => {
 };
 
 const confirmCancelSale = (sale: SaleRow) => {
+  if (!canCancelSales.value) return;
   dialog.warning({
     title: 'Cancelar venda',
     content: `Deseja cancelar a venda #${sale.id}?`,

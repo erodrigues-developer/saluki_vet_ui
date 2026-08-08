@@ -5,6 +5,7 @@ interface User {
   name: string;
   email: string;
   roles: any[];
+  permissions?: string[];
 }
 
 interface AuthState {
@@ -22,7 +23,30 @@ export const useAuthStore = defineStore('auth', {
     isAdmin: (state) => {
       if (!state.user || !state.user.roles) return false;
       return state.user.roles.some((r) => r.code === 'ADMIN');
-    }
+    },
+    permissionSet: (state) => new Set(state.user?.permissions || []),
+    hasPermission: (state) => (permission: string) => {
+      if (!permission) return true;
+      const roles = state.user?.roles || [];
+      if (roles.some((r) => r.code === 'ADMIN')) return true;
+      return (state.user?.permissions || []).includes(permission);
+    },
+    hasAnyPermission: (state) => (permissions: string[]) => {
+      if (!permissions || permissions.length === 0) return true;
+      const roles = state.user?.roles || [];
+      if (roles.some((r) => r.code === 'ADMIN')) return true;
+      return permissions.some((permission) =>
+        (state.user?.permissions || []).includes(permission)
+      );
+    },
+    hasAllPermissions: (state) => (permissions: string[]) => {
+      if (!permissions || permissions.length === 0) return true;
+      const roles = state.user?.roles || [];
+      if (roles.some((r) => r.code === 'ADMIN')) return true;
+      return permissions.every((permission) =>
+        (state.user?.permissions || []).includes(permission)
+      );
+    },
   },
   actions: {
     cookieOptions() {
@@ -45,6 +69,24 @@ export const useAuthStore = defineStore('auth', {
           localStorage.removeItem('auth_user');
         }
       }
+    },
+    setUser(user: User) {
+      this.user = user;
+      if (process.client) {
+        localStorage.setItem('auth_user', JSON.stringify(user));
+      }
+    },
+    async refreshUser() {
+      if (!this.token) return null;
+      const config = useRuntimeConfig();
+      const response = await $fetch<{ data: { user: User } }>('/api/v1/auth/me', {
+        baseURL: config.public.apiBaseUrl,
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+        },
+      });
+      this.setUser(response.data.user);
+      return this.user;
     },
     clearPersistedAuth() {
       const tokenCookie = useCookie<string | null>('auth_token', this.cookieOptions());

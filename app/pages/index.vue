@@ -50,7 +50,7 @@
             </div>
             <p v-else class="empty-state">Nenhum atendimento agendado para hoje.</p>
             </div>
-            <button class="action-link" @click.stop="goTo('/atendimento/agendamentos')">Ver agenda</button>
+            <button v-if="canGo('/atendimento/agendamentos')" class="action-link" @click.stop="goTo('/atendimento/agendamentos')">Ver agenda</button>
           </template>
         </article>
 
@@ -78,7 +78,7 @@
             </div>
             <p v-else class="empty-state">Nenhuma venda registrada hoje.</p>
             </div>
-            <button class="action-link" @click.stop="goTo('/financeiro/vendas')">Ver vendas</button>
+            <button v-if="canGo('/financeiro/vendas')" class="action-link" @click.stop="goTo('/financeiro/vendas')">Ver vendas</button>
           </template>
         </article>
 
@@ -112,7 +112,7 @@
             </ul>
             <p v-else class="empty-state">Nenhuma vacina pendente.</p>
             </div>
-            <button class="action-link" @click.stop="goTo('/atendimento/agendamentos')">Ver agenda de vacinas</button>
+            <button v-if="canGo('/atendimento/agendamentos')" class="action-link" @click.stop="goTo('/atendimento/agendamentos')">Ver agenda de vacinas</button>
           </template>
         </article>
 
@@ -142,7 +142,7 @@
             </ul>
             <p v-else class="empty-state">Nenhum item crítico no estoque.</p>
             </div>
-            <button class="action-link" @click.stop="goTo('/estoque/saldos?status=LOW')">Ver estoque crítico</button>
+            <button v-if="canGo('/estoque/saldos')" class="action-link" @click.stop="goTo('/estoque/saldos?status=LOW')">Ver estoque crítico</button>
           </template>
         </article>
       </div>
@@ -182,7 +182,7 @@
             </div>
             <p v-else class="empty-state">Nenhuma pendência financeira no período.</p>
           </template>
-          <button class="action-link" @click="goTo('/financeiro/contas-a-pagar')">Ver contas a pagar</button>
+          <button v-if="canGo('/financeiro/contas-a-pagar')" class="action-link" @click="goTo('/financeiro/contas-a-pagar')">Ver contas a pagar</button>
         </article>
 
         <article class="card section-card">
@@ -195,7 +195,7 @@
           </div>
           <div v-if="chartsLoading" class="skeleton h220 w100"></div>
           <EChartBase v-else :option="consultationsOption" height="220px" class="tall-chart" />
-          <button class="action-link" @click="goTo('/atendimento/consultas')">Ver atendimentos</button>
+          <button v-if="canGo('/atendimento/consultas')" class="action-link" @click="goTo('/atendimento/consultas')">Ver atendimentos</button>
         </article>
 
         <article class="card section-card">
@@ -208,7 +208,7 @@
           </div>
           <div v-if="chartsLoading" class="skeleton h220 w100"></div>
           <EChartBase v-else :option="revenueOption" height="220px" class="tall-chart" />
-          <button class="action-link" @click="goTo('/financeiro/vendas')">Ver relatório financeiro</button>
+          <button v-if="canGo('/financeiro/vendas')" class="action-link" @click="goTo('/financeiro/vendas')">Ver relatório financeiro</button>
         </article>
 
         <article class="card section-card">
@@ -224,7 +224,7 @@
           </div>
           <div v-if="chartsLoading" class="skeleton h220 w100"></div>
           <EChartBase v-else :option="pieChartOptions" height="220px" class="tall-chart" />
-          <button class="action-link" @click="goTo('/financeiro/contas-a-pagar')">Ver despesas</button>
+          <button v-if="canGo('/financeiro/contas-a-pagar')" class="action-link" @click="goTo('/financeiro/contas-a-pagar')">Ver despesas</button>
         </article>
       </div>
     </section>
@@ -249,7 +249,7 @@
             </li>
           </ul>
           <p v-else class="empty-state">Nenhum item crítico no estoque.</p>
-          <button class="action-link" @click="goTo('/estoque/saldos?status=LOW')">Repor estoque</button>
+          <button v-if="canGo('/estoque/saldos')" class="action-link" @click="goTo('/estoque/saldos?status=LOW')">Repor estoque</button>
         </article>
 
         <article class="card section-card">
@@ -267,7 +267,7 @@
             </li>
           </ul>
           <p v-else class="empty-state">Nenhuma vacina pendente.</p>
-          <button class="action-link" @click="goTo('/atendimento/agendamentos')">Ver vacinas</button>
+          <button v-if="canGo('/atendimento/agendamentos')" class="action-link" @click="goTo('/atendimento/agendamentos')">Ver vacinas</button>
         </article>
 
         <article class="card section-card alert-priority">
@@ -279,7 +279,7 @@
           </div>
           <div v-if="alertsLoading" class="skeleton h180 w100"></div>
           <EChartBase v-else :option="barChartOptions" height="180px" class="tall-chart" />
-          <button class="action-link" @click="goTo('/financeiro/contas-a-pagar')">Ver contas</button>
+          <button v-if="canGo('/financeiro/contas-a-pagar')" class="action-link" @click="goTo('/financeiro/contas-a-pagar')">Ver contas</button>
         </article>
 
         <article class="card section-card">
@@ -311,7 +311,7 @@
               </li>
             </ul>
           </div>
-          <button class="action-link" @click="goTo('/cadastros/procedimentos')">Ver procedimentos</button>
+          <button v-if="canGo('/cadastros/procedimentos')" class="action-link" @click="goTo('/cadastros/procedimentos')">Ver procedimentos</button>
         </article>
 
         <article class="card section-card">
@@ -333,7 +333,7 @@
             </ul>
           </template>
           <p v-else class="empty-state">Nenhuma venda aberta.</p>
-          <button class="action-link" @click="goTo('/financeiro/vendas?status=aberta')">Ver vendas abertas</button>
+          <button v-if="canGo('/financeiro/vendas')" class="action-link" @click="goTo('/financeiro/vendas?status=aberta')">Ver vendas abertas</button>
         </article>
       </div>
     </section>
@@ -369,8 +369,10 @@ import DashboardAiTrigger from '~/components/dashboard-ai/DashboardAiTrigger.vue
 import AiChatFloating from '~/components/ai/AiChatFloating.vue'
 import { suggestedQuestions } from '~/mocks/dashboardAi.mock'
 import { useAiConversation } from '~/composables/useAiConversation'
+import { findRoutePermissions } from '~/constants/permissions'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const dashboardData = ref(null)
 const stockData = ref(null)
 const financeLoading = ref(false)
@@ -700,7 +702,15 @@ const attendanceOption = computed(() => ({
   ]
 }))
 
-const goTo = (path) => router.push(path)
+const canGo = (path) => {
+  const permissions = findRoutePermissions(String(path).split('?')[0])
+  return !permissions.length || authStore.hasAnyPermission(permissions)
+}
+
+const goTo = (path) => {
+  if (!canGo(path)) return
+  router.push(path)
+}
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 }).format(value)

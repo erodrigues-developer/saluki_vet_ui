@@ -6,10 +6,10 @@
         <h1>Procedimentos de atendimento</h1>
         <p class="subhead">Gerencie procedimentos clínicos utilizados nos atendimentos, preços padrão, comissões e disponibilidade.</p>
       </div>
-      <n-button v-if="!isMobile" type="primary" size="large" @click="openCreate">Novo procedimento</n-button>
+      <n-button v-if="!isMobile && canCreateProcedures" type="primary" size="large" @click="openCreate">Novo procedimento</n-button>
     </div>
 
-    <n-button v-if="isMobile" type="primary" size="large" block class="mobile-head-cta" @click="openCreate">Novo procedimento</n-button>
+    <n-button v-if="isMobile && canCreateProcedures" type="primary" size="large" block class="mobile-head-cta" @click="openCreate">Novo procedimento</n-button>
 
     <div :class="isMobile ? 'summary-grid-mobile summary-grid' : 'summary-grid'">
       <n-card size="small" :bordered="false" class="summary-card">
@@ -66,7 +66,7 @@
             <p class="card-subtitle card-subtitle-muted"><span class="card-line-label">Atualizado em:</span> {{ formatDate(item.updatedAt || '') || '—' }}</p>
             <div class="card-actions" @click.stop>
               <n-button size="small" secondary type="primary" @click="openEdit(item)">Ver procedimento</n-button>
-              <n-dropdown trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
+              <n-dropdown v-if="buildActionOptions(item).length" trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
                 <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
               </n-dropdown>
             </div>
@@ -86,7 +86,7 @@
         <n-empty v-else :description="emptyDescription">
           <template #extra>
             <n-button v-if="hasActiveFilters" @click="handleClearFilters">Limpar filtros</n-button>
-            <n-button v-else type="primary" @click="openCreate">Novo procedimento</n-button>
+            <n-button v-else-if="canCreateProcedures" type="primary" @click="openCreate">Novo procedimento</n-button>
           </template>
         </n-empty>
       </div>
@@ -106,7 +106,7 @@
         <n-empty v-else :description="emptyDescription">
           <template #extra>
             <n-button v-if="hasActiveFilters" @click="handleClearFilters">Limpar filtros</n-button>
-            <n-button v-else type="primary" @click="openCreate">Novo procedimento</n-button>
+            <n-button v-else-if="canCreateProcedures" type="primary" @click="openCreate">Novo procedimento</n-button>
           </template>
         </n-empty>
       </template>
@@ -135,7 +135,7 @@
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" @click="submitProcedureForm">{{ editingProcedure ? 'Salvar alterações' : 'Criar procedimento' }}</n-button>
+          <n-button v-if="canSaveProcedure" type="primary" :loading="saving" @click="submitProcedureForm">{{ editingProcedure ? 'Salvar alterações' : 'Criar procedimento' }}</n-button>
         </div>
       </template>
     </n-modal>
@@ -147,6 +147,8 @@ import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { format } from 'date-fns'
 import { NButton, NDropdown, NTag, useDialog, useMessage } from 'naive-ui'
 import ProcedureForm, { type Procedure } from '~/components/procedures/ProcedureForm.vue'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 interface ProceduresResponse {
   data: Procedure[]
@@ -155,6 +157,7 @@ interface ProceduresResponse {
 
 const message = useMessage()
 const dialog = useDialog()
+const authStore = useAuthStore()
 
 const procedures = ref<Procedure[]>([])
 const allProcedures = ref<Procedure[]>([])
@@ -192,6 +195,10 @@ const tablePagination = computed(() => ({
 
 const hasActiveFilters = computed(() => Boolean(filters.name || filters.status !== 'all'))
 const emptyDescription = computed(() => hasActiveFilters.value ? 'Nenhum procedimento encontrado com os filtros aplicados.' : 'Nenhum procedimento cadastrado.')
+const canCreateProcedures = computed(() => authStore.hasPermission(PERMISSIONS.proceduresCreate))
+const canUpdateProcedures = computed(() => authStore.hasPermission(PERMISSIONS.proceduresUpdate))
+const canDeleteProcedures = computed(() => authStore.hasPermission(PERMISSIONS.proceduresDelete))
+const canSaveProcedure = computed(() => editingProcedure.value ? canUpdateProcedures.value : canCreateProcedures.value)
 
 const formatDate = (value: string) => value ? format(new Date(value), 'dd/MM/yyyy HH:mm') : ''
 const formatBRL = (value?: number | null) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0))
@@ -233,12 +240,18 @@ const columns = [
   }
 ]
 
-const buildActionOptions = (item: Procedure) => [
-  { label: 'Editar', key: 'edit' },
-  { label: item.isActive ? 'Inativar' : 'Ativar', key: 'toggleStatus' },
-  { type: 'divider', key: `divider-${item.id}` },
-  { label: 'Excluir', key: 'delete' }
-]
+const buildActionOptions = (item: Procedure) => {
+  const options: Array<{ label?: string; key: string; type?: 'divider' }> = []
+  if (canUpdateProcedures.value) {
+    options.push({ label: 'Editar', key: 'edit' })
+    options.push({ label: item.isActive ? 'Inativar' : 'Ativar', key: 'toggleStatus' })
+  }
+  if (canDeleteProcedures.value) {
+    if (options.length) options.push({ type: 'divider', key: `divider-${item.id}` })
+    options.push({ label: 'Excluir', key: 'delete' })
+  }
+  return options
+}
 
 const handleActionSelect = (key: string, item: Procedure) => {
   if (key === 'edit') return openEdit(item)
@@ -288,6 +301,7 @@ const fetchProcedures = async () => {
 }
 
 const handleSubmit = async (payload: Procedure) => {
+  if ((payload.id && !canUpdateProcedures.value) || (!payload.id && !canCreateProcedures.value)) return
   saving.value = true
   const api = useApi()
   try {
@@ -308,9 +322,13 @@ const handleSubmit = async (payload: Procedure) => {
   }
 }
 
-const submitProcedureForm = async () => { await procedureFormRef.value?.submit() }
+const submitProcedureForm = async () => {
+  if (!canSaveProcedure.value) return
+  await procedureFormRef.value?.submit()
+}
 
 const confirmDelete = (procedure: Procedure) => {
+  if (!canDeleteProcedures.value) return
   if (!procedure.id) return
   dialog.warning({
     title: 'Confirmar exclusão',
@@ -331,6 +349,7 @@ const confirmDelete = (procedure: Procedure) => {
 }
 
 const confirmDeactivate = (procedure: Procedure) => {
+  if (!canUpdateProcedures.value) return
   if (!procedure.id) return
   dialog.warning({
     title: 'Confirmar inativação',
@@ -347,6 +366,7 @@ const confirmDeactivate = (procedure: Procedure) => {
 }
 
 const confirmReactivate = (procedure: Procedure) => {
+  if (!canUpdateProcedures.value) return
   if (!procedure.id) return
   dialog.success({
     title: 'Confirmar ativação',
@@ -362,7 +382,11 @@ const confirmReactivate = (procedure: Procedure) => {
   })
 }
 
-const openCreate = () => { editingProcedure.value = null; showModal.value = true }
+const openCreate = () => {
+  if (!canCreateProcedures.value) return
+  editingProcedure.value = null
+  showModal.value = true
+}
 const openEdit = (procedure: Procedure) => { editingProcedure.value = procedure; showModal.value = true }
 const closeModal = () => { showModal.value = false }
 

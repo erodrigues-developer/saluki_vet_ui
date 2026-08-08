@@ -6,7 +6,7 @@
         <h1>Categorias de produto</h1>
         <p class="subhead">Gerencie categorias utilizadas para organização dos produtos da clínica.</p>
       </div>
-      <n-button type="primary" size="large" class="head-cta" @click="openCreate">Nova categoria</n-button>
+      <n-button v-if="canCreateCategories" type="primary" size="large" class="head-cta" @click="openCreate">Nova categoria</n-button>
     </div>
 
     <div :class="isMobile ? 'summary-grid-mobile summary-grid' : 'summary-grid'">
@@ -66,7 +66,7 @@
             <p class="card-subtitle card-subtitle-muted"><span class="card-line-label">Atualizado em:</span> {{ formatDate(item.updatedAt || '') || '—' }}</p>
             <div class="card-actions" @click.stop>
               <n-button size="small" secondary type="primary" @click="openEdit(item)">Ver categoria</n-button>
-              <n-dropdown trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
+              <n-dropdown v-if="buildActionOptions(item).length" trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
                 <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
               </n-dropdown>
             </div>
@@ -85,7 +85,7 @@
         </template>
         <n-empty v-else description="Nenhuma categoria encontrada.">
           <template #extra>
-            <n-button type="primary" @click="openCreate">Nova categoria</n-button>
+            <n-button v-if="canCreateCategories" type="primary" @click="openCreate">Nova categoria</n-button>
           </template>
         </n-empty>
       </div>
@@ -104,7 +104,7 @@
         />
         <n-empty v-else description="Nenhuma categoria encontrada.">
           <template #extra>
-            <n-button type="primary" @click="openCreate">Nova categoria</n-button>
+            <n-button v-if="canCreateCategories" type="primary" @click="openCreate">Nova categoria</n-button>
           </template>
         </n-empty>
       </template>
@@ -147,7 +147,7 @@
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" :disabled="!canSubmitCategoryForm" @click="submitCategoryForm">
+          <n-button v-if="canSaveCategory" type="primary" :loading="saving" :disabled="!canSubmitCategoryForm" @click="submitCategoryForm">
             {{ editingCategory ? 'Salvar alterações' : 'Criar categoria' }}
           </n-button>
         </div>
@@ -161,6 +161,8 @@ import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { NButton, NDropdown, NTag, useDialog, useMessage } from 'naive-ui'
 import { format } from 'date-fns'
 import ProductCategoryForm, { type ProductCategory } from '~/components/product-categories/ProductCategoryForm.vue'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 interface ProductCategoriesResponse {
   data: ProductCategory[]
@@ -179,6 +181,7 @@ interface ProductCategoriesResponse {
 
 const message = useMessage()
 const dialog = useDialog()
+const authStore = useAuthStore()
 
 const filters = reactive({
   search: '',
@@ -243,16 +246,23 @@ const tablePagination = computed(() => ({
   pageSizes: [10, 20, 50]
 }))
 
+const canCreateCategories = computed(() => authStore.hasPermission(PERMISSIONS.productCategoriesCreate))
+const canUpdateCategories = computed(() => authStore.hasPermission(PERMISSIONS.productCategoriesUpdate))
+const canDeleteCategories = computed(() => authStore.hasPermission(PERMISSIONS.productCategoriesDelete))
+const canSaveCategory = computed(() => editingCategory.value ? canUpdateCategories.value : canCreateCategories.value)
+
 const canDeleteCategory = (row: ProductCategory) => Number(row.productsLinked || 0) === 0
 
 const buildActionOptions = (row: ProductCategory) => {
-  const options: Array<{ label?: string; key: string; type?: 'divider' }> = [
-    { label: 'Editar', key: 'edit' },
-    { label: row.isActive ? 'Inativar' : 'Ativar', key: 'toggleStatus' }
-  ]
+  const options: Array<{ label?: string; key: string; type?: 'divider' }> = []
 
-  if (canDeleteCategory(row)) {
-    options.push({ type: 'divider', key: `divider-${row.id}` })
+  if (canUpdateCategories.value) {
+    options.push({ label: 'Editar', key: 'edit' })
+    options.push({ label: row.isActive ? 'Inativar' : 'Ativar', key: 'toggleStatus' })
+  }
+
+  if (canDeleteCategories.value && canDeleteCategory(row)) {
+    if (options.length) options.push({ type: 'divider', key: `divider-${row.id}` })
     options.push({ label: 'Excluir', key: 'delete' })
   }
 
@@ -349,6 +359,7 @@ const fetchCategories = async () => {
 }
 
 const handleSubmit = async (payload: ProductCategory) => {
+  if ((payload.id && !canUpdateCategories.value) || (!payload.id && !canCreateCategories.value)) return
   saving.value = true
   const api = useApi()
   try {
@@ -375,10 +386,12 @@ const handleSubmit = async (payload: ProductCategory) => {
 }
 
 const submitCategoryForm = async () => {
+  if (!canSaveCategory.value) return
   await categoryFormRef.value?.submit()
 }
 
 const toggleStatus = (category: ProductCategory) => {
+  if (!canUpdateCategories.value) return
   const label = category.isActive ? 'inativar' : 'ativar'
   dialog.warning({
     title: `Confirmar ${label}`,
@@ -402,6 +415,7 @@ const toggleStatus = (category: ProductCategory) => {
 }
 
 const confirmDelete = (category: ProductCategory) => {
+  if (!canDeleteCategories.value) return
   if (!canDeleteCategory(category)) {
     message.warning('Não é possível excluir categorias com produtos vinculados.')
     return
@@ -426,6 +440,7 @@ const confirmDelete = (category: ProductCategory) => {
 }
 
 const openCreate = () => {
+  if (!canCreateCategories.value) return
   editingCategory.value = null
   showModal.value = true
 }

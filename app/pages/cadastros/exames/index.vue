@@ -6,10 +6,10 @@
         <h1>Exames</h1>
         <p class="subhead">Gerencie tipos de exames, categoria, preço padrão e disponibilidade.</p>
       </div>
-      <n-button v-if="!isMobile" type="primary" size="large" @click="openCreate">Novo exame</n-button>
+      <n-button v-if="!isMobile && canCreateExamTypes" type="primary" size="large" @click="openCreate">Novo exame</n-button>
     </div>
 
-    <n-button v-if="isMobile" type="primary" size="large" block class="mobile-head-cta" @click="openCreate">Novo exame</n-button>
+    <n-button v-if="isMobile && canCreateExamTypes" type="primary" size="large" block class="mobile-head-cta" @click="openCreate">Novo exame</n-button>
 
     <div :class="isMobile ? 'summary-grid-mobile summary-grid' : 'summary-grid'">
       <n-card size="small" :bordered="false" class="summary-card">
@@ -67,7 +67,7 @@
             <p class="card-subtitle card-subtitle-muted"><span class="card-line-label">Atualizado em:</span> {{ formatDate(item.updatedAt || '') || '—' }}</p>
             <div class="card-actions" @click.stop>
               <n-button size="small" secondary type="primary" @click="openEdit(item)">Ver exame</n-button>
-              <n-dropdown trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
+              <n-dropdown v-if="buildActionOptions(item).length" trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
                 <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
               </n-dropdown>
             </div>
@@ -87,7 +87,7 @@
         <n-empty v-else :description="emptyDescription">
           <template #extra>
             <n-button v-if="hasActiveFilters" @click="handleClearFilters">Limpar filtros</n-button>
-            <n-button v-else type="primary" @click="openCreate">Novo exame</n-button>
+            <n-button v-else-if="canCreateExamTypes" type="primary" @click="openCreate">Novo exame</n-button>
           </template>
         </n-empty>
       </div>
@@ -107,7 +107,7 @@
         <n-empty v-else :description="emptyDescription">
           <template #extra>
             <n-button v-if="hasActiveFilters" @click="handleClearFilters">Limpar filtros</n-button>
-            <n-button v-else type="primary" @click="openCreate">Novo exame</n-button>
+            <n-button v-else-if="canCreateExamTypes" type="primary" @click="openCreate">Novo exame</n-button>
           </template>
         </n-empty>
       </template>
@@ -137,7 +137,7 @@
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" @click="submitExamForm">{{ editingExam ? 'Salvar alterações' : 'Criar exame' }}</n-button>
+          <n-button v-if="canSaveExamType" type="primary" :loading="saving" @click="submitExamForm">{{ editingExam ? 'Salvar alterações' : 'Criar exame' }}</n-button>
         </div>
       </template>
     </n-modal>
@@ -149,6 +149,8 @@ import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { format } from 'date-fns'
 import { NButton, NDropdown, NTag, useDialog, useMessage } from 'naive-ui'
 import ExamForm, { type ExamType } from '~/components/exams/ExamForm.vue'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 interface ExamsResponse {
   data: ExamType[]
@@ -157,6 +159,7 @@ interface ExamsResponse {
 
 const message = useMessage()
 const dialog = useDialog()
+const authStore = useAuthStore()
 
 const exams = ref<ExamType[]>([])
 const allExams = ref<ExamType[]>([])
@@ -199,6 +202,10 @@ const tablePagination = computed(() => ({
 
 const hasActiveFilters = computed(() => Boolean(filters.name || filters.status !== 'all' || filters.categoryId))
 const emptyDescription = computed(() => hasActiveFilters.value ? 'Nenhum exame encontrado com os filtros aplicados.' : 'Nenhum exame cadastrado.')
+const canCreateExamTypes = computed(() => authStore.hasPermission(PERMISSIONS.examTypesCreate))
+const canUpdateExamTypes = computed(() => authStore.hasPermission(PERMISSIONS.examTypesUpdate))
+const canDeleteExamTypes = computed(() => authStore.hasPermission(PERMISSIONS.examTypesDelete))
+const canSaveExamType = computed(() => editingExam.value ? canUpdateExamTypes.value : canCreateExamTypes.value)
 
 const formatDate = (value: string) => value ? format(new Date(value), 'dd/MM/yyyy HH:mm') : ''
 const formatBRL = (value?: number | null) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0))
@@ -239,12 +246,18 @@ const columns = [
   }
 ]
 
-const buildActionOptions = (item: ExamType) => [
-  { label: 'Editar', key: 'edit' },
-  { label: item.isActive ? 'Inativar' : 'Ativar', key: 'toggleStatus' },
-  { type: 'divider', key: `divider-${item.id}` },
-  { label: 'Excluir', key: 'delete' }
-]
+const buildActionOptions = (item: ExamType) => {
+  const options: Array<{ label?: string; key: string; type?: 'divider' }> = []
+  if (canUpdateExamTypes.value) {
+    options.push({ label: 'Editar', key: 'edit' })
+    options.push({ label: item.isActive ? 'Inativar' : 'Ativar', key: 'toggleStatus' })
+  }
+  if (canDeleteExamTypes.value) {
+    if (options.length) options.push({ type: 'divider', key: `divider-${item.id}` })
+    options.push({ label: 'Excluir', key: 'delete' })
+  }
+  return options
+}
 
 const handleActionSelect = (key: string, item: ExamType) => {
   if (key === 'edit') return openEdit(item)
@@ -314,6 +327,7 @@ const fetchExams = async () => {
 }
 
 const handleSubmit = async (payload: ExamType) => {
+  if ((payload.id && !canUpdateExamTypes.value) || (!payload.id && !canCreateExamTypes.value)) return
   saving.value = true
   const api = useApi()
   try {
@@ -334,9 +348,13 @@ const handleSubmit = async (payload: ExamType) => {
   }
 }
 
-const submitExamForm = async () => { await examFormRef.value?.submit() }
+const submitExamForm = async () => {
+  if (!canSaveExamType.value) return
+  await examFormRef.value?.submit()
+}
 
 const confirmDelete = (exam: ExamType) => {
+  if (!canDeleteExamTypes.value) return
   if (!exam.id) return
   dialog.warning({
     title: 'Confirmar exclusão',
@@ -357,6 +375,7 @@ const confirmDelete = (exam: ExamType) => {
 }
 
 const confirmDeactivate = (exam: ExamType) => {
+  if (!canUpdateExamTypes.value) return
   if (!exam.id) return
   dialog.warning({
     title: 'Confirmar inativação',
@@ -373,6 +392,7 @@ const confirmDeactivate = (exam: ExamType) => {
 }
 
 const confirmReactivate = (exam: ExamType) => {
+  if (!canUpdateExamTypes.value) return
   if (!exam.id) return
   dialog.success({
     title: 'Confirmar ativação',
@@ -388,7 +408,11 @@ const confirmReactivate = (exam: ExamType) => {
   })
 }
 
-const openCreate = () => { editingExam.value = null; showModal.value = true }
+const openCreate = () => {
+  if (!canCreateExamTypes.value) return
+  editingExam.value = null
+  showModal.value = true
+}
 const openEdit = (exam: ExamType) => { editingExam.value = exam; showModal.value = true }
 const closeModal = () => { showModal.value = false }
 

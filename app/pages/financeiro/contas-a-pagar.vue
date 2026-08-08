@@ -6,12 +6,12 @@
         <h1>Contas a pagar</h1>
         <p class="subhead">Gerencie despesas, vencimentos, pagamentos e pendências financeiras.</p>
       </div>
-      <n-button v-if="!isMobile" type="primary" size="large" class="head-cta" @click="openCreateModal">
+      <n-button v-if="!isMobile && canCreateAccountsPayable" type="primary" size="large" class="head-cta" @click="openCreateModal">
         Nova conta
       </n-button>
     </div>
 
-    <n-button v-if="isMobile" type="primary" block class="mobile-primary-cta" @click="openCreateModal">
+    <n-button v-if="isMobile && canCreateAccountsPayable" type="primary" block class="mobile-primary-cta" @click="openCreateModal">
       Nova conta
     </n-button>
 
@@ -91,7 +91,7 @@
           </p>
           <div class="empty-actions">
             <n-button v-if="hasActiveFilters" tertiary @click="handleClearFilters">Limpar filtros</n-button>
-            <n-button type="primary" @click="openCreateModal">Adicionar conta</n-button>
+            <n-button v-if="canCreateAccountsPayable" type="primary" @click="openCreateModal">Adicionar conta</n-button>
           </div>
         </div>
       </template>
@@ -112,7 +112,7 @@
             <p class="card-subtitle card-value-line"><span class="card-line-label">Valor: </span><span class="card-line-value financial-value">{{ formatCurrency(Number(row.amount)) }}</span></p>
             <div class="card-actions" @click.stop @mousedown.stop>
               <n-button size="small" secondary type="primary" @click.stop="openEditModal(row)">Ver conta</n-button>
-              <n-dropdown trigger="click" :options="buildActionOptions(row)" @select="(key: string) => handleActionSelect(key, row)">
+              <n-dropdown v-if="buildActionOptions(row).length" trigger="click" :options="buildActionOptions(row)" @select="(key: string) => handleActionSelect(key, row)">
                 <n-button size="small" quaternary class="menu-button" @click.stop @mousedown.stop><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
               </n-dropdown>
             </div>
@@ -131,7 +131,7 @@
         </p>
         <div class="empty-actions">
           <n-button v-if="hasActiveFilters" tertiary @click="handleClearFilters">Limpar filtros</n-button>
-          <n-button type="primary" @click="openCreateModal">Adicionar conta</n-button>
+          <n-button v-if="canCreateAccountsPayable" type="primary" @click="openCreateModal">Adicionar conta</n-button>
         </div>
       </div>
       <n-data-table
@@ -249,12 +249,12 @@
                 <p><span class="card-line-label">Data de pagamento: </span><span class="card-line-value">{{ formatDateTimeDisplay(registeredPayment.paidAt) }}</span></p>
                 <p><span class="card-line-label">Valor pago: </span><span class="card-line-value">{{ formatCurrency(Number(registeredPayment.paidAmount || 0)) }}</span></p>
                 <p><span class="card-line-label">Forma de pagamento: </span><span class="card-line-value">{{ registeredPayment.paymentMethod || '-' }}</span></p>
-                <n-button size="small" tertiary @click="handleUndoInlinePayment">Estornar pagamento</n-button>
+                <n-button v-if="canReverseAccountsPayable" size="small" tertiary @click="handleUndoInlinePayment">Estornar pagamento</n-button>
               </div>
 
               <template v-else>
                 <n-button
-                  v-if="!showInlinePaymentForm"
+                  v-if="canPayAccountsPayable && !showInlinePaymentForm"
                   size="small"
                   secondary
                   type="primary"
@@ -344,7 +344,7 @@
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeCreateModal">Cancelar</n-button>
-          <n-button type="primary" :loading="primaryActionLoading" @click="handlePrimaryModalAction">
+          <n-button v-if="canRunPrimaryAction" type="primary" :loading="primaryActionLoading" @click="handlePrimaryModalAction">
             {{ primaryActionLabel }}
           </n-button>
         </div>
@@ -357,6 +357,8 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { NButton, NDropdown, NTag, useMessage } from 'naive-ui';
+import { PERMISSIONS } from '~/constants/permissions';
+import { useAuthStore } from '~/stores/auth';
 
 definePageMeta({ layout: 'default' });
 
@@ -404,6 +406,7 @@ interface AccountPayableItem {
 type FinancialStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELED';
 
 const message = useMessage();
+const authStore = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 const loading = ref(false);
@@ -616,6 +619,15 @@ const modalCurrentStatus = computed<FinancialStatus>(() =>
 const isGeneratedCommissionAccount = computed(
   () => editingAccountId.value !== null && modalOriginType.value === 'COMMISSION_PAYOUT',
 );
+const canCreateAccountsPayable = computed(() => authStore.hasPermission(PERMISSIONS.accountsPayableCreate));
+const canUpdateAccountsPayable = computed(() => authStore.hasPermission(PERMISSIONS.accountsPayableUpdate));
+const canPayAccountsPayable = computed(() => authStore.hasPermission(PERMISSIONS.accountsPayablePay));
+const canReverseAccountsPayable = computed(() => authStore.hasPermission(PERMISSIONS.accountsPayableReverse));
+const canRunPrimaryAction = computed(() => {
+  if (isGeneratedCommissionAccount.value) return true;
+  if (editingAccountId.value && showInlinePaymentForm.value) return canPayAccountsPayable.value && canUpdateAccountsPayable.value;
+  return editingAccountId.value ? canUpdateAccountsPayable.value : canCreateAccountsPayable.value;
+});
 
 const primaryActionLabel = computed(() => {
   if (editingAccountId.value && showInlinePaymentForm.value) {
@@ -827,6 +839,7 @@ const columns = [
               {
                 trigger: 'click',
                 options: buildActionOptions(row),
+                style: buildActionOptions(row).length ? undefined : 'display: none',
                 onSelect: (key: string) => handleActionSelect(key, row),
               },
               {
@@ -859,15 +872,17 @@ const tableRowProps = (row: AccountPayableItem) => {
 };
 
 const buildActionOptions = (row: AccountPayableItem) => {
-  const options: Array<{ label: string; key: string }> = [
-    { label: 'Editar', key: 'edit' },
-  ];
+  const options: Array<{ label: string; key: string }> = [];
 
-  if (getEffectiveStatus(row) !== 'PAID') {
+  if (canUpdateAccountsPayable.value) {
+    options.push({ label: 'Editar', key: 'edit' });
+  }
+
+  if (canPayAccountsPayable.value && getEffectiveStatus(row) !== 'PAID') {
     options.push({ label: 'Registrar pagamento', key: 'pay' });
   }
 
-  if (row.originType !== 'COMMISSION_PAYOUT') {
+  if (canCreateAccountsPayable.value && row.originType !== 'COMMISSION_PAYOUT') {
     options.push({ label: 'Duplicar', key: 'duplicate' });
   }
   return options;
@@ -890,6 +905,7 @@ const handleActionSelect = (key: string, row: AccountPayableItem) => {
 };
 
 const openDuplicateModal = (row: AccountPayableItem) => {
+  if (!canCreateAccountsPayable.value) return;
   editingAccountId.value = null;
   createForm.description = row.description || '';
   createForm.supplierId = row.supplierId || row.supplier?.id || null;
@@ -1051,6 +1067,7 @@ const closeCreateModal = () => {
 };
 
 const openCreateModal = () => {
+  if (!canCreateAccountsPayable.value) return;
   editingAccountId.value = null;
   resetCreateForm();
   showCreateModal.value = true;
@@ -1200,6 +1217,7 @@ const handleSubmitAccount = async () => {
 };
 
 const openInlinePaymentForm = () => {
+  if (!canPayAccountsPayable.value) return;
   inlinePayForm.paidAt = Date.now();
   inlinePayForm.paidAmount = Number(createForm.amount || 0);
   inlinePayForm.paymentMethodId = paymentMethodOptions.value[0]?.value || null;
@@ -1222,6 +1240,7 @@ const cancelInlinePayment = () => {
 };
 
 const handlePrimaryModalAction = async () => {
+  if (!canRunPrimaryAction.value) return;
   if (isGeneratedCommissionAccount.value && !showInlinePaymentForm.value) {
     closeCreateModal();
     return;
@@ -1285,6 +1304,7 @@ const confirmInlinePayment = async () => {
 };
 
 const handleUndoInlinePayment = async () => {
+  if (!canReverseAccountsPayable.value) return;
   if (!editingAccountId.value) return;
   savingInlinePayment.value = true;
   const api = useApi();

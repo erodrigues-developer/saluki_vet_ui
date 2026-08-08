@@ -37,7 +37,7 @@
               <h2>{{ activeTabMeta.title }}</h2>
               <p v-if="activeTabMeta.description" class="card-description">{{ activeTabMeta.description }}</p>
             </div>
-            <div v-if="activeTab === 'hours'" class="quick-actions">
+            <div v-if="activeTab === 'hours' && canUpdateClinicSettings" class="quick-actions">
               <n-button size="small" @click="applyBusinessHoursPreset">Aplicar horário comercial</n-button>
               <n-button size="small" @click="copyMondayToFriday">Copiar segunda para sexta</n-button>
             </div>
@@ -126,8 +126,8 @@
                   </div>
                   <div class="asset-actions">
                     <input ref="logoFileInputRef" type="file" accept="image/*" class="hidden-input" @change="onImageSelected('logo', $event)" />
-                    <n-button size="small" :loading="uploadingLogo" @click="logoFileInputRef?.click()">Enviar imagem</n-button>
-                    <n-button size="small" quaternary :loading="uploadingLogo" @click="clearImage('logo')">Remover</n-button>
+                    <n-button v-if="canUploadClinicImage" size="small" :loading="uploadingLogo" @click="logoFileInputRef?.click()">Enviar imagem</n-button>
+                    <n-button v-if="canDeleteClinicImage" size="small" quaternary :loading="uploadingLogo" @click="clearImage('logo')">Remover</n-button>
                   </div>
                 </div>
                 <div class="asset-box asset-box-logo">
@@ -145,8 +145,8 @@
                   </div>
                   <div class="asset-actions">
                     <input ref="loginImageFileInputRef" type="file" accept="image/*" class="hidden-input" @change="onImageSelected('login', $event)" />
-                    <n-button size="small" :loading="uploadingLoginImage" @click="loginImageFileInputRef?.click()">Enviar imagem</n-button>
-                    <n-button size="small" quaternary :loading="uploadingLoginImage" @click="clearImage('login')">Remover</n-button>
+                    <n-button v-if="canUploadClinicImage" size="small" :loading="uploadingLoginImage" @click="loginImageFileInputRef?.click()">Enviar imagem</n-button>
+                    <n-button v-if="canDeleteClinicImage" size="small" quaternary :loading="uploadingLoginImage" @click="clearImage('login')">Remover</n-button>
                   </div>
                 </div>
                 <div class="asset-box">
@@ -239,12 +239,12 @@
                     />
                   </n-form-item>
 
-                  <n-button quaternary circle @click="removeInterval(day.key, index)" aria-label="Remover intervalo">
+                    <n-button v-if="canUpdateClinicSettings" quaternary circle @click="removeInterval(day.key, index)" aria-label="Remover intervalo">
                     -
                   </n-button>
 
                   <n-button
-                    v-if="index === model.businessHours[day.key].length - 1"
+                    v-if="canUpdateClinicSettings && index === model.businessHours[day.key].length - 1"
                     tertiary
                     size="small"
                     class="inline-add"
@@ -384,7 +384,7 @@
                       :input-props="{ autocomplete: 'new-password', name: 'nfce-csc-token' }"
                     />
                     <n-button
-                      v-if="nfceCscMasked"
+                      v-if="canUpdateNfceConfig && nfceCscMasked"
                       secondary
                       @click="toggleNfceCscEdit"
                     >
@@ -417,7 +417,7 @@
                 <n-form-item label="Arquivo .pfx">
                   <div class="file-picker">
                     <input ref="certificateFileInputRef" type="file" accept=".pfx" class="hidden-input" @change="handleCertificateFile" />
-                    <n-button secondary @click="certificateFileInputRef?.click()">Selecionar arquivo</n-button>
+                    <n-button v-if="canUploadFiscalCertificate" secondary @click="certificateFileInputRef?.click()">Selecionar arquivo</n-button>
                     <span class="file-name">
                       {{ selectedCertificateFile?.name || certificateFileLabel }}
                     </span>
@@ -439,7 +439,7 @@
                       :input-props="{ autocomplete: 'new-password', name: 'certificate-password' }"
                     />
                     <n-button
-                      v-if="certificatePasswordConfigured"
+                      v-if="canUpdateFiscalCertificatePassword && certificatePasswordConfigured"
                       secondary
                       @click="toggleCertificatePasswordEdit"
                     >
@@ -471,7 +471,7 @@
           </div>
 
           <div class="footer-actions" :class="{ mobile: isMobile }">
-            <n-button type="primary" size="large" :loading="saving" :block="isMobile" @click="handleSave">
+            <n-button v-if="canSaveActiveTab" type="primary" size="large" :loading="saving" :block="isMobile" @click="handleSave">
               Salvar alterações
             </n-button>
           </div>
@@ -487,6 +487,7 @@ import cepPromise from 'cep-promise'
 import { useMessage } from 'naive-ui'
 import type { FormInst, FormRules } from 'naive-ui'
 import { formatBrazilPhone } from '~/composables/useBrazilPhone'
+import { PERMISSIONS } from '~/constants/permissions'
 
 type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
 type ImageField = 'logo' | 'login'
@@ -532,6 +533,7 @@ interface ClinicSettingsForm {
 }
 
 const message = useMessage()
+const authStore = useAuthStore()
 const formRef = ref<FormInst | null>(null)
 const loading = ref(false)
 const saving = ref(false)
@@ -572,6 +574,21 @@ const tabs: Array<{ key: ClinicTabKey; label: string; title: string; description
 ]
 
 const activeTabMeta = computed(() => tabs.find((tab) => tab.key === activeTab.value) || tabs[0])
+const canUpdateClinicSettings = computed(() => authStore.hasPermission(PERMISSIONS.clinicSettingsUpdate))
+const canUploadClinicImage = computed(() => authStore.hasPermission(PERMISSIONS.clinicSettingsImageUpload))
+const canDeleteClinicImage = computed(() => authStore.hasPermission(PERMISSIONS.clinicSettingsImageDelete))
+const canCreateFiscalProfile = computed(() => authStore.hasPermission(PERMISSIONS.fiscalProfilesCreate))
+const canUpdateFiscalProfile = computed(() => authStore.hasPermission(PERMISSIONS.fiscalProfilesUpdate))
+const canUpdateNfceConfig = computed(() => authStore.hasPermission(PERMISSIONS.fiscalNfceConfigsUpdate))
+const canUploadFiscalCertificate = computed(() => authStore.hasPermission(PERMISSIONS.fiscalCertificatesUpload))
+const canUpdateFiscalCertificatePassword = computed(() => authStore.hasPermission(PERMISSIONS.fiscalCertificatesUpdatePassword))
+const canSaveFiscalSettings = computed(() =>
+  (currentProfileId.value ? canUpdateFiscalProfile.value : canCreateFiscalProfile.value) ||
+  canUpdateNfceConfig.value ||
+  canUploadFiscalCertificate.value ||
+  canUpdateFiscalCertificatePassword.value
+)
+const canSaveActiveTab = computed(() => activeTab.value === 'fiscal' ? canSaveFiscalSettings.value : canUpdateClinicSettings.value)
 const businessDays = [
   { key: 'mon', label: 'Segunda-feira' },
   { key: 'tue', label: 'Terça-feira' },
@@ -775,6 +792,7 @@ const normalizeHexColor = (value: string | null | undefined, fallback = '') => {
 const isHexColor = (value: string) => /^#[0-9A-Fa-f]{6}$/.test(String(value || '').trim())
 
 const updateColor = (field: 'primaryColor' | 'secondaryColor', value: string) => {
+  if (!canUpdateClinicSettings.value) return
   const normalized = String(value || '').trim().toUpperCase()
   model[field] = normalized.startsWith('#') ? normalized : `#${normalized.replace(/^#+/, '')}`
 }
@@ -802,6 +820,7 @@ const maskZipCode = (value: string) => {
 }
 
 const onZipInput = async (value: string) => {
+  if (!canUpdateClinicSettings.value) return
   model.zipCode = maskZipCode(value)
   const digits = digitsOnly(model.zipCode)
   if (digits.length === 8) {
@@ -979,6 +998,7 @@ const loadFiscalSettings = async () => {
 }
 
 const persistFiscalProfile = async () => {
+  if (currentProfileId.value ? !canUpdateFiscalProfile.value : !canCreateFiscalProfile.value) return
   const payload = buildFiscalProfilePayload()
   if (!payload.legalName || !payload.tradeName || !payload.cnpj) {
     throw new Error('Preencha nome da clínica e CNPJ em Dados gerais antes de salvar o perfil fiscal.')
@@ -1005,6 +1025,7 @@ const persistFiscalProfile = async () => {
 }
 
 const persistNfceConfig = async () => {
+  if (!canUpdateNfceConfig.value) return
   if (!currentProfileId.value) {
     throw new Error('Salve o perfil fiscal antes de configurar a NFC-e.')
   }
@@ -1029,6 +1050,7 @@ const persistNfceConfig = async () => {
 }
 
 const handleCertificateFile = (event: Event) => {
+  if (!canUploadFiscalCertificate.value) return
   const input = event.target as HTMLInputElement
   selectedCertificateFile.value = input.files?.[0] || null
   if (selectedCertificateFile.value) {
@@ -1037,11 +1059,13 @@ const handleCertificateFile = (event: Event) => {
 }
 
 const toggleNfceCscEdit = () => {
+  if (!canUpdateNfceConfig.value) return
   editingNfceCsc.value = !editingNfceCsc.value
   nfceForm.csc = ''
 }
 
 const toggleCertificatePasswordEdit = () => {
+  if (!canUpdateFiscalCertificatePassword.value && !canUploadFiscalCertificate.value) return
   const wasEditing = editingCertificatePassword.value
   editingCertificatePassword.value = !editingCertificatePassword.value
   certificateForm.password = ''
@@ -1054,6 +1078,7 @@ const toggleCertificatePasswordEdit = () => {
 }
 
 const persistCertificate = async () => {
+  if (!canUploadFiscalCertificate.value && !(editingCertificatePassword.value && canUpdateFiscalCertificatePassword.value)) return
   if (!currentProfileId.value) {
     throw new Error('Salve o perfil fiscal antes de enviar o certificado.')
   }
@@ -1092,6 +1117,7 @@ const persistCertificate = async () => {
 }
 
 const persistCertificatePassword = async () => {
+  if (!canUpdateFiscalCertificatePassword.value) return
   if (!currentProfileId.value) {
     throw new Error('Salve o perfil fiscal antes de alterar a senha do certificado.')
   }
@@ -1213,14 +1239,17 @@ const serializeBusinessHours = () => {
 const isDayOpen = (day: DayKey) => model.businessHours[day].length > 0
 
 const setDayOpen = (day: DayKey, open: boolean) => {
+  if (!canUpdateClinicSettings.value) return
   model.businessHours[day] = open ? [{ start: '08:00', end: '18:00' }] : []
 }
 
 const addInterval = (day: DayKey) => {
+  if (!canUpdateClinicSettings.value) return
   model.businessHours[day].push({ start: '08:00', end: '18:00' })
 }
 
 const removeInterval = (day: DayKey, index: number) => {
+  if (!canUpdateClinicSettings.value) return
   model.businessHours[day].splice(index, 1)
   if (!model.businessHours[day].length) {
     model.businessHours[day] = []
@@ -1228,6 +1257,7 @@ const removeInterval = (day: DayKey, index: number) => {
 }
 
 const applyBusinessHoursPreset = () => {
+  if (!canUpdateClinicSettings.value) return
   model.businessHours = {
     mon: [{ start: '08:00', end: '18:00' }],
     tue: [{ start: '08:00', end: '18:00' }],
@@ -1240,6 +1270,7 @@ const applyBusinessHoursPreset = () => {
 }
 
 const copyMondayToFriday = () => {
+  if (!canUpdateClinicSettings.value) return
   const monday = model.businessHours.mon.map((interval) => ({ ...interval }))
   ;(['tue', 'wed', 'thu', 'fri'] as DayKey[]).forEach((day) => {
     model.businessHours[day] = monday.map((interval) => ({ ...interval }))
@@ -1279,6 +1310,7 @@ const validateBusinessHours = () => {
 }
 
 const clearImage = async (field: ImageField) => {
+  if (!canDeleteClinicImage.value) return
   if (field === 'logo') uploadingLogo.value = true
   else uploadingLoginImage.value = true
 
@@ -1303,6 +1335,7 @@ const clearImage = async (field: ImageField) => {
 }
 
 const onImageSelected = async (field: ImageField, event: Event) => {
+  if (!canUploadClinicImage.value) return
   const input = event.target as HTMLInputElement | null
   const file = input?.files?.[0]
   if (!file) return
@@ -1420,6 +1453,7 @@ const buildClinicSettingsPayload = () => ({
 })
 
 const persistClinicSettings = async () => {
+  if (!canUpdateClinicSettings.value) return
   const api = useApi()
   await api('/api/v1/clinic-settings', {
     method: 'PATCH',
@@ -1428,6 +1462,7 @@ const persistClinicSettings = async () => {
 }
 
 const handleSave = async () => {
+  if (!canSaveActiveTab.value) return
   try {
     await formRef.value?.validate()
     if (!validateBusinessHours()) return

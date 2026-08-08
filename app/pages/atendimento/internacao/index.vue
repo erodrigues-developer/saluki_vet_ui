@@ -8,7 +8,7 @@
       </div>
       <n-space class="head-actions">
         <n-button secondary size="large" class="refresh-action-btn" @click="refreshBoard" :loading="loadingBoard">Atualizar painel</n-button>
-        <n-button type="primary" size="large" class="btn-primary-green new-admission-btn" @click="openAdmissionModal()">Nova internação</n-button>
+        <n-button v-if="canCreateInpatient" type="primary" size="large" class="btn-primary-green new-admission-btn" @click="openAdmissionModal()">Nova internação</n-button>
       </n-space>
     </div>
 
@@ -127,7 +127,7 @@
             <p><strong>Admissão:</strong> Pronto</p>
             <p><strong>Higienização:</strong> Sem registro</p>
           </div>
-          <n-button size="small" type="primary" secondary class="admit-btn" @click="openAdmissionModal({ boxId: box.id })">Internar</n-button>
+          <n-button v-if="canCreateInpatient" size="small" type="primary" secondary class="admit-btn" @click="openAdmissionModal({ boxId: box.id })">Internar</n-button>
         </div>
       </article>
 
@@ -168,7 +168,7 @@
       <template #footer>
         <div class="modal-footer">
           <n-button tertiary :disabled="savingAdmission" @click="showAdmissionModal = false">Cancelar</n-button>
-          <n-button type="primary" class="btn-primary-green" :loading="savingAdmission" @click="submitAdmissionForm">
+          <n-button v-if="canCreateInpatient" type="primary" class="btn-primary-green" :loading="savingAdmission" @click="submitAdmissionForm">
             Confirmar internação
           </n-button>
         </div>
@@ -200,7 +200,7 @@
       <template #footer>
         <div class="modal-footer">
           <n-button tertiary :disabled="savingTransfer" @click="closeTransferModal">Cancelar</n-button>
-          <n-button type="primary" class="btn-primary-green" :loading="savingTransfer" @click="submitTransferForm">
+          <n-button v-if="canTransferInpatient" type="primary" class="btn-primary-green" :loading="savingTransfer" @click="submitTransferForm">
             Confirmar transferência
           </n-button>
         </div>
@@ -233,7 +233,7 @@
       <template #footer>
         <div class="modal-footer">
           <n-button tertiary :disabled="savingPrescription" @click="showPrescriptionModal = false">Cancelar</n-button>
-          <n-button type="primary" class="btn-primary-green" :loading="savingPrescription" @click="submitPrescriptionForm">
+          <n-button v-if="canCreatePrescriptions" type="primary" class="btn-primary-green" :loading="savingPrescription" @click="submitPrescriptionForm">
             Emitir prescrição
           </n-button>
         </div>
@@ -253,8 +253,8 @@
             <h2>{{ clinicTitle }}</h2>
           </div>
           <n-space>
-            <n-button tertiary @click="sharePrescriptionWhatsapp">Compartilhar no WhatsApp</n-button>
-            <n-button type="primary" @click="printPrescription">Imprimir / PDF</n-button>
+            <n-button v-if="canPrintPrescriptions" tertiary @click="sharePrescriptionWhatsapp">Compartilhar no WhatsApp</n-button>
+            <n-button v-if="canPrintPrescriptions" type="primary" @click="printPrescription">Imprimir / PDF</n-button>
           </n-space>
         </div>
 
@@ -332,7 +332,7 @@
                 <n-empty v-else description="Nenhuma aferição registrada." />
               </n-card>
 
-              <n-card size="small" title="Nova aferição" class="panel-card">
+              <n-card v-if="canCreateClinicalParameters" size="small" title="Nova aferição" class="panel-card">
                 <ClinicalParametersForm :loading="savingVitals" @submit="createClinicalParameter" />
               </n-card>
 
@@ -358,7 +358,7 @@
             </n-tab-pane>
 
             <n-tab-pane name="treatment" :tab="treatmentTabLabel">
-              <n-card v-if="showTreatmentForm || treatmentItems.length" size="small" title="Agendar item" class="panel-card">
+              <n-card v-if="canCreateTreatmentMap && (showTreatmentForm || treatmentItems.length)" size="small" title="Agendar item" class="panel-card">
                 <TreatmentItemForm :loading="savingTreatment" :product-options="productOptions" :procedure-options="procedureOptions" @submit="createTreatmentItem" />
               </n-card>
 
@@ -379,14 +379,14 @@
                   <p v-if="item.notes" class="feed-notes">{{ item.notes }}</p>
 
                   <div class="card-actions">
-                    <n-button v-if="item.status === 'PENDING'" size="small" type="primary" secondary @click="executeTreatment(item)">Executar</n-button>
+                    <n-button v-if="item.status === 'PENDING' && canExecuteTreatmentMap" size="small" type="primary" secondary @click="executeTreatment(item)">Executar</n-button>
                     <span v-else class="executed-by">Aplicado por {{ item.executedByUser?.name || 'usuário não identificado' }}</span>
                   </div>
                 </article>
 
                 <div v-if="!treatmentItems.length && !showTreatmentForm" class="empty-tab-action">
                   <n-empty description="Nenhum item terapêutico registrado." />
-                  <n-button type="primary" secondary @click="showTreatmentForm = true">Adicionar item</n-button>
+                  <n-button v-if="canCreateTreatmentMap" type="primary" secondary @click="showTreatmentForm = true">Adicionar item</n-button>
                 </div>
               </div>
             </n-tab-pane>
@@ -397,7 +397,7 @@
                   <p class="eyebrow">Histórico do paciente</p>
                   <h3>Receitas emitidas</h3>
                 </div>
-                <n-button type="primary" secondary class="new-prescription-btn" @click="openPrescriptionModalForSelectedRecord">+ Nova prescrição digital</n-button>
+                <n-button v-if="canCreatePrescriptions" type="primary" secondary class="new-prescription-btn" @click="openPrescriptionModalForSelectedRecord">+ Nova prescrição digital</n-button>
               </div>
 
               <div class="feed prescriptions-feed">
@@ -411,13 +411,13 @@
                   <p class="prescription-responsible">{{ item.veterinarian?.name || 'Veterinário não identificado' }}</p>
                   <p class="feed-notes prescription-content">{{ item.content }}</p>
                   <div class="card-actions">
-                    <n-button size="small" tertiary @click="previewExistingPrescription(item)">Abrir receituário</n-button>
+                    <n-button v-if="canPrintPrescriptions" size="small" tertiary @click="previewExistingPrescription(item)">Abrir receituário</n-button>
                   </div>
                 </article>
 
                 <div v-if="!prescriptions.length" class="empty-tab-action">
                   <n-empty description="Nenhuma prescrição ativa." />
-                  <n-button type="primary" secondary @click="openPrescriptionModalForSelectedRecord">Adicionar prescrição</n-button>
+                  <n-button v-if="canCreatePrescriptions" type="primary" secondary @click="openPrescriptionModalForSelectedRecord">Adicionar prescrição</n-button>
                 </div>
               </div>
             </n-tab-pane>
@@ -437,11 +437,22 @@ import InpatientTransferForm, { type InpatientTransferPayload } from '~/componen
 import ClinicalParametersForm from '~/components/hospitalization/ClinicalParametersForm.vue'
 import TreatmentItemForm from '~/components/hospitalization/TreatmentItemForm.vue'
 import PrescriptionForm from '~/components/hospitalization/PrescriptionForm.vue'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
 const dialog = useDialog()
+const authStore = useAuthStore()
+const canCreateInpatient = computed(() => authStore.hasPermission(PERMISSIONS.inpatientCreate))
+const canDischargeInpatient = computed(() => authStore.hasPermission(PERMISSIONS.inpatientDischarge))
+const canTransferInpatient = computed(() => authStore.hasPermission(PERMISSIONS.inpatientTransfer))
+const canCreateClinicalParameters = computed(() => authStore.hasPermission(PERMISSIONS.clinicalParametersCreate))
+const canCreateTreatmentMap = computed(() => authStore.hasPermission(PERMISSIONS.treatmentMapCreate))
+const canExecuteTreatmentMap = computed(() => authStore.hasPermission(PERMISSIONS.treatmentMapExecute))
+const canCreatePrescriptions = computed(() => authStore.hasPermission(PERMISSIONS.prescriptionsCreate))
+const canPrintPrescriptions = computed(() => authStore.hasPermission(PERMISSIONS.prescriptionsPrint))
 
 const loadingBoard = ref(false)
 const detailLoading = ref(false)
@@ -708,10 +719,10 @@ const clearFilters = () => {
 
 const rowMenuOptions = (inpatient: any) => [
   { label: 'Registrar sinais', key: `vitals:${inpatient.id}` },
-  { label: 'Prescrição', key: `prescription:${inpatient.id}` },
+  ...(canCreatePrescriptions.value ? [{ label: 'Prescrição', key: `prescription:${inpatient.id}` }] : []),
   { label: 'Mapa terapêutico', key: `treatment:${inpatient.id}` },
-  { label: 'Transferir leito', key: `transfer:${inpatient.id}` },
-  { label: 'Dar alta', key: `discharge:${inpatient.id}` },
+  ...(canTransferInpatient.value ? [{ label: 'Transferir leito', key: `transfer:${inpatient.id}` }] : []),
+  ...(canDischargeInpatient.value ? [{ label: 'Dar alta', key: `discharge:${inpatient.id}` }] : []),
   { label: 'Histórico', key: `history:${inpatient.id}` },
 ]
 
@@ -726,6 +737,7 @@ const handleRowMenuSelect = async (key: string, inpatient: any) => {
     return
   }
   if (key.startsWith('prescription:')) {
+    if (!canCreatePrescriptions.value) return
     openPrescriptionModalForContext({ petId: Number(inpatient.petId), consultationId: inpatient.consultationId ? Number(inpatient.consultationId) : null })
     return
   }
@@ -734,6 +746,7 @@ const handleRowMenuSelect = async (key: string, inpatient: any) => {
     return
   }
   if (key.startsWith('discharge:')) {
+    if (!canDischargeInpatient.value) return
     dialog.warning({
       title: 'Confirmar alta',
       content: 'Encerrar internação deste paciente?',
@@ -746,6 +759,7 @@ const handleRowMenuSelect = async (key: string, inpatient: any) => {
     return
   }
   if (key.startsWith('transfer:')) {
+    if (!canTransferInpatient.value) return
     openTransferModal(inpatient)
     return
   }
@@ -798,11 +812,13 @@ const refreshBoard = async () => {
 }
 
 const openAdmissionModal = (initialValue?: Partial<InpatientAdmissionPayload>) => {
+  if (!canCreateInpatient.value) return
   admissionInitialValue.value = initialValue ?? null
   showAdmissionModal.value = true
 }
 
 const submitAdmissionForm = () => {
+  if (!canCreateInpatient.value) return
   admissionFormRef.value?.submit?.()
 }
 
@@ -812,6 +828,7 @@ const resolveCurrentBoxLabel = (inpatient: any) =>
   || `Box #${inpatient?.boxId || '-'}`
 
 const openTransferModal = (inpatient: any) => {
+  if (!canTransferInpatient.value) return
   transferTargetRecord.value = {
     ...inpatient,
     currentBoxLabel: resolveCurrentBoxLabel(inpatient),
@@ -830,10 +847,12 @@ const closeTransferModal = () => {
 }
 
 const submitTransferForm = () => {
+  if (!canTransferInpatient.value) return
   transferFormRef.value?.submit?.()
 }
 
 const openPrescriptionModalForContext = (context: { petId: number; consultationId?: number | null }) => {
+  if (!canCreatePrescriptions.value) return
   const pet = pets.value.find((item) => Number(item.id) === Number(context.petId))
   const consultation = context.consultationId ? consultations.value.find((item) => Number(item.id) === Number(context.consultationId)) : null
 
@@ -847,10 +866,12 @@ const openPrescriptionModalForContext = (context: { petId: number; consultationI
 }
 
 const submitPrescriptionForm = () => {
+  if (!canCreatePrescriptions.value) return
   prescriptionFormRef.value?.submit?.()
 }
 
 const openPrescriptionModalForSelectedRecord = () => {
+  if (!canCreatePrescriptions.value) return
   if (!selectedRecord.value?.petId) return
   openPrescriptionModalForContext({
     petId: Number(selectedRecord.value.petId),
@@ -897,6 +918,7 @@ const refreshSelectedRecord = async () => {
 }
 
 const createAdmission = async (payload: any) => {
+  if (!canCreateInpatient.value) return
   savingAdmission.value = true
   try {
     const selectedPet = pets.value.find((item) => Number(item.id) === Number(payload.petId))
@@ -939,6 +961,7 @@ const createAdmission = async (payload: any) => {
 }
 
 const createTransfer = async (payload: InpatientTransferPayload) => {
+  if (!canTransferInpatient.value) return
   if (!transferTargetRecord.value?.id) return
 
   savingTransfer.value = true
@@ -969,6 +992,7 @@ const createTransfer = async (payload: InpatientTransferPayload) => {
 }
 
 const createClinicalParameter = async (payload: any) => {
+  if (!canCreateClinicalParameters.value) return
   if (!selectedRecordId.value) return
   savingVitals.value = true
   try {
@@ -983,6 +1007,7 @@ const createClinicalParameter = async (payload: any) => {
 }
 
 const createTreatmentItem = async (payload: any) => {
+  if (!canCreateTreatmentMap.value) return
   if (!selectedRecordId.value) return
   savingTreatment.value = true
   try {
@@ -998,6 +1023,7 @@ const createTreatmentItem = async (payload: any) => {
 }
 
 const executeTreatment = async (item: any) => {
+  if (!canExecuteTreatmentMap.value) return
   try {
     await api(`/api/v1/treatment-map/${item.id}/execute`, { method: 'PATCH', body: {} })
     message.success('Tratamento marcado como executado.')
@@ -1009,6 +1035,7 @@ const executeTreatment = async (item: any) => {
 }
 
 const createPrescription = async (payload: any) => {
+  if (!canCreatePrescriptions.value) return
   savingPrescription.value = true
   try {
     const created = await api<any>('/api/v1/prescriptions', { method: 'POST', body: payload })
@@ -1031,6 +1058,7 @@ const createPrescription = async (payload: any) => {
 }
 
 const previewExistingPrescription = (item: any) => {
+  if (!canPrintPrescriptions.value) return
   lastCreatedPrescription.value = item
   showPrintModal.value = true
 }
@@ -1048,6 +1076,7 @@ const buildPrescriptionText = (prescription: any) => [
 ].filter(Boolean).join('\n')
 
 const printPrescription = () => {
+  if (!canPrintPrescriptions.value) return
   if (!lastCreatedPrescription.value || !process.client) return
 
   const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700')
@@ -1087,12 +1116,14 @@ const printPrescription = () => {
 }
 
 const sharePrescriptionWhatsapp = () => {
+  if (!canPrintPrescriptions.value) return
   if (!lastCreatedPrescription.value || !process.client) return
   const text = buildPrescriptionText(lastCreatedPrescription.value)
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer')
 }
 
 const dischargeRecord = async (record: any) => {
+  if (!canDischargeInpatient.value) return
   try {
     await api(`/api/v1/inpatient-records/${record.id}/discharge`, { method: 'PATCH', body: {} })
     message.success('Internação encerrada.')

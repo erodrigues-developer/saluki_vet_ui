@@ -109,8 +109,9 @@
 </template>
 
 <script setup lang="ts">
-import { h, onMounted, reactive, ref } from "vue";
+import { computed, h, onMounted, reactive, ref } from "vue";
 import { NButton, NDropdown, NEmpty, NTag, useMessage } from "naive-ui";
+import { PERMISSIONS } from "~/constants/permissions";
 
 const loading = ref(false);
 const reprocessingIds = ref<Set<number>>(new Set());
@@ -121,6 +122,9 @@ const selectedLogDocument = ref<any | null>(null);
 const pagination = reactive({ page: 1, limit: 20, total: 0 });
 const filters = reactive({ status: null as string | null, environment: null as string | null, saleId: "" });
 const message = useMessage();
+const authStore = useAuthStore();
+const canDownloadFiscalDocument = computed(() => authStore.hasPermission(PERMISSIONS.fiscalDocumentsDownload));
+const canResolveFiscalPending = computed(() => authStore.hasPermission(PERMISSIONS.fiscalPendingResolve));
 
 const statusOptions = [
   "PENDING_ISSUE",
@@ -247,21 +251,23 @@ const buildActionOptions = (row: any) => {
     ["FAILED", "PENDING_ISSUE"].includes(issueRequest?.status);
 
   return [
-    { label: "Baixar XML", key: "download_xml", disabled: !xmlFile },
-    { label: "Baixar DANFE", key: "download_danfe", disabled: !danfeFile },
-    { type: "divider", key: "downloads_divider" },
+    canDownloadFiscalDocument.value ? { label: "Baixar XML", key: "download_xml", disabled: !xmlFile } : null,
+    canDownloadFiscalDocument.value ? { label: "Baixar DANFE", key: "download_danfe", disabled: !danfeFile } : null,
+    canDownloadFiscalDocument.value ? { type: "divider", key: "downloads_divider" } : null,
     { label: "Ver log", key: "log" },
-    { label: "Reprocessar", key: "reprocess", disabled: !canReprocess },
-  ];
+    canResolveFiscalPending.value ? { label: "Reprocessar", key: "reprocess", disabled: !canReprocess } : null,
+  ].filter(Boolean);
 };
 
 const handleActionSelect = (key: string, row: any) => {
   const { xmlFile, danfeFile } = fiscalArtifacts(row);
   if (key === "download_xml" && xmlFile) {
+    if (!canDownloadFiscalDocument.value) return;
     downloadArtifact(xmlFile, row);
     return;
   }
   if (key === "download_danfe" && danfeFile) {
+    if (!canDownloadFiscalDocument.value) return;
     downloadArtifact(danfeFile, row);
     return;
   }
@@ -270,6 +276,7 @@ const handleActionSelect = (key: string, row: any) => {
     return;
   }
   if (key === "reprocess") {
+    if (!canResolveFiscalPending.value) return;
     const issueRequestId = Number(row.latestIssueRequest?.id || 0);
     reprocessIssueRequest(issueRequestId);
   }

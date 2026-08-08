@@ -42,22 +42,22 @@
           </template>
           <div class="grid">
             <n-form-item label="Atendimento relacionado">
-              <n-select v-model:value="model.appointmentId" :options="appointmentsOptions" placeholder="Vincular agendamento, retorno ou atendimento anterior" clearable @update:value="handleAppointmentChange" />
+              <n-select v-model:value="model.appointmentId" :options="appointmentsOptions" :disabled="isConsultationReadOnly" placeholder="Vincular agendamento, retorno ou atendimento anterior" clearable @update:value="handleAppointmentChange" />
               <template #feedback>
                 <span class="field-help">Opcional. Vincule um agendamento anterior para preencher os dados automaticamente.</span>
               </template>
             </n-form-item>
             <n-form-item label="Tutor" required>
-              <n-select v-model:value="model.clientId" :options="clientOptions" placeholder="Selecione" filterable @update:value="handleClientChange" />
+              <n-select v-model:value="model.clientId" :options="clientOptions" :disabled="isConsultationReadOnly" placeholder="Selecione" filterable @update:value="handleClientChange" />
             </n-form-item>
             <n-form-item label="Paciente" required>
-              <n-select v-model:value="model.petId" :options="petOptions" :disabled="!model.clientId" placeholder="Selecione" filterable />
+              <n-select v-model:value="model.petId" :options="petOptions" :disabled="!model.clientId || isConsultationReadOnly" placeholder="Selecione" filterable />
             </n-form-item>
             <n-form-item label="Veterinário responsável" required>
-              <n-select v-model:value="model.veterinarianId" :options="veterinarianOptions" placeholder="Selecione" filterable />
+              <n-select v-model:value="model.veterinarianId" :options="veterinarianOptions" :disabled="isConsultationReadOnly" placeholder="Selecione" filterable />
             </n-form-item>
             <n-form-item label="Data e hora" required>
-              <n-date-picker v-model:value="model.visitDate" type="datetime" format="dd/MM/yyyy HH:mm" style="width: 100%" />
+              <n-date-picker v-model:value="model.visitDate" :disabled="isConsultationReadOnly" type="datetime" format="dd/MM/yyyy HH:mm" style="width: 100%" />
             </n-form-item>
           </div>
           <p v-if="appointmentPrefilledFeedback" class="feedback-note">Dados preenchidos a partir do agendamento selecionado.</p>
@@ -72,13 +72,13 @@
           </template>
           <div class="grid triage-grid">
             <n-form-item label="Peso (kg)">
-              <n-input-number v-model:value="model.weightKg" :min="0" :precision="2" style="width: 100%" />
+              <n-input-number v-model:value="model.weightKg" :disabled="isConsultationReadOnly" :min="0" :precision="2" style="width: 100%" />
             </n-form-item>
             <n-form-item label="Temperatura (°C)">
-              <n-input-number v-model:value="model.temperatureC" :min="0" :precision="1" style="width: 100%" />
+              <n-input-number v-model:value="model.temperatureC" :disabled="isConsultationReadOnly" :min="0" :precision="1" style="width: 100%" />
             </n-form-item>
             <n-form-item label="Prioridade clínica">
-              <n-select v-model:value="model.triageRisk" :options="triageRiskOptions" placeholder="Não triado" />
+              <n-select v-model:value="model.triageRisk" :options="triageRiskOptions" :disabled="isConsultationReadOnly" placeholder="Não triado" />
             </n-form-item>
           </div>
           <n-button tertiary type="info" size="small" @click="showOptionalVitals = !showOptionalVitals">
@@ -87,19 +87,19 @@
           <p class="field-help">Frequência cardíaca, frequência respiratória, mucosas, hidratação e dor.</p>
           <div v-if="showOptionalVitals" class="grid optional-vitals-grid">
             <n-form-item label="Frequência cardíaca (bpm)">
-              <n-input-number v-model:value="model.heartRateBpm" :min="0" :precision="0" style="width: 100%" />
+              <n-input-number v-model:value="model.heartRateBpm" :disabled="isConsultationReadOnly" :min="0" :precision="0" style="width: 100%" />
             </n-form-item>
             <n-form-item label="Frequência respiratória (irpm)">
-              <n-input-number v-model:value="model.respiratoryRateIpm" :min="0" :precision="0" style="width: 100%" />
+              <n-input-number v-model:value="model.respiratoryRateIpm" :disabled="isConsultationReadOnly" :min="0" :precision="0" style="width: 100%" />
             </n-form-item>
             <n-form-item label="Mucosas">
-              <n-input v-model:value="model.mucosaStatus" placeholder="Ex.: rosadas, pálidas..." />
+              <n-input v-model:value="model.mucosaStatus" :disabled="isConsultationReadOnly" placeholder="Ex.: rosadas, pálidas..." />
             </n-form-item>
             <n-form-item label="Hidratação">
-              <n-input v-model:value="model.hydrationStatus" placeholder="Ex.: normohidratado, leve desidratação..." />
+              <n-input v-model:value="model.hydrationStatus" :disabled="isConsultationReadOnly" placeholder="Ex.: normohidratado, leve desidratação..." />
             </n-form-item>
             <n-form-item label="Dor">
-              <n-input v-model:value="model.painStatus" placeholder="Ex.: sem dor aparente, dor moderada..." />
+              <n-input v-model:value="model.painStatus" :disabled="isConsultationReadOnly" placeholder="Ex.: sem dor aparente, dor moderada..." />
             </n-form-item>
           </div>
         </n-card>
@@ -127,7 +127,7 @@
               </div>
               <p class="recording-helper">{{ aiHelperText }}</p>
               <div class="inline-actions">
-                <n-button type="info" class="recording-cta" :disabled="(!model.id || !canUseAudioCapture) && !aiHasError" @click="handleMicrophoneAction">
+                <n-button v-if="canUseConsultationAi" type="info" class="recording-cta" :disabled="isConsultationReadOnly || ((!model.id || !canUseAudioCapture) && !aiHasError)" @click="handleMicrophoneAction">
                   <template #icon>
                     <svg viewBox="0 0 24 24" class="btn-mic-icon" aria-hidden="true">
                       <path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0a7 7 0 0 1-6 6.92V20h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.08A7 7 0 0 1 5 11a1 1 0 1 1 2 0a5 5 0 1 0 10 0Z"/>
@@ -153,6 +153,7 @@
               type="textarea"
               :autosize="{ minRows: 4, maxRows: 8 }"
               :readonly="isOriginalTranscriptReadonly"
+              :disabled="isConsultationReadOnly"
               placeholder="Disponível para digitação manual apenas antes da primeira gravação."
               @update:value="onOriginalComplaintChange"
             />
@@ -168,12 +169,13 @@
                 :value="model.aiOrganizedComplaint"
                 type="textarea"
                 :autosize="{ minRows: 5, maxRows: 10 }"
+                :disabled="isConsultationReadOnly"
                 placeholder="Edite a anamnese antes de avançar."
                 @update:value="onAiOrganizedComplaintChange"
               />
             </div>
             <div class="inline-actions" v-if="suggestedAnamnesisText && !model.anamnesisApproved">
-              <n-button tertiary type="info" @click="openAnamnesisChat">Revisar sugestão da IA</n-button>
+              <n-button v-if="canUseConsultationAi" tertiary type="info" @click="openAnamnesisChat">Revisar sugestão da IA</n-button>
             </div>
             <p class="field-help">Texto sugerido: <strong>{{ model.anamnesisApproved ? 'Utilizado no prontuário' : suggestedAnamnesisText ? 'Aguardando revisão no chat' : 'Aguardando IA' }}</strong></p>
           </div>
@@ -220,7 +222,7 @@
           <template #footer>
             <div class="modal-actions">
               <n-button tertiary @click="prescriptionModalVisible = false">Cancelar</n-button>
-              <n-button type="primary" :loading="creatingPrescription" @click="confirmGeneratePrescription">
+              <n-button v-if="canCreatePrescription" type="primary" :loading="creatingPrescription" @click="confirmGeneratePrescription">
                 Gerar e abrir prescrição
               </n-button>
             </div>
@@ -238,7 +240,7 @@
               <section class="prescription-form-section">
                 <div class="prescription-section-head">
                   <h4 class="prescription-section-title">Exames disponíveis</h4>
-                  <n-button quaternary type="info" @click="openQuickExamCreateModal">Cadastro rápido de exame</n-button>
+                  <n-button v-if="canCreateExamType" quaternary type="info" @click="openQuickExamCreateModal">Cadastro rápido de exame</n-button>
                 </div>
                 <n-input
                   v-model:value="examRequestFilter"
@@ -276,7 +278,7 @@
           <template #footer>
             <div class="modal-actions">
               <n-button tertiary @click="examRequestModalVisible = false">Cancelar</n-button>
-              <n-button type="primary" :loading="creatingExamRequest" @click="confirmGenerateExamRequest">
+              <n-button v-if="canCreateExamRequest" type="primary" :loading="creatingExamRequest" @click="confirmGenerateExamRequest">
                 Gerar pedido e abrir impressão
               </n-button>
             </div>
@@ -293,7 +295,7 @@
           <template #footer>
             <div class="modal-actions">
               <n-button tertiary @click="quickExamCreateModalVisible = false">Cancelar</n-button>
-              <n-button type="primary" :loading="creatingQuickExamType" @click="confirmQuickExamCreate">Criar exame</n-button>
+              <n-button v-if="canCreateExamType" type="primary" :loading="creatingQuickExamType" @click="confirmQuickExamCreate">Criar exame</n-button>
             </div>
           </template>
         </n-modal>
@@ -343,7 +345,7 @@
           <template #footer>
             <div class="modal-actions">
               <n-button tertiary @click="billingProcedureModalVisible = false">Cancelar</n-button>
-              <n-button type="primary" :loading="savingBillingProcedure" @click="submitBillingProcedure">
+              <n-button v-if="canUpdateConsultation" type="primary" :loading="savingBillingProcedure" @click="submitBillingProcedure">
                 {{ billingProcedureForm.id ? 'Salvar procedimento' : 'Adicionar procedimento' }}
               </n-button>
             </div>
@@ -364,25 +366,26 @@
           </template>
           <div class="grid">
             <n-form-item label="Diagnóstico ou hipótese diagnóstica" class="full-row">
-              <n-input v-model:value="model.diagnosis" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" />
+              <n-input v-model:value="model.diagnosis" :disabled="isConsultationReadOnly" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" />
             </n-form-item>
             <n-form-item label="Conduta" class="full-row">
-              <n-input v-model:value="model.treatmentPlan" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" />
+              <n-input v-model:value="model.treatmentPlan" :disabled="isConsultationReadOnly" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" />
               <template #feedback>
                 <span v-if="treatmentPlanFromAi" class="field-help">Sugestão da IA aplicada. Revise antes de finalizar.</span>
               </template>
             </n-form-item>
             <n-form-item label="Retorno recomendado">
-              <n-input v-model:value="clinical.followUp" placeholder="Ex.: retorno em 5 dias" />
+              <n-input v-model:value="clinical.followUp" :disabled="isConsultationReadOnly" placeholder="Ex.: retorno em 5 dias" />
             </n-form-item>
             <n-form-item label="Encaminhar para internação">
-              <n-switch v-model:value="clinical.referInpatient" />
+              <n-switch v-model:value="clinical.referInpatient" :disabled="isConsultationReadOnly" />
             </n-form-item>
             <template v-if="clinical.referInpatient">
               <n-form-item label="Box/Leito" required>
                 <n-select
                   v-model:value="inpatientReferral.boxId"
                   :options="availableInpatientBoxOptions"
+                  :disabled="isConsultationReadOnly"
                   placeholder="Selecione um leito disponível"
                   filterable
                 />
@@ -392,6 +395,7 @@
                   v-model:value="inpatientReferral.reason"
                   type="textarea"
                   :autosize="{ minRows: 2, maxRows: 4 }"
+                  :disabled="isConsultationReadOnly"
                   placeholder="Ex.: pós-operatório, fluidoterapia, observação neurológica..."
                 />
               </n-form-item>
@@ -400,17 +404,18 @@
                   v-model:value="inpatientReferral.notes"
                   type="textarea"
                   :autosize="{ minRows: 2, maxRows: 4 }"
+                  :disabled="isConsultationReadOnly"
                   placeholder="Anotações iniciais para a equipe de plantão."
                 />
               </n-form-item>
             </template>
           </div>
           <div class="inline-actions">
-            <button type="button" class="quick-action-card" @click="openPrescriptionPrint">
+            <button v-if="canCreatePrescription || canPrintPrescription" type="button" class="quick-action-card" @click="openPrescriptionPrint">
               <span class="quick-action-icon"><AppIcon name="pill" :size="14" :stroke-width="2" /></span>
               <span><strong>{{ prescriptionActionLabel }}</strong> — {{ prescriptionActionHint }}</span>
             </button>
-            <button type="button" class="quick-action-card" @click="openExamRequestPrint">
+            <button v-if="canCreateExamRequest || canPrintExamRequest" type="button" class="quick-action-card" @click="openExamRequestPrint">
               <span class="quick-action-icon"><AppIcon name="flask" :size="14" :stroke-width="2" /></span>
               <span><strong>{{ examRequestActionLabel }}</strong> — {{ examRequestActionHint }}</span>
             </button>
@@ -432,6 +437,7 @@
                     @change="handleConsultationFileSelected"
                   />
                   <n-button
+                    v-if="canUploadConsultationAttachment"
                     type="primary"
                     secondary
                     :loading="uploadingConsultationAttachment"
@@ -457,6 +463,7 @@
                     <div class="artifact-item-actions">
                       <n-button tertiary size="small" @click="openExternalFile(item.fileUrl)">Abrir</n-button>
                       <n-button
+                        v-if="canDeleteConsultationAttachment"
                         tertiary
                         size="small"
                         type="error"
@@ -499,6 +506,7 @@
                     <div class="artifact-item-actions">
                       <n-tag :bordered="false" round>{{ normalizeExamRequestStatus(request.status) }}</n-tag>
                       <n-button
+                        v-if="canUploadExamResult"
                         tertiary
                         size="small"
                         :loading="uploadingExamResult && pendingExamRequestIdForUpload === request.id"
@@ -545,26 +553,26 @@
           </n-alert>
           <div class="review-grid">
             <section class="review-block">
-              <div class="review-block-head"><h4>Paciente</h4><button type="button" class="edit-link" @click="setCurrentStep(0)">Editar</button></div>
+              <div class="review-block-head"><h4>Paciente</h4><button type="button" class="edit-link" @click="setCurrentStep(0)">{{ reviewNavigationLabel }}</button></div>
               <p><strong>Paciente:</strong> {{ petLabel }}</p>
               <p><strong>Tutor:</strong> {{ clientLabel }}</p>
               <p><strong>Veterinário:</strong> {{ veterinarianLabel }}</p>
             </section>
             <section class="review-block">
-              <div class="review-block-head"><h4>Relato clínico</h4><button type="button" class="edit-link" @click="setCurrentStep(2)">Editar</button></div>
+              <div class="review-block-head"><h4>Relato clínico</h4><button type="button" class="edit-link" @click="setCurrentStep(2)">{{ reviewNavigationLabel }}</button></div>
               <p><strong>Relato original:</strong> {{ model.originalComplaint || 'Ainda não registrado' }}</p>
               <p><strong>Queixa final:</strong> {{ model.mainComplaint || 'Ainda não registrado' }}</p>
               <p><strong>Anamnese organizada:</strong> {{ model.aiOrganizedComplaint || 'Ainda não registrado' }}</p>
               <p><strong>Texto sugerido:</strong> {{ model.anamnesisApproved ? 'Utilizado' : 'Pendente' }}</p>
             </section>
             <section class="review-block">
-              <div class="review-block-head"><h4>Conduta</h4><button type="button" class="edit-link" @click="setCurrentStep(3)">Editar</button></div>
+              <div class="review-block-head"><h4>Conduta</h4><button type="button" class="edit-link" @click="setCurrentStep(3)">{{ reviewNavigationLabel }}</button></div>
               <p><strong>Diagnóstico:</strong> {{ model.diagnosis || 'Ainda não registrado' }}</p>
               <p><strong>Conduta:</strong> {{ model.treatmentPlan || 'Ainda não registrado' }}</p>
               <p><strong>Origem da conduta:</strong> {{ treatmentPlanFromAi ? 'IA revisada' : 'Manual' }}</p>
             </section>
             <section class="review-block">
-              <div class="review-block-head"><h4>Encaminhamentos</h4><button type="button" class="edit-link" @click="setCurrentStep(3)">Editar</button></div>
+              <div class="review-block-head"><h4>Encaminhamentos</h4><button type="button" class="edit-link" @click="setCurrentStep(3)">{{ reviewNavigationLabel }}</button></div>
               <p><strong>Retorno:</strong> {{ clinical.followUp || 'Não definido' }}</p>
               <p><strong>Internação:</strong> {{ clinical.referInpatient ? 'Encaminhar para internação' : 'Sem encaminhamento' }}</p>
               <p v-if="clinical.referInpatient"><strong>Box/Leito:</strong> {{ inpatientBoxLabel || 'Não definido' }}</p>
@@ -572,13 +580,13 @@
               <p v-if="clinical.referInpatient"><strong>Observações:</strong> {{ inpatientReferral.notes || 'Não definido' }}</p>
             </section>
             <section class="review-block">
-              <div class="review-block-head"><h4>Anexos e exames</h4><button type="button" class="edit-link" @click="setCurrentStep(3)">Editar</button></div>
+              <div class="review-block-head"><h4>Anexos e exames</h4><button type="button" class="edit-link" @click="setCurrentStep(3)">{{ reviewNavigationLabel }}</button></div>
               <p><strong>Arquivos do prontuário:</strong> {{ consultationAttachments.length }}</p>
               <p><strong>Pedidos de exame:</strong> {{ consultationExamRequests.length }}</p>
               <p><strong>Resultados anexados:</strong> {{ examResults.length }}</p>
             </section>
             <section class="review-block">
-              <div class="review-block-head"><h4>Cobrança</h4><button type="button" class="edit-link" @click="setCurrentStep(5)">Editar</button></div>
+              <div class="review-block-head"><h4>Cobrança</h4><button type="button" class="edit-link" @click="setCurrentStep(5)">{{ reviewNavigationLabel }}</button></div>
               <p><strong>Procedimentos cobrados:</strong> {{ consultationBillingItems.length }}</p>
               <p><strong>Total previsto:</strong> {{ formatCurrency(consultationBillingTotal) }}</p>
               <p><strong>Status:</strong> {{ consultationBillingItems.length ? 'Itens lançados para cobrança' : 'Sem itens para cobrança' }}</p>
@@ -617,7 +625,7 @@
                 <p>Procedimentos realizados na consulta que devem seguir para a venda e o checkout.</p>
               </div>
               <div class="artifact-section-actions">
-                <n-button type="primary" secondary @click="openBillingProcedureModal()">Adicionar procedimento</n-button>
+                <n-button v-if="canUpdateConsultation" type="primary" secondary @click="openBillingProcedureModal()">Adicionar procedimento</n-button>
               </div>
             </div>
             <p v-if="!model.id" class="field-help">Ao adicionar o primeiro item, a consulta será salva como rascunho para liberar a cobrança.</p>
@@ -635,8 +643,9 @@
                   <small>Total: {{ formatCurrency(item.totalPrice) }}</small>
                 </div>
                 <div class="artifact-item-actions">
-                  <n-button tertiary size="small" @click="openBillingProcedureModal(item)">Editar</n-button>
+                  <n-button v-if="canUpdateConsultation" tertiary size="small" @click="openBillingProcedureModal(item)">Editar</n-button>
                   <n-button
+                    v-if="canUpdateConsultation"
                     tertiary
                     size="small"
                     type="error"
@@ -664,7 +673,8 @@
           </div>
           <div class="inline-actions">
             <n-button tertiary @click="currentStep = 4">Voltar para revisão</n-button>
-            <n-button
+              <n-button
+                v-if="canFinalizeConsultation"
               type="primary"
               :loading="saving || finalizingAndBilling || loadingConsultationBillingItems"
               :disabled="hasPendingAppliedAiBlocks"
@@ -677,7 +687,7 @@
 
         <div v-if="currentStep < steps.length - 1" class="step-nav">
           <n-button :disabled="currentStep === 0" @click="goPrev">Voltar</n-button>
-          <n-button type="primary" :loading="saving" :disabled="currentStep === 2 && !model.anamnesisApproved && !suggestedAnamnesisText" @click="saveAndContinue">Salvar e continuar</n-button>
+          <n-button v-if="canSaveConsultation" type="primary" :loading="saving" :disabled="currentStep === 2 && !model.anamnesisApproved && !suggestedAnamnesisText" @click="saveAndContinue">Salvar e continuar</n-button>
         </div>
       </section>
 
@@ -696,6 +706,7 @@
     </div>
 
     <AiChatFloating
+      v-if="canUseConsultationAi"
       :show="consultationAiChatVisible"
       launcher
       :is-mobile="isMobile"
@@ -728,6 +739,7 @@ import AiChatFloating from '~/components/ai/AiChatFloating.vue'
 import CurrencyInput from '~/components/common/CurrencyInput.vue'
 import ExamForm, { type ExamType } from '~/components/exams/ExamForm.vue'
 import { useAiConversation } from '~/composables/useAiConversation'
+import { PERMISSIONS } from '~/constants/permissions'
 
 interface DictationStructuredPayload {
   summary?: string
@@ -795,6 +807,7 @@ interface ConsultationBillingProcedureRow {
 }
 
 const message = useMessage()
+const authStore = useAuthStore()
 const route = useRoute()
 const saving = ref(false)
 const currentStep = ref(0)
@@ -1031,6 +1044,37 @@ const billingProcedureForm = reactive<{
 })
 
 const MIN_AUTOMATION_LENGTH = 18
+const canViewConsultation = computed(() => authStore.hasPermission(PERMISSIONS.consultationsView))
+const canCreateConsultation = computed(() => authStore.hasPermission(PERMISSIONS.consultationsCreate))
+const canUpdateConsultation = computed(() => authStore.hasPermission(PERMISSIONS.consultationsUpdate))
+const canSaveConsultation = computed(() => model.id ? canUpdateConsultation.value : canCreateConsultation.value)
+const isConsultationReadOnly = computed(() => Boolean(model.id) && !canUpdateConsultation.value)
+const reviewNavigationLabel = computed(() => isConsultationReadOnly.value ? 'Ver' : 'Editar')
+const canFinalizeConsultation = computed(() => authStore.hasPermission(canFinalizeAndBill.value ? PERMISSIONS.consultationsFinalizeAndBill : PERMISSIONS.consultationsFinalize))
+const canUseConsultationAi = computed(() => authStore.hasPermission(PERMISSIONS.consultationsAi))
+const canViewAppointments = computed(() => authStore.hasPermission(PERMISSIONS.appointmentsView))
+const canViewClients = computed(() => authStore.hasPermission(PERMISSIONS.clientsView))
+const canViewPets = computed(() => authStore.hasPermission(PERMISSIONS.petsView))
+const canCreatePrescription = computed(() => authStore.hasPermission(PERMISSIONS.prescriptionsCreate))
+const canPrintPrescription = computed(() => authStore.hasPermission(PERMISSIONS.prescriptionsPrint))
+const canCreateExamRequest = computed(() => authStore.hasPermission(PERMISSIONS.examRequestsCreate))
+const canPrintExamRequest = computed(() => authStore.hasPermission(PERMISSIONS.examRequestsPrint))
+const canLoadExamRequests = computed(() => authStore.hasAnyPermission([
+  PERMISSIONS.examRequestsView,
+  PERMISSIONS.examRequestsCreate,
+  PERMISSIONS.examRequestsPrint,
+]))
+const canLoadExamSupportData = computed(() => authStore.hasAnyPermission([
+  PERMISSIONS.examTypesView,
+  PERMISSIONS.examRequestsView,
+  PERMISSIONS.examRequestsCreate,
+]))
+const canCreateExamType = computed(() => authStore.hasPermission(PERMISSIONS.examTypesCreate))
+const canUploadConsultationAttachment = computed(() => authStore.hasPermission(PERMISSIONS.consultationAttachmentsUpload))
+const canDeleteConsultationAttachment = computed(() => authStore.hasPermission(PERMISSIONS.consultationAttachmentsDelete))
+const canUploadExamResult = computed(() =>
+  authStore.hasAnyPermission([PERMISSIONS.examResultsCreate, PERMISSIONS.examResultsUpload])
+)
 const aiHasError = computed(() => Boolean(aiErrorMessage.value))
 const cleanedMainComplaint = computed(() =>
   String(model.originalComplaint || model.mainComplaint || '')
@@ -1038,9 +1082,9 @@ const cleanedMainComplaint = computed(() =>
     .trim(),
 )
 const normalizedAutoSuggestionText = computed(() => normalizeSuggestionText(cleanedMainComplaint.value))
-const canUseAudioCapture = computed(() => process.client && typeof MediaRecorder !== 'undefined' && typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia)
+const canUseAudioCapture = computed(() => canUseConsultationAi.value && process.client && typeof MediaRecorder !== 'undefined' && typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia)
 const hasPendingSuggestion = computed(() => sendingDictation.value || dictations.value.some((item) => ['PENDING', 'PROCESSING'].includes(item.status)))
-const canAutoGenerate = computed(() => Boolean(model.id) && (cleanedMainComplaint.value.length >= MIN_AUTOMATION_LENGTH || !!latestAudioBlob.value))
+const canAutoGenerate = computed(() => canUseConsultationAi.value && Boolean(model.id) && (cleanedMainComplaint.value.length >= MIN_AUTOMATION_LENGTH || !!latestAudioBlob.value))
 const hasExistingTranscript = computed(() => String(model.originalComplaint || '').trim().length > 0)
 const hasPersistedAudio = computed(() => dictations.value.some((item) => Boolean(item.audioFileName)))
 const isOriginalTranscriptReadonly = computed(() => hasPersistedAudio.value || isRecording.value || hasPendingSuggestion.value)
@@ -1332,10 +1376,10 @@ const loadLookups = async () => {
   const api = useApi()
   try {
     const [clientsRes, petsRes, usersRes, apptsRes, boxesRes, proceduresRes] = await Promise.all([
-      api<any>('/api/v1/clients?limit=500'),
-      api<any>('/api/v1/pets?limit=1000'),
+      canViewClients.value ? api<any>('/api/v1/clients?limit=500') : Promise.resolve({ data: [] }),
+      canViewPets.value ? api<any>('/api/v1/pets?limit=1000') : Promise.resolve({ data: [] }),
       api<any>('/api/v1/users?limit=100'),
-      api<any>('/api/v1/appointments?sortBy=startsAt&sortDirection=desc&limit=50'),
+      canViewAppointments.value ? api<any>('/api/v1/appointments?sortBy=startsAt&sortDirection=desc&limit=50') : Promise.resolve({ data: [] }),
       api<any>('/api/v1/boxes?isActive=true'),
       api<any>('/api/v1/procedures?limit=500'),
     ])
@@ -1625,6 +1669,7 @@ const syncConsultationBillingItems = async () => {
 }
 
 const openBillingProcedureModal = async (item?: ConsultationBillingProcedureRow) => {
+  if (!canUpdateConsultation.value) return
   const ready = await ensureConsultationDraftForBilling()
   if (!ready) return
 
@@ -1641,6 +1686,7 @@ const openBillingProcedureModal = async (item?: ConsultationBillingProcedureRow)
 }
 
 const submitBillingProcedure = async () => {
+  if (!canUpdateConsultation.value) return
   if (!model.id) return
   if (!billingProcedureForm.procedureId) {
     message.warning('Selecione o procedimento a cobrar.')
@@ -1688,6 +1734,7 @@ const submitBillingProcedure = async () => {
 }
 
 const removeBillingProcedure = async (id: number) => {
+  if (!canUpdateConsultation.value) return
   removingBillingProcedureId.value = id
   try {
     const api = useApi()
@@ -1843,6 +1890,8 @@ const syncExtraNotes = () => {
 }
 
 const persist = async ({ finalize = false }: { finalize?: boolean } = {}) => {
+  if (finalize && !authStore.hasPermission(PERMISSIONS.consultationsFinalize)) return false
+  if (!finalize && !canSaveConsultation.value) return false
   if (!validateCore()) return false
   if (!validateInpatientReferral()) return false
   if (finalize) {
@@ -1910,6 +1959,7 @@ const saveDraft = async () => {
 
 const ensureInpatientReferralCreated = async () => {
   if (!clinical.referInpatient || !model.id || !model.petId) return 'skipped' as const
+  if (!authStore.hasPermission(PERMISSIONS.inpatientCreate)) return 'skipped' as const
   if (linkedInpatientRecordId.value) return 'exists' as const
 
   const api = useApi()
@@ -1971,6 +2021,7 @@ const ensureInpatientReferralCreated = async () => {
 }
 
 const saveAndContinue = async () => {
+  if (!canSaveConsultation.value) return
   if (currentStep.value === 2 && !model.anamnesisApproved) {
     message.warning('Revise a sugestão da IA e utilize o texto sugerido para avançar.')
     if (suggestedAnamnesisText.value) openAnamnesisChat()
@@ -1983,6 +2034,7 @@ const saveAndContinue = async () => {
 }
 
 const finalizeAttendance = async () => {
+  if (!canFinalizeConsultation.value) return
   const ready = await syncConsultationBillingItems()
   if (!ready) return
 
@@ -1997,6 +2049,7 @@ const finalizeAttendance = async () => {
 }
 
 const finalizeAndBill = async (options: { skipBillingSync?: boolean } = {}) => {
+  if (!authStore.hasPermission(PERMISSIONS.consultationsFinalizeAndBill)) return
   const ready = options.skipBillingSync ? await ensureConsultationDraftForBilling() : await syncConsultationBillingItems()
   if (!ready || !model.id) return
   if (!canFinalizeAndBill.value) {
@@ -2107,6 +2160,11 @@ const setCurrentStep = (stepIndex: number) => {
 
 const loadDictations = async () => {
   if (!model.id) {
+    dictations.value = []
+    stopDictationPolling()
+    return
+  }
+  if (!canUseConsultationAi.value) {
     dictations.value = []
     stopDictationPolling()
     return
@@ -2286,6 +2344,7 @@ const toggleRecordingPause = () => {
 }
 
 const handleMicrophoneAction = async () => {
+  if (!canUseConsultationAi.value) return
   if (isRecording.value) {
     stopRecording()
     return
@@ -2317,6 +2376,7 @@ const onAiOrganizedComplaintChange = (value: string) => {
 }
 
 const openConsultationChat = async () => {
+  if (!canUseConsultationAi.value) return
   if (!model.id) {
     message.warning('Salve a consulta antes de abrir o assistente com histórico persistente.')
     return
@@ -2330,6 +2390,7 @@ const closeConsultationChat = () => {
 }
 
 const openAnamnesisChat = async () => {
+  if (!canUseConsultationAi.value) return
   if (!String(suggestedAnamnesisText.value || '').trim()) {
     message.info('A IA ainda não gerou uma anamnese sugerida.')
     return
@@ -2373,6 +2434,7 @@ const openAnamnesisChat = async () => {
 }
 
 const openClinicalSupportChat = async () => {
+  if (!canUseConsultationAi.value) return
   if (!String(model.consultiveSupportText || '').trim()) {
     message.info('O apoio clínico ainda não está disponível.')
     return
@@ -2410,6 +2472,7 @@ const openClinicalSupportChat = async () => {
 }
 
 const sendConsultationAiQuestion = async () => {
+  if (!canUseConsultationAi.value) return
   const question = consultationAiQuestion.value.trim()
   if (!question) return
   if (!model.id) {
@@ -2421,6 +2484,7 @@ const sendConsultationAiQuestion = async () => {
 }
 
 const sendConsultationAiQuickQuestion = async (question: string) => {
+  if (!canUseConsultationAi.value) return
   if (!model.id) {
     message.warning('Salve a consulta antes de conversar com a IA.')
     return
@@ -2429,6 +2493,7 @@ const sendConsultationAiQuickQuestion = async (question: string) => {
 }
 
 const handleConsultationAiPrimaryAction = async () => {
+  if (!canUseConsultationAi.value) return
   if (consultationAiMode.value === 'anamnesis') await useSuggestedAnamnesis()
 }
 
@@ -2679,6 +2744,10 @@ const refreshPrescriptionStatus = async () => {
 }
 
 const fetchExamSupportData = async () => {
+  if (!canLoadExamSupportData.value) {
+    activeExamTypes.value = []
+    return
+  }
   const api = useApi()
   try {
     const [examTypesRes, categoriesRes] = await Promise.all([
@@ -2703,6 +2772,11 @@ const fetchExamSupportData = async () => {
 
 const refreshExamRequestStatus = async () => {
   if (!model.id) {
+    hasExistingExamRequest.value = false
+    consultationExamRequests.value = []
+    return
+  }
+  if (!canLoadExamRequests.value) {
     hasExistingExamRequest.value = false
     consultationExamRequests.value = []
     return
@@ -2742,6 +2816,10 @@ const loadExamResults = async () => {
     examResults.value = []
     return
   }
+  if (!canViewConsultation.value) {
+    examResults.value = []
+    return
+  }
   examResultsLoading.value = true
   try {
     const api = useApi()
@@ -2757,6 +2835,7 @@ const loadExamResults = async () => {
 }
 
 const openConsultationFilePicker = () => {
+  if (!canUploadConsultationAttachment.value) return
   if (!model.id) {
     message.warning('Salve a consulta antes de enviar arquivos.')
     return
@@ -2765,6 +2844,7 @@ const openConsultationFilePicker = () => {
 }
 
 const handleConsultationFileSelected = async (event: Event) => {
+  if (!canUploadConsultationAttachment.value) return
   const input = event.target as HTMLInputElement | null
   const file = input?.files?.[0]
   if (!file || !model.id) {
@@ -2794,6 +2874,7 @@ const handleConsultationFileSelected = async (event: Event) => {
 }
 
 const removeConsultationAttachment = async (attachmentId: number) => {
+  if (!canDeleteConsultationAttachment.value) return
   deletingConsultationAttachmentId.value = attachmentId
   const api = useApi()
   try {
@@ -2810,6 +2891,7 @@ const removeConsultationAttachment = async (attachmentId: number) => {
 }
 
 const openExamResultFilePicker = (examRequestId: number) => {
+  if (!canUploadExamResult.value) return
   if (!model.id) {
     message.warning('Salve a consulta antes de enviar resultados.')
     return
@@ -2819,6 +2901,7 @@ const openExamResultFilePicker = (examRequestId: number) => {
 }
 
 const handleExamResultFileSelected = async (event: Event) => {
+  if (!canUploadExamResult.value) return
   const input = event.target as HTMLInputElement | null
   const file = input?.files?.[0]
   const examRequestId = pendingExamRequestIdForUpload.value
@@ -2880,6 +2963,7 @@ const normalizeExamRequestStatus = (status?: string | null) => {
 }
 
 const openPrescriptionPrint = () => {
+  if (hasExistingPrescription.value ? !canPrintPrescription.value : !canCreatePrescription.value) return
   if (!model.id) {
     message.warning('Salve a consulta antes de abrir a prescrição.')
     return
@@ -2893,6 +2977,7 @@ const openPrescriptionPrint = () => {
 }
 
 const openExamRequestPrint = () => {
+  if (hasExistingExamRequest.value ? !canPrintExamRequest.value : !canCreateExamRequest.value) return
   if (!model.id) {
     message.warning('Salve a consulta antes de solicitar exames.')
     return
@@ -2906,6 +2991,7 @@ const openExamRequestPrint = () => {
 }
 
 const openExamRequestModal = async () => {
+  if (!canCreateExamRequest.value) return
   await fetchExamSupportData()
   const selectedNames = String(clinical.exams || '')
     .split(';')
@@ -2920,14 +3006,17 @@ const openExamRequestModal = async () => {
 }
 
 const openQuickExamCreateModal = async () => {
+  if (!canCreateExamType.value) return
   quickExamCreateModalVisible.value = true
 }
 
 const confirmQuickExamCreate = async () => {
+  if (!canCreateExamType.value) return
   quickExamFormRef.value?.submit?.()
 }
 
 const handleQuickExamSubmit = async (payload: ExamType) => {
+  if (!canCreateExamType.value) return
   creatingQuickExamType.value = true
   try {
     const api = useApi()
@@ -2952,11 +3041,13 @@ const handleQuickExamSubmit = async (payload: ExamType) => {
 }
 
 const openPrescriptionGenerateModal = () => {
+  if (!canCreatePrescription.value) return
   prescriptionDraftContent.value = String(clinical.prescription || '').trim()
   prescriptionModalVisible.value = true
 }
 
 const confirmGeneratePrescription = async () => {
+  if (!canCreatePrescription.value) return
   if (!model.id || !model.petId) {
     message.warning('Salve a consulta com paciente vinculado antes de gerar a prescrição.')
     return
@@ -3000,6 +3091,7 @@ const confirmGeneratePrescription = async () => {
 }
 
 const confirmGenerateExamRequest = async () => {
+  if (!canCreateExamRequest.value) return
   if (!model.id || !model.petId) {
     message.warning('Salve a consulta com paciente vinculado antes de gerar o pedido.')
     return

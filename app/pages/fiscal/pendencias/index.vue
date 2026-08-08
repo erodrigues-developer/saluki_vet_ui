@@ -31,10 +31,15 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref } from "vue";
 import { NTag } from "naive-ui";
+import { PERMISSIONS } from "~/constants/permissions";
 
+const authStore = useAuthStore();
 const loading = ref(false);
 const requests = ref<any[]>([]);
 const counters = ref<any>({});
+const canViewFiscalSettings = computed(() =>
+  authStore.hasPermission(PERMISSIONS.fiscalSettingsView),
+);
 
 const summaryCards = computed(() => [
   { label: "Emissão pendente", value: counters.value.documentsPending || 0 },
@@ -95,11 +100,24 @@ const loadRequests = async () => {
   loading.value = true;
   try {
     const [settings, response] = await Promise.all([
-      api<any>("/api/v1/fiscal/settings"),
+      canViewFiscalSettings.value
+        ? api<any>("/api/v1/fiscal/settings")
+        : Promise.resolve({ counters: {} }),
       api<any>("/api/v1/fiscal/issue-requests?limit=50"),
     ]);
-    counters.value = settings.counters || {};
     requests.value = response.data || [];
+    counters.value = canViewFiscalSettings.value
+      ? settings.counters || {}
+      : {
+          documentsPending: requests.value.filter((item) =>
+            String(item.status || "").includes("PENDING"),
+          ).length,
+          contingencyPending: requests.value.filter((item) =>
+            String(item.status || "").includes("CONTINGENCY"),
+          ).length,
+          rejected: requests.value.filter((item) => item.status === "REJECTED")
+            .length,
+        };
   } finally {
     loading.value = false;
   }

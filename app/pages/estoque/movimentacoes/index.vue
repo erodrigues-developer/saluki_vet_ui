@@ -6,7 +6,7 @@
         <h1>Histórico de movimentações</h1>
         <p class="subhead">Audite entradas, saídas, ajustes e baixas automáticas geradas pelo sistema.</p>
       </div>
-      <n-button type="primary" size="large" @click="navigateTo('/estoque/saldos')">
+      <n-button v-if="canViewStockBalances" type="primary" size="large" @click="navigateTo('/estoque/saldos')">
         Ver saldos
       </n-button>
     </div>
@@ -98,6 +98,7 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { NTag, useMessage } from 'naive-ui'
+import { PERMISSIONS } from '~/constants/permissions'
 
 interface HistoryRow {
   id: number
@@ -125,6 +126,7 @@ interface HistoryResponse {
 }
 
 const message = useMessage()
+const authStore = useAuthStore()
 const loading = ref(false)
 const data = ref<HistoryRow[]>([])
 const productOptions = ref<{ label: string; value: number }[]>([])
@@ -132,6 +134,10 @@ const locationOptions = ref<{ label: string; value: number }[]>([])
 const isMobile = ref(false)
 const showMobileFilters = ref(false)
 let mediaQuery: MediaQueryList | null = null
+
+const canViewStockBalances = computed(() => authStore.hasPermission(PERMISSIONS.stockBalancesView))
+const canViewProducts = computed(() => authStore.hasPermission(PERMISSIONS.productsView))
+const canViewStockLocations = computed(() => authStore.hasPermission(PERMISSIONS.stockLocationsView))
 
 const filters = reactive({
   productId: null as number | null,
@@ -199,12 +205,16 @@ const fetchOptions = async () => {
   const api = useApi()
   try {
     const [products, locations] = await Promise.all([
-      api<any>('/api/v1/products', {
-        query: { page: 1, limit: 200, isService: false, isActive: true, sortBy: 'name', sortDirection: 'asc' }
-      }),
-      api<any>('/api/v1/stock-locations', {
-        query: { activeOnly: true }
-      })
+      canViewProducts.value
+        ? api<any>('/api/v1/products', {
+          query: { page: 1, limit: 200, isService: false, isActive: true, sortBy: 'name', sortDirection: 'asc' }
+        })
+        : Promise.resolve({ data: [] }),
+      canViewStockLocations.value
+        ? api<any>('/api/v1/stock-locations', {
+          query: { activeOnly: true }
+        })
+        : Promise.resolve({ data: [] })
     ])
 
     productOptions.value = (products.data || []).map((item: any) => ({

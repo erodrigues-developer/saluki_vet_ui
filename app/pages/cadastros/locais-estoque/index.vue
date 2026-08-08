@@ -6,7 +6,7 @@
         <h1>Locais de estoque</h1>
         <p class="subhead">Gerencie os estoques operacionais, local padrão e status ativo da clínica.</p>
       </div>
-      <n-button type="primary" size="large" class="head-cta" @click="openCreate">
+      <n-button v-if="canCreateStockLocations" type="primary" size="large" class="head-cta" @click="openCreate">
         Novo local
       </n-button>
     </div>
@@ -64,8 +64,8 @@
           <p class="card-line"><span class="card-line-label">Atualizado:</span> <span class="card-line-value">{{ formatDate(item.updatedAt) }}</span></p>
         </div>
         <div class="card-actions" @click.stop>
-          <n-button size="small" secondary type="primary" @click="openEdit(item)">Editar</n-button>
-          <n-dropdown trigger="click" :options="actionOptions(item)" @select="(key: string) => handleAction(key, item)">
+          <n-button size="small" secondary type="primary" @click="openEdit(item)">Ver local</n-button>
+          <n-dropdown v-if="actionOptions(item).length" trigger="click" :options="actionOptions(item)" @select="(key: string) => handleAction(key, item)">
             <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
           </n-dropdown>
         </div>
@@ -121,7 +121,7 @@
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" @click="submitForm">
+          <n-button v-if="canSaveStockLocation" type="primary" :loading="saving" @click="submitForm">
             {{ editingItem ? 'Salvar alterações' : 'Criar local' }}
           </n-button>
         </div>
@@ -131,9 +131,11 @@
 </template>
 
 <script setup lang="ts">
-import { h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { NButton, NDropdown, NTag, useDialog, useMessage } from 'naive-ui'
 import StockLocationForm, { type StockLocation } from '~/components/stock/StockLocationForm.vue'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 interface StockLocationsResponse {
   data: StockLocation[]
@@ -152,6 +154,7 @@ interface StockLocationsResponse {
 
 const message = useMessage()
 const dialog = useDialog()
+const authStore = useAuthStore()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -188,6 +191,11 @@ const statusOptions = [
   { label: 'Inativos', value: false }
 ]
 
+const canCreateStockLocations = computed(() => authStore.hasPermission(PERMISSIONS.stockLocationsCreate))
+const canUpdateStockLocations = computed(() => authStore.hasPermission(PERMISSIONS.stockLocationsUpdate))
+const canDeleteStockLocations = computed(() => authStore.hasPermission(PERMISSIONS.stockLocationsDelete))
+const canSaveStockLocation = computed(() => editingItem.value ? canUpdateStockLocations.value : canCreateStockLocations.value)
+
 const updateIsMobile = () => {
   isMobile.value = mediaQuery?.matches ?? false
 }
@@ -220,6 +228,7 @@ const fetchLocations = async () => {
 }
 
 const openCreate = () => {
+  if (!canCreateStockLocations.value) return
   editingItem.value = null
   showModal.value = true
 }
@@ -235,10 +244,12 @@ const closeModal = () => {
 }
 
 const submitForm = async () => {
+  if (!canSaveStockLocation.value) return
   await formRef.value?.submit()
 }
 
 const handleSubmit = async (payload: StockLocation) => {
+  if ((editingItem.value?.id && !canUpdateStockLocations.value) || (!editingItem.value?.id && !canCreateStockLocations.value)) return
   saving.value = true
   const api = useApi()
   try {
@@ -265,6 +276,7 @@ const handleSubmit = async (payload: StockLocation) => {
 }
 
 const removeItem = (item: StockLocation) => {
+  if (!canDeleteStockLocations.value) return
   dialog.warning({
     title: 'Excluir local',
     content: `Deseja excluir o local "${item.name}"?`,
@@ -288,10 +300,15 @@ const handleAction = (key: string, item: StockLocation) => {
   if (key === 'delete') removeItem(item)
 }
 
-const actionOptions = (item: StockLocation) => [
-  { label: 'Editar', key: 'edit' },
-  { label: `Excluir ${item.name}`, key: 'delete' }
-]
+const actionOptions = (item: StockLocation) => {
+  const options: Array<{ label?: string; key: string; type?: 'divider' }> = []
+  if (canUpdateStockLocations.value) options.push({ label: 'Editar', key: 'edit' })
+  if (canDeleteStockLocations.value) {
+    if (options.length) options.push({ type: 'divider', key: `divider-${item.id}` })
+    options.push({ label: `Excluir ${item.name}`, key: 'delete' })
+  }
+  return options
+}
 
 const clearFilters = async () => {
   filters.search = ''
@@ -358,6 +375,7 @@ const columns = [
       h(NDropdown, {
         trigger: 'click',
         options: actionOptions(row),
+        style: actionOptions(row).length ? undefined : 'display: none',
         onSelect: (key: string) => handleAction(key, row)
       }, {
         default: () => h(NButton, { size: 'small', quaternary: true, class: 'menu-button' }, { default: () => '•••' })

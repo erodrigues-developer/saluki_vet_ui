@@ -6,7 +6,7 @@
         <h1>Clientes</h1>
         <p class="subhead">Gerencie tutores, contatos, documentos e vínculos com pacientes.</p>
       </div>
-      <n-button type="primary" size="large" class="head-cta" @click="openCreate">
+      <n-button v-if="canCreateClients" type="primary" size="large" class="head-cta" @click="openCreate">
         Novo cliente
       </n-button>
     </div>
@@ -95,7 +95,7 @@
 
         <div class="card-actions" @click.stop>
           <n-button size="small" secondary type="primary" @click="openEdit(client)">Ver ficha</n-button>
-          <n-dropdown trigger="click" :options="actionOptions" @select="(key: string) => handleActionSelect(key, client)">
+          <n-dropdown v-if="clientActionOptions.length" trigger="click" :options="clientActionOptions" @select="(key: string) => handleActionSelect(key, client)">
             <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
           </n-dropdown>
         </div>
@@ -209,13 +209,13 @@
       <template #footer>
         <div v-if="activeClientTab === 'details' || !editingClient?.id" class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" @click="submitClientForm">
+          <n-button v-if="!editingClient || canUpdateClients" type="primary" :loading="saving" @click="submitClientForm">
             {{ editingClient ? 'Salvar alterações' : 'Criar cliente' }}
           </n-button>
         </div>
         <div v-else class="modal-actions">
           <n-button tertiary @click="closeModal">Fechar</n-button>
-          <n-button type="primary" secondary @click="activeClientTab = 'details'">Editar cadastro</n-button>
+          <n-button v-if="canUpdateClients" type="primary" secondary @click="activeClientTab = 'details'">Editar cadastro</n-button>
         </div>
       </template>
     </n-modal>
@@ -226,6 +226,8 @@
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { NButton, NDropdown, NTag, useDialog, useMessage } from 'naive-ui'
 import ClientForm, { type Client } from '~/components/clients/ClientForm.vue'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 interface ClientsResponse {
   data: Client[]
@@ -250,6 +252,10 @@ interface ClientPetsResponse {
 
 const message = useMessage()
 const dialog = useDialog()
+const authStore = useAuthStore()
+const canCreateClients = computed(() => authStore.hasPermission(PERMISSIONS.clientsCreate))
+const canUpdateClients = computed(() => authStore.hasPermission(PERMISSIONS.clientsUpdate))
+const canDeleteClients = computed(() => authStore.hasPermission(PERMISSIONS.clientsDelete))
 
 const filters = reactive({
   name: '',
@@ -312,13 +318,12 @@ const tablePagination = computed(() => ({
   pageSizes: [10, 20, 50]
 }))
 
-const actionOptions = [
-  { label: 'Editar', key: 'edit' },
+const clientActionOptions = computed(() => [
+  ...(canUpdateClients.value ? [{ label: 'Editar', key: 'edit' }] : []),
   { label: 'Ver pets vinculados', key: 'pets' },
   { label: 'Ver histórico', key: 'history' },
-  { type: 'divider', key: 'divider' },
-  { label: 'Excluir', key: 'delete' }
-]
+  ...(canDeleteClients.value ? [{ type: 'divider', key: 'divider' }, { label: 'Excluir', key: 'delete' }] : [])
+])
 
 const clientPetsColumns = [
   {
@@ -416,7 +421,7 @@ const columns = [
           NDropdown,
           {
             trigger: 'click',
-            options: actionOptions,
+            options: clientActionOptions.value,
             onSelect: (key: string) => handleActionSelect(key, row)
           },
           {
@@ -502,6 +507,7 @@ const fetchClients = async () => {
 }
 
 const handleSubmit = async (payload: Client) => {
+  if ((payload.id && !canUpdateClients.value) || (!payload.id && !canCreateClients.value)) return
   saving.value = true
   const api = useApi()
   try {
@@ -529,6 +535,7 @@ const handleSubmit = async (payload: Client) => {
 }
 
 const confirmDelete = (client: Client) => {
+  if (!canDeleteClients.value) return
   dialog.warning({
     title: 'Confirmar exclusão',
     content: `Deseja excluir ${client.name}?`,
@@ -551,6 +558,7 @@ const confirmDelete = (client: Client) => {
 
 const handleActionSelect = (key: string, client: Client) => {
   if (key === 'edit') {
+    if (!canUpdateClients.value) return
     openEdit(client)
     return
   }
@@ -566,11 +574,13 @@ const handleActionSelect = (key: string, client: Client) => {
   }
 
   if (key === 'delete') {
+    if (!canDeleteClients.value) return
     confirmDelete(client)
   }
 }
 
 const openCreate = () => {
+  if (!canCreateClients.value) return
   editingClient.value = null
   activeClientTab.value = 'details'
   clientPets.value = []
@@ -579,7 +589,7 @@ const openCreate = () => {
 
 const openEdit = (client: Client, tab: 'details' | 'pets' = 'details') => {
   editingClient.value = client
-  activeClientTab.value = tab
+  activeClientTab.value = tab === 'details' && !canUpdateClients.value ? 'pets' : tab
   showModal.value = true
   if (tab === 'pets') {
     void loadClientPets(client.id)

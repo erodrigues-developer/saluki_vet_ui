@@ -6,7 +6,7 @@
         <h1>Espécies</h1>
         <p class="subhead">Gerencie as espécies utilizadas no cadastro e atendimento dos pets.</p>
       </div>
-      <n-button type="primary" size="large" class="head-cta" @click="openCreate">Nova espécie</n-button>
+      <n-button v-if="canCreateSpecies" type="primary" size="large" class="head-cta" @click="openCreate">Nova espécie</n-button>
     </div>
 
     <div :class="isMobile ? 'summary-grid-mobile summary-grid' : 'summary-grid'">
@@ -65,7 +65,7 @@
             <p class="card-subtitle card-subtitle-muted"><span class="card-line-label">Atualizado em:</span> {{ formatDate(item.updatedAt || '') || '—' }}</p>
             <div class="card-actions" @click.stop>
               <n-button size="small" secondary type="primary" @click="openEdit(item)">Ver espécie</n-button>
-              <n-dropdown trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
+              <n-dropdown v-if="buildActionOptions(item).length" trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
                 <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
               </n-dropdown>
             </div>
@@ -84,7 +84,7 @@
         </template>
         <n-empty v-else description="Nenhuma espécie encontrada.">
           <template #extra>
-            <n-button type="primary" @click="openCreate">Nova espécie</n-button>
+            <n-button v-if="canCreateSpecies" type="primary" @click="openCreate">Nova espécie</n-button>
           </template>
         </n-empty>
       </div>
@@ -103,7 +103,7 @@
         />
         <n-empty v-else description="Nenhuma espécie encontrada.">
           <template #extra>
-            <n-button type="primary" @click="openCreate">Nova espécie</n-button>
+            <n-button v-if="canCreateSpecies" type="primary" @click="openCreate">Nova espécie</n-button>
           </template>
         </n-empty>
       </template>
@@ -142,7 +142,7 @@
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" :disabled="!canSubmitForm" @click="submitForm">
+          <n-button v-if="canSaveSpecies" type="primary" :loading="saving" :disabled="!canSubmitForm" @click="submitForm">
             {{ editingItem ? 'Salvar alterações' : 'Criar espécie' }}
           </n-button>
         </div>
@@ -156,6 +156,8 @@ import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { format } from 'date-fns'
 import { NButton, NDropdown, NTag, useDialog, useMessage } from 'naive-ui'
 import SpeciesForm, { type Species } from '~/components/species/SpeciesForm.vue'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 interface SpeciesResponse {
   data: Species[]
@@ -168,6 +170,7 @@ interface SpeciesResponse {
 
 const message = useMessage()
 const dialog = useDialog()
+const authStore = useAuthStore()
 
 const species = ref<Species[]>([])
 const loading = ref(false)
@@ -214,6 +217,10 @@ const tablePagination = computed(() => ({
   pageSizes: [10, 20, 50]
 }))
 
+const canCreateSpecies = computed(() => authStore.hasPermission(PERMISSIONS.speciesCreate))
+const canUpdateSpecies = computed(() => authStore.hasPermission(PERMISSIONS.speciesUpdate))
+const canDeleteSpecies = computed(() => authStore.hasPermission(PERMISSIONS.speciesDelete))
+const canSaveSpecies = computed(() => editingItem.value ? canUpdateSpecies.value : canCreateSpecies.value)
 
 const formatDate = (value: string) => {
   if (!value) return ''
@@ -230,13 +237,17 @@ const formatBreedsLinked = (row: Species) => {
 const hasLinks = (row: Species) => resolveBreedsCount(row) > 0 || Number((row as any).petsCount || 0) > 0
 
 const buildActionOptions = (row: Species) => {
-  const options: Array<{ label?: string; key: string; type?: 'divider' }> = [
-    { label: 'Editar', key: 'edit' },
-    { label: row.isActive ? 'Inativar' : 'Ativar', key: 'toggleStatus' }
-  ]
+  const options: Array<{ label?: string; key: string; type?: 'divider' }> = []
 
-  if (!hasLinks(row)) {
-    options.push({ type: 'divider', key: `divider-${row.id}` })
+  if (canUpdateSpecies.value) {
+    options.push({ label: 'Editar', key: 'edit' })
+    options.push({ label: row.isActive ? 'Inativar' : 'Ativar', key: 'toggleStatus' })
+  }
+
+  if (canDeleteSpecies.value && !hasLinks(row)) {
+    if (options.length) {
+      options.push({ type: 'divider', key: `divider-${row.id}` })
+    }
     options.push({ label: 'Excluir', key: 'delete' })
   }
 
@@ -275,6 +286,7 @@ const columns = [
         }
       }, { default: () => 'Ver espécie' }),
       h(NDropdown, {
+        style: buildActionOptions(row).length ? undefined : 'display: none',
         trigger: 'click',
         options: buildActionOptions(row),
         onSelect: (key: string) => handleActionSelect(key, row)
@@ -320,6 +332,7 @@ const fetchSpecies = async () => {
 }
 
 const handleSubmit = async (payload: Species) => {
+  if ((payload.id && !canUpdateSpecies.value) || (!payload.id && !canCreateSpecies.value)) return
   saving.value = true
   try {
     const api = useApi()
@@ -344,6 +357,7 @@ const handleSubmit = async (payload: Species) => {
 }
 
 const confirmDelete = (item: Species) => {
+  if (!canDeleteSpecies.value) return
   if (hasLinks(item)) {
     message.warning('Não é possível excluir espécies com vínculos existentes.')
     return
@@ -368,6 +382,7 @@ const confirmDelete = (item: Species) => {
 }
 
 const toggleStatus = (item: Species) => {
+  if (!canUpdateSpecies.value) return
   const actionLabel = item.isActive ? 'inativar' : 'ativar'
   dialog.warning({
     title: `Confirmar ${actionLabel}`,
@@ -391,6 +406,7 @@ const toggleStatus = (item: Species) => {
 }
 
 const openCreate = () => {
+  if (!canCreateSpecies.value) return
   editingItem.value = null
   canSubmitForm.value = false
   showModal.value = true
@@ -407,6 +423,7 @@ const closeModal = () => {
 }
 
 const submitForm = async () => {
+  if (!canSaveSpecies.value) return
   await formRef.value?.submit()
 }
 

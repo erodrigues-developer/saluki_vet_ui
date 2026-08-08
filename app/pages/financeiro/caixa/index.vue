@@ -9,14 +9,15 @@
         </p>
       </div>
       <div v-if="!isMobile" class="head-actions">
-        <n-button secondary strong @click="openPrinterModal"
+        <n-button v-if="canManagePrinters" secondary strong @click="openPrinterModal"
           >Nova impressora</n-button
         >
-        <n-button secondary strong @click="openTerminalModal"
+        <n-button v-if="canManageTerminals" secondary strong @click="openTerminalModal"
           >Novo terminal</n-button
         >
         <n-button
           type="primary"
+          v-if="canOpenCashRegister"
           size="large"
           class="head-cta"
           @click="openSessionModal"
@@ -26,10 +27,10 @@
     </div>
 
     <div v-if="isMobile" class="mobile-actions-row">
-      <n-button type="primary" block @click="openSessionModal"
+      <n-button v-if="canOpenCashRegister" type="primary" block @click="openSessionModal"
         >Abrir caixa</n-button
       >
-      <n-button secondary strong block @click="openTerminalModal"
+      <n-button v-if="canManageTerminals" secondary strong block @click="openTerminalModal"
         >Novo terminal</n-button
       >
     </div>
@@ -161,6 +162,7 @@
         </p>
         <div class="card-actions" @click.stop>
           <n-button
+            v-if="canWithdrawCashRegister"
             size="small"
             secondary
             type="primary"
@@ -169,6 +171,7 @@
             >Sangria</n-button
           >
           <n-button
+            v-if="canCloseCashRegister"
             size="small"
             secondary
             type="primary"
@@ -282,7 +285,7 @@
           <n-button :disabled="saving" @click="showSessionModal = false"
             >Cancelar</n-button
           >
-          <n-button type="primary" :loading="saving" @click="handleOpenSession"
+          <n-button v-if="canOpenCashRegister" type="primary" :loading="saving" @click="handleOpenSession"
             >Abrir caixa</n-button
           >
         </div>
@@ -316,11 +319,12 @@
       </section>
       <template #footer>
         <div class="modal-actions">
-          <n-button :disabled="saving" @click="continueCloseWithoutWithdraw"
+          <n-button v-if="canCloseCashRegister" :disabled="saving" @click="continueCloseWithoutWithdraw"
             >Fechar sem sangria</n-button
           >
           <n-button
             type="primary"
+            v-if="canWithdrawCashRegister"
             :disabled="saving"
             @click="startWithdrawBeforeClose"
             >Realizar sangria</n-button
@@ -374,7 +378,7 @@
           <n-button :disabled="saving" @click="cancelWithdraw"
             >Cancelar</n-button
           >
-          <n-button type="primary" :loading="saving" @click="handleWithdraw"
+          <n-button v-if="canWithdrawCashRegister" type="primary" :loading="saving" @click="handleWithdraw"
             >Confirmar sangria</n-button
           >
         </div>
@@ -431,7 +435,7 @@
           <n-button :disabled="saving" @click="showCloseModal = false"
             >Cancelar</n-button
           >
-          <n-button type="primary" :loading="saving" @click="handleCloseSession"
+          <n-button v-if="canCloseCashRegister" type="primary" :loading="saving" @click="handleCloseSession"
             >Fechar caixa</n-button
           >
         </div>
@@ -464,6 +468,7 @@
           >
           <n-button
             type="primary"
+            v-if="canManageTerminals"
             :loading="saving"
             :disabled="!terminalFormValid"
             @click="terminalFormRef?.submit()"
@@ -498,6 +503,7 @@
           >
           <n-button
             type="primary"
+            v-if="canManagePrinters"
             :loading="saving"
             :disabled="!printerFormValid"
             @click="printerFormRef?.submit()"
@@ -524,6 +530,7 @@ import { NButton, NTag, useMessage } from "naive-ui";
 import CurrencyInput from "~/components/common/CurrencyInput.vue";
 import CashRegisterTerminalForm from "~/components/cash-registers/CashRegisterTerminalForm.vue";
 import ThermalPrinterForm from "~/components/cash-registers/ThermalPrinterForm.vue";
+import { PERMISSIONS } from "~/constants/permissions";
 
 type SessionRow = {
   id: number;
@@ -546,6 +553,7 @@ const ModalHead = (_props: { title: string; subtitle: string }) =>
 const message = useMessage();
 const api = useApi();
 const router = useRouter();
+const authStore = useAuthStore();
 const loading = ref(false);
 const saving = ref(false);
 const sessions = ref<SessionRow[]>([]);
@@ -618,8 +626,14 @@ const cashDifference = computed(
     Number(closeForm.declaredCashAmount || 0) -
     Number(selectedSession.value?.expectedCashAmount || 0),
 );
+const canOpenCashRegister = computed(() => authStore.hasPermission(PERMISSIONS.cashRegistersOpen));
+const canCloseCashRegister = computed(() => authStore.hasPermission(PERMISSIONS.cashRegistersClose));
+const canWithdrawCashRegister = computed(() => authStore.hasPermission(PERMISSIONS.cashRegistersWithdraw));
+const canManageTerminals = computed(() => authStore.hasPermission(PERMISSIONS.cashRegistersManageTerminals));
+const canManagePrinters = computed(() => authStore.hasPermission(PERMISSIONS.cashRegistersManagePrinters));
+const canUseCurrentCashRegister = computed(() => authStore.hasPermission(PERMISSIONS.cashRegistersCurrent));
 
-const columns = [
+const columns = computed(() => [
   {
     title: "Terminal",
     key: "terminal",
@@ -674,7 +688,7 @@ const columns = [
     titleAlign: "right",
     render: (row: SessionRow) =>
       h("div", { class: "table-actions" }, [
-        h(
+        canWithdrawCashRegister.value ? h(
           NButton,
           {
             size: "small",
@@ -687,8 +701,8 @@ const columns = [
             },
           },
           { default: () => "Sangria" },
-        ),
-        h(
+        ) : null,
+        canCloseCashRegister.value ? h(
           NButton,
           {
             size: "small",
@@ -701,10 +715,10 @@ const columns = [
             },
           },
           { default: () => "Fechar" },
-        ),
-      ]),
+        ) : null,
+      ].filter(Boolean)),
   },
-];
+]);
 
 const formatCurrency = (value: string | number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
@@ -762,11 +776,15 @@ const fetchSessions = async () => {
   }
 };
 const refreshAll = async () => {
-  await Promise.all([fetchTerminals(), fetchPrinters()]);
+  await Promise.all([
+    canOpenCashRegister.value || canManageTerminals.value ? fetchTerminals() : Promise.resolve(),
+    canManagePrinters.value || canManageTerminals.value ? fetchPrinters() : Promise.resolve(),
+  ]);
   await fetchSessions();
 };
 
 const fetchCurrentUserSession = async () => {
+  if (!canUseCurrentCashRegister.value) return undefined;
   const response = await api<any[]>("/api/v1/cash-registers/sessions/current");
   return Array.isArray(response)
     ? (response[0] as SessionRow | undefined)
@@ -805,6 +823,7 @@ const fetchOpeningSuggestion = async (terminalId: number | null) => {
 };
 
 const openSessionModal = async () => {
+  if (!canOpenCashRegister.value) return;
   try {
     const currentSession = await fetchCurrentUserSession();
     if (currentSession?.id) {
@@ -831,6 +850,7 @@ const openWithdrawModal = (
   row: SessionRow,
   shouldCloseAfterWithdraw = false,
 ) => {
+  if (!canWithdrawCashRegister.value) return;
   selectedSession.value = row;
   closeAfterWithdraw.value = shouldCloseAfterWithdraw;
   withdrawForm.amount = 0;
@@ -838,21 +858,25 @@ const openWithdrawModal = (
   showWithdrawModal.value = true;
 };
 const prepareCloseModal = (row: SessionRow) => {
+  if (!canCloseCashRegister.value) return;
   selectedSession.value = row;
   closeForm.declaredCashAmount = Number(row.expectedCashAmount || 0);
   closeForm.closingNotes = "";
   showCloseModal.value = true;
 };
 const openCloseModal = (row: SessionRow) => {
+  if (!canCloseCashRegister.value) return;
   selectedSession.value = row;
   showCloseSangriaPrompt.value = true;
 };
 const continueCloseWithoutWithdraw = () => {
+  if (!canCloseCashRegister.value) return;
   if (!selectedSession.value) return;
   showCloseSangriaPrompt.value = false;
   prepareCloseModal(selectedSession.value);
 };
 const startWithdrawBeforeClose = () => {
+  if (!canWithdrawCashRegister.value) return;
   if (!selectedSession.value) return;
   showCloseSangriaPrompt.value = false;
   openWithdrawModal(selectedSession.value, true);
@@ -863,15 +887,18 @@ const cancelWithdraw = () => {
 };
 const openSummary = (_row: SessionRow) => {};
 const openTerminalModal = () => {
+  if (!canManageTerminals.value) return;
   terminalFormValid.value = false;
   showTerminalModal.value = true;
 };
 const openPrinterModal = () => {
+  if (!canManagePrinters.value) return;
   printerFormValid.value = false;
   showPrinterModal.value = true;
 };
 
 const handleOpenSession = async () => {
+  if (!canOpenCashRegister.value) return;
   if (!openForm.terminalId) return message.warning("Selecione o terminal.");
   saving.value = true;
   try {
@@ -889,6 +916,7 @@ const handleOpenSession = async () => {
   }
 };
 const handleWithdraw = async () => {
+  if (!canWithdrawCashRegister.value) return;
   if (!selectedSession.value) return;
   if (!withdrawForm.notes.trim())
     return message.warning("Informe o motivo da sangria.");
@@ -913,6 +941,7 @@ const handleWithdraw = async () => {
   }
 };
 const handleCloseSession = async () => {
+  if (!canCloseCashRegister.value) return;
   if (!selectedSession.value) return;
   saving.value = true;
   try {
@@ -930,6 +959,7 @@ const handleCloseSession = async () => {
   }
 };
 const handleSaveTerminal = async (payload: any) => {
+  if (!canManageTerminals.value) return;
   saving.value = true;
   try {
     await api("/api/v1/cash-registers/terminals", {
@@ -946,6 +976,7 @@ const handleSaveTerminal = async (payload: any) => {
   }
 };
 const handleSavePrinter = async (payload: any) => {
+  if (!canManagePrinters.value) return;
   saving.value = true;
   try {
     await api("/api/v1/cash-registers/printers", {

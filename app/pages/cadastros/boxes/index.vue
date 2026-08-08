@@ -6,7 +6,7 @@
         <h1>Cadastro de boxes</h1>
         <p class="subhead">Gerencie leitos, canis, gatis e áreas de internação disponíveis na clínica.</p>
       </div>
-      <n-button type="primary" size="large" class="head-cta" @click="openCreate">
+      <n-button v-if="canCreateBoxes" type="primary" size="large" class="head-cta" @click="openCreate">
         Novo box
       </n-button>
     </div>
@@ -100,7 +100,7 @@
         </div>
         <div class="card-actions" @click.stop>
           <n-button size="small" secondary type="primary" @click="openEdit(box)">Ver ficha</n-button>
-          <n-dropdown trigger="click" :options="actionOptions" @select="(key: string) => handleActionSelect(key, box)">
+          <n-dropdown v-if="actionOptions(box).length" trigger="click" :options="actionOptions(box)" @select="(key: string) => handleActionSelect(key, box)">
             <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
           </n-dropdown>
         </div>
@@ -171,7 +171,7 @@
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" @click="submitBoxForm">
+          <n-button v-if="canSaveBox" type="primary" :loading="saving" @click="submitBoxForm">
             {{ editingBox ? 'Salvar alterações' : 'Criar box' }}
           </n-button>
         </div>
@@ -184,6 +184,8 @@
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { NButton, NDropdown, NTag, useDialog, useMessage } from 'naive-ui'
 import BoxForm, { type BoxEntity } from '~/components/boxes/BoxForm.vue'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 interface BoxesResponse {
   data: BoxEntity[]
@@ -197,6 +199,7 @@ interface BoxesResponse {
 const message = useMessage()
 const dialog = useDialog()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const filters = reactive({
   name: '',
@@ -242,12 +245,22 @@ const occupancyOptions = [
   { label: 'Livres', value: 'AVAILABLE' },
 ]
 
-const actionOptions = [
-  { label: 'Editar', key: 'edit' },
-  { label: 'Abrir internação', key: 'inpatient' },
-  { type: 'divider', key: 'divider' },
-  { label: 'Excluir', key: 'delete' },
-]
+const canCreateBoxes = computed(() => authStore.hasPermission(PERMISSIONS.boxesCreate))
+const canUpdateBoxes = computed(() => authStore.hasPermission(PERMISSIONS.boxesUpdate))
+const canDeleteBoxes = computed(() => authStore.hasPermission(PERMISSIONS.boxesDelete))
+const canViewInpatientRecords = computed(() => authStore.hasPermission(PERMISSIONS.inpatientView))
+const canSaveBox = computed(() => editingBox.value ? canUpdateBoxes.value : canCreateBoxes.value)
+
+const actionOptions = (_box: BoxEntity) => {
+  const options: Array<{ label?: string; key: string; type?: 'divider' }> = []
+  if (canUpdateBoxes.value) options.push({ label: 'Editar', key: 'edit' })
+  if (canViewInpatientRecords.value) options.push({ label: 'Abrir internação', key: 'inpatient' })
+  if (canDeleteBoxes.value) {
+    if (options.length) options.push({ type: 'divider', key: 'divider' })
+    options.push({ label: 'Excluir', key: 'delete' })
+  }
+  return options
+}
 
 const summary = computed(() => {
   const rows = boxes.value
@@ -353,7 +366,8 @@ const columns = [
           NDropdown,
           {
             trigger: 'click',
-            options: actionOptions,
+            options: actionOptions(row),
+            style: actionOptions(row).length ? undefined : 'display: none',
             onSelect: (key: string) => handleActionSelect(key, row),
           },
           {
@@ -410,6 +424,7 @@ const fetchBoxes = async () => {
 }
 
 const handleSubmit = async (payload: BoxEntity) => {
+  if ((payload.id && !canUpdateBoxes.value) || (!payload.id && !canCreateBoxes.value)) return
   saving.value = true
   const api = useApi()
   try {
@@ -437,10 +452,12 @@ const handleSubmit = async (payload: BoxEntity) => {
 }
 
 const submitBoxForm = async () => {
+  if (!canSaveBox.value) return
   await boxFormRef.value?.submit()
 }
 
 const confirmDelete = (box: BoxEntity) => {
+  if (!canDeleteBoxes.value) return
   dialog.warning({
     title: 'Confirmar exclusão',
     content: `Deseja excluir ${box.name}?`,
@@ -468,6 +485,7 @@ const handleActionSelect = (key: string, box: BoxEntity) => {
   }
 
   if (key === 'inpatient') {
+    if (!canViewInpatientRecords.value) return
     router.push({
       path: '/atendimento/internacao',
       query: box.id ? { boxId: String(box.id) } : undefined,
@@ -481,6 +499,7 @@ const handleActionSelect = (key: string, box: BoxEntity) => {
 }
 
 const openCreate = () => {
+  if (!canCreateBoxes.value) return
   editingBox.value = null
   showModal.value = true
 }

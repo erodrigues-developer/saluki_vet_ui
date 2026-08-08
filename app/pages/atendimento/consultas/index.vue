@@ -6,7 +6,7 @@
         <h1>Consultório Clínico</h1>
         <p class="subhead">Gerencie consultas, diagnósticos, prescrições e encaminhamentos clínicos.</p>
       </div>
-      <n-button type="primary" size="large" class="head-cta" @click="openCreate">Nova consulta</n-button>
+      <n-button v-if="canCreateConsultations" type="primary" size="large" class="head-cta" @click="openCreate">Nova consulta</n-button>
     </div>
 
     <div v-if="!isMobile" class="summary-grid">
@@ -122,7 +122,7 @@
           </p>
           <div class="card-actions">
             <n-button size="small" secondary type="primary" @click.stop="openEdit(row)">Abrir consulta</n-button>
-            <n-dropdown trigger="click" :options="actionOptionsFor(row)" @select="(key: string) => handleActionSelect(key, row)">
+            <n-dropdown v-if="actionOptionsFor(row).length > 1" trigger="click" :options="actionOptionsFor(row)" @select="(key: string) => handleActionSelect(key, row)">
               <n-button size="small" quaternary class="menu-button" @click.stop><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
             </n-dropdown>
           </div>
@@ -181,8 +181,17 @@
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { NButton, NDropdown, NSpace, useMessage } from 'naive-ui'
 import { format } from 'date-fns'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 const message = useMessage()
+const authStore = useAuthStore()
+const canCreateConsultations = computed(() => authStore.hasPermission(PERMISSIONS.consultationsCreate))
+const canUpdateConsultations = computed(() => authStore.hasPermission(PERMISSIONS.consultationsUpdate))
+const canCreatePrescriptions = computed(() => authStore.hasPermission(PERMISSIONS.prescriptionsCreate))
+const canPrintPrescriptions = computed(() => authStore.hasPermission(PERMISSIONS.prescriptionsPrint))
+const canCreateInpatient = computed(() => authStore.hasPermission(PERMISSIONS.inpatientCreate))
+const canViewInpatient = computed(() => authStore.hasPermission(PERMISSIONS.inpatientView))
 
 const consultations = ref<any[]>([])
 const loading = ref(false)
@@ -336,13 +345,13 @@ const summary = computed(() => {
 const actionOptionsFor = (row: any) => {
   const options = [
     { label: 'Prontuário', key: 'open' },
-    { label: 'Prescrição', key: 'prescription' },
-    { label: 'Imprimir prescrição', key: 'print-prescription' },
-    { label: 'Editar', key: 'edit' },
+    ...(canCreatePrescriptions.value ? [{ label: 'Prescrição', key: 'prescription' }] : []),
+    ...(canPrintPrescriptions.value ? [{ label: 'Imprimir prescrição', key: 'print-prescription' }] : []),
+    ...(canUpdateConsultations.value ? [{ label: 'Editar', key: 'edit' }] : []),
     { label: 'Ver histórico', key: 'history' }
   ]
 
-  if (!isInpatient(row)) {
+  if (!isInpatient(row) && canCreateInpatient.value) {
     options.push({ label: 'Internar', key: 'admit' })
   }
 
@@ -355,6 +364,7 @@ const handleActionSelect = (key: string, row: any) => {
     return
   }
   if (key === 'edit') {
+    if (!canUpdateConsultations.value) return
     openEdit(row)
     return
   }
@@ -365,6 +375,7 @@ const handleActionSelect = (key: string, row: any) => {
   }
 
   if (key === 'prescription') {
+    if (!canCreatePrescriptions.value) return
     navigateTo({
       path: '/atendimento/internacao',
       query: {
@@ -377,11 +388,13 @@ const handleActionSelect = (key: string, row: any) => {
   }
 
   if (key === 'print-prescription') {
+    if (!canPrintPrescriptions.value) return
     navigateTo(`/atendimento/consultas/${row.id}/prescricao/imprimir`)
     return
   }
 
   if (key === 'admit') {
+    if (!canCreateInpatient.value) return
     navigateTo({
       path: '/atendimento/internacao',
       query: {
@@ -454,18 +467,20 @@ const columns = [
             openEdit(row)
           }
         }, { default: () => 'Abrir consulta' }),
-        h(NDropdown, {
-          trigger: 'click',
-          options: actionOptionsFor(row),
-          onSelect: (key: string) => handleActionSelect(key, row)
-        }, {
-          default: () => h(NButton, {
-            size: 'small',
-            quaternary: true,
-            class: 'menu-button',
-            onClick: (event: MouseEvent) => event.stopPropagation()
-          }, { default: () => '⋯' })
-        })
+        actionOptionsFor(row).length > 1
+          ? h(NDropdown, {
+              trigger: 'click',
+              options: actionOptionsFor(row),
+              onSelect: (key: string) => handleActionSelect(key, row)
+            }, {
+              default: () => h(NButton, {
+                size: 'small',
+                quaternary: true,
+                class: 'menu-button',
+                onClick: (event: MouseEvent) => event.stopPropagation()
+              }, { default: () => '⋯' })
+            })
+          : null
       ]
     })
   }
@@ -498,6 +513,11 @@ const loadLookups = async () => {
 }
 
 const loadInpatientMap = async () => {
+  if (!canViewInpatient.value) {
+    inpatientConsultationIds.value = new Set()
+    return
+  }
+
   const api = useApi()
   try {
     const limit = 100
@@ -597,6 +617,7 @@ const handlePageSizeChange = (s: number) => {
 }
 
 const openCreate = () => {
+  if (!canCreateConsultations.value) return
   navigateTo('/consultas/novo-atendimento')
 }
 

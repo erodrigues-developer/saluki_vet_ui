@@ -6,12 +6,12 @@
         <h1>Comissões</h1>
         <p class="subhead">Acompanhe a carteira de comissões, gere pagamentos e conecte a liquidação ao contas a pagar.</p>
       </div>
-      <n-button v-if="!isMobile" type="primary" size="large" class="head-cta" @click="openPayoutModal">
+      <n-button v-if="!isMobile && canCreatePayout" type="primary" size="large" class="head-cta" @click="openPayoutModal">
         Gerar pagamento
       </n-button>
     </div>
 
-    <n-button v-if="isMobile" type="primary" block class="mobile-primary-cta" @click="openPayoutModal">
+    <n-button v-if="isMobile && canCreatePayout" type="primary" block class="mobile-primary-cta" @click="openPayoutModal">
       Gerar pagamento
     </n-button>
 
@@ -115,8 +115,8 @@
             <p class="card-subtitle">Base: {{ formatCurrency(row.baseAmount) }} • Taxa: {{ formatPercent(row.ratePercent) }}</p>
             <p class="card-subtitle card-value">Comissão: {{ formatCurrency(row.amount) }}</p>
             <div class="card-actions">
-              <n-button v-if="row.saleId" size="small" secondary type="primary" @click="openSale(row.saleId)">Abrir venda</n-button>
-              <n-button v-if="resolveAccountPayableId(row)" size="small" tertiary @click="openAccountPayable(resolveAccountPayableId(row)!)">Abrir conta</n-button>
+              <n-button v-if="row.saleId && canViewSales" size="small" secondary type="primary" @click="openSale(row.saleId)">Abrir venda</n-button>
+              <n-button v-if="resolveAccountPayableId(row) && canViewAccountsPayable" size="small" tertiary @click="openAccountPayable(resolveAccountPayableId(row)!)">Abrir conta</n-button>
             </div>
           </div>
         </div>
@@ -158,7 +158,7 @@
             <p class="card-subtitle">Bruto: {{ formatCurrency(payout.grossAmount) }} • Ajustes: {{ formatCurrency(payout.adjustmentAmount) }}</p>
             <p class="card-subtitle card-value">Líquido: {{ formatCurrency(payout.netAmount) }}</p>
             <div class="card-actions">
-              <n-button v-if="payout.accountPayableId" size="small" secondary type="primary" @click="openAccountPayable(payout.accountPayableId)">Abrir conta</n-button>
+              <n-button v-if="payout.accountPayableId && canViewAccountsPayable" size="small" secondary type="primary" @click="openAccountPayable(payout.accountPayableId)">Abrir conta</n-button>
             </div>
           </div>
         </div>
@@ -258,7 +258,7 @@
           <section class="form-section">
             <div class="section-head section-head-tight">
               <h4 class="section-title">Pré-visualização</h4>
-              <n-button secondary strong size="small" :loading="previewLoading" @click="handlePreviewPayout">
+              <n-button v-if="canPreviewPayout" secondary strong size="small" :loading="previewLoading" @click="handlePreviewPayout">
                 Pré-visualizar
               </n-button>
             </div>
@@ -300,7 +300,7 @@
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary @click="closePayoutModal">Cancelar</n-button>
-          <n-button type="primary" :loading="creatingPayout" @click="handleCreatePayout">
+          <n-button v-if="canCreatePayout" type="primary" :loading="creatingPayout" @click="handleCreatePayout">
             Gerar pagamento
           </n-button>
         </div>
@@ -313,6 +313,7 @@
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { format, startOfMonth } from 'date-fns';
 import { NButton, NTag, useMessage } from 'naive-ui';
+import { PERMISSIONS } from '~/constants/permissions';
 
 definePageMeta({ layout: 'default' });
 
@@ -377,6 +378,7 @@ type CommissionPreviewResponse = {
 };
 
 const message = useMessage();
+const authStore = useAuthStore();
 const loading = ref(false);
 const payoutsLoading = ref(false);
 const previewLoading = ref(false);
@@ -493,6 +495,10 @@ const payoutStatusBadgeClass = (status: string) => {
 const selectedProfessionalLabel = computed(() => {
   return userOptions.value.find((option) => option.value === filters.userId)?.label || '';
 });
+const canPreviewPayout = computed(() => authStore.hasPermission(PERMISSIONS.commissionsPreview));
+const canCreatePayout = computed(() => authStore.hasPermission(PERMISSIONS.commissionsPayout));
+const canViewSales = computed(() => authStore.hasPermission(PERMISSIONS.salesView));
+const canViewAccountsPayable = computed(() => authStore.hasPermission(PERMISSIONS.accountsPayableView));
 
 const walletQuery = computed(() => {
   const query: Record<string, string | number> = {
@@ -534,10 +540,15 @@ const originLabel = (row: CommissionRow) => {
   return 'Origem não identificada';
 };
 
-const openSale = (saleId: number) => navigateTo(`/financeiro/vendas/${saleId}`);
+const openSale = (saleId: number) => {
+  if (!canViewSales.value) return;
+  navigateTo(`/financeiro/vendas/${saleId}`);
+};
 
-const openAccountPayable = (accountId: number) =>
+const openAccountPayable = (accountId: number) => {
+  if (!canViewAccountsPayable.value) return;
   navigateTo(`/financeiro/contas-a-pagar?accountId=${accountId}`);
+};
 
 const columns = [
   { title: 'ID', key: 'id', width: 80 },
@@ -591,7 +602,7 @@ const columns = [
     key: 'actions',
     render: (row: CommissionRow) =>
       h('div', { class: 'data-table__actions' }, [
-        row.saleId
+        row.saleId && canViewSales.value
           ? h(
               NButton,
               {
@@ -606,7 +617,7 @@ const columns = [
               { default: () => 'Abrir venda' },
             )
           : null,
-        resolveAccountPayableId(row)
+        resolveAccountPayableId(row) && canViewAccountsPayable.value
           ? h(
               NButton,
               {
@@ -665,7 +676,7 @@ const payoutColumns = [
     title: 'Ações',
     key: 'actions',
     render: (row: CommissionPayoutRow) =>
-      row.accountPayableId
+      row.accountPayableId && canViewAccountsPayable.value
         ? h(
             NButton,
             {
@@ -783,6 +794,7 @@ const handlePayoutPageChange = (page: number) => {
 };
 
 const openPayoutModal = () => {
+  if (!canCreatePayout.value) return;
   payoutForm.userId = filters.userId;
   payoutForm.period = filters.period ? [...filters.period] as [number, number] : defaultPeriod();
   payoutForm.notes = '';
@@ -810,6 +822,7 @@ const buildPayoutPayload = () => {
 };
 
 const handlePreviewPayout = async () => {
+  if (!canPreviewPayout.value) return;
   const payload = buildPayoutPayload();
   if (!payload) return;
 
@@ -831,6 +844,7 @@ const handlePreviewPayout = async () => {
 };
 
 const handleCreatePayout = async () => {
+  if (!canCreatePayout.value) return;
   const payload = buildPayoutPayload();
   if (!payload) return;
 

@@ -43,7 +43,7 @@
                 </div>
 
                 <div class="topbar-right">
-                  <NDropdown :options="quickCreateOptions" @select="handleQuickCreate">
+                  <NDropdown v-if="quickCreateOptions.length" :options="quickCreateOptions" @select="handleQuickCreate">
                     <NButton type="primary" secondary class="topbar-btn">+ Criar</NButton>
                   </NDropdown>
 
@@ -54,7 +54,7 @@
                     <div v-if="notificationOpen" class="notification-panel">
                       <p class="panel-title">Notificações</p>
                       <button
-                        v-for="item in notifications"
+                        v-for="item in visibleNotifications"
                         :key="item.id"
                         type="button"
                         class="notification-item"
@@ -95,7 +95,7 @@
                     <div v-if="notificationOpen" class="notification-panel">
                       <p class="panel-title">Notificações</p>
                       <button
-                        v-for="item in notifications"
+                        v-for="item in visibleNotifications"
                         :key="`mobile-${item.id}`"
                         type="button"
                         class="notification-item"
@@ -191,6 +191,7 @@ import {
 import { NAvatar, NBadge, NButton, NConfigProvider, NDialogProvider, NDropdown, NInput, NMessageProvider, NModal, NSelect, datePtBR, ptBR } from 'naive-ui'
 import Sidebar from '~/components/Sidebar.vue'
 import { useAuthStore } from '~/stores/auth'
+import { PERMISSIONS, findRoutePermissions } from '~/constants/permissions'
 
 const isMobile = ref(false)
 const sidebarOpen = ref(false)
@@ -205,6 +206,7 @@ const searchWrapRef = ref(null)
 const notificationRef = ref(null)
 const auth = useAuthStore()
 const router = useRouter()
+const { canAny, filterByPermission } = usePermissions()
 let mediaQuery = null
 
 const updateIsMobile = () => {
@@ -317,60 +319,66 @@ const unitOptions = [
   { label: 'Clínica Zona Sul', value: 'sul' }
 ]
 
-const quickCreateOptions = [
-  { label: 'Novo atendimento', key: '/consultas/novo-atendimento' },
-  { label: 'Novo agendamento', key: '/atendimento/agendamentos' },
-  { label: 'Nova venda', key: '/financeiro/vendas/nova' },
-  { label: 'Nova entrada de estoque', key: '/estoque/saldos' },
-  { label: 'Novo cliente', key: '/clientes' },
-  { label: 'Novo pet', key: '/pets' },
-  { label: 'Novo box', key: '/cadastros/boxes' },
-  { label: 'Nova conta a pagar', key: '/financeiro/contas-a-pagar' },
-  { label: 'Nova conta a receber', key: '/financeiro/contas-a-receber' }
+const rawQuickCreateOptions = [
+  { label: 'Novo atendimento', key: '/consultas/novo-atendimento', permission: PERMISSIONS.consultationsCreate },
+  { label: 'Novo agendamento', key: '/atendimento/agendamentos', permission: PERMISSIONS.appointmentsCreate },
+  { label: 'Nova venda', key: '/financeiro/vendas/nova', permission: PERMISSIONS.salesCreate },
+  { label: 'Nova entrada de estoque', key: '/estoque/saldos', permission: 'estoque.movements.in' },
+  { label: 'Novo cliente', key: '/clientes', permission: PERMISSIONS.clientsCreate },
+  { label: 'Novo pet', key: '/pets', permission: PERMISSIONS.petsCreate },
+  { label: 'Novo box', key: '/cadastros/boxes', permission: 'cadastros.boxes.create' },
+  { label: 'Nova conta a pagar', key: '/financeiro/contas-a-pagar', permission: 'financeiro.accounts_payable.create' },
+  { label: 'Nova conta a receber', key: '/financeiro/contas-a-receber', permission: 'financeiro.accounts_receivable.create' }
 ]
 
-const profileOptions = [
+const quickCreateOptions = computed(() => filterByPermission(rawQuickCreateOptions))
+
+const profileOptions = computed(() => filterByPermission([
   { label: 'Meu perfil', key: '/usuarios' },
-  { label: 'Configurações', key: '/configuracoes/clinica' },
+  { label: 'Configurações', key: '/configuracoes/clinica', permission: PERMISSIONS.clinicSettingsView },
   { label: 'Trocar clínica/unidade', key: 'switch-unit' },
   { type: 'divider', key: 'divider-1' },
   { label: 'Sair', key: 'logout' }
-]
+]))
 
 const notifications = [
-  { id: 'n1', title: '3 vacinas atrasadas', meta: 'Agenda de vacinas', to: '/atendimento/agendamentos' },
-  { id: 'n2', title: '3 itens com estoque crítico', meta: 'Estoque', to: '/estoque/saldos?status=LOW' },
-  { id: 'n3', title: 'R$ 3.550 em contas atrasadas', meta: 'Financeiro', to: '/financeiro/contas-a-pagar' },
-  { id: 'n4', title: '3 vendas abertas', meta: 'Vendas', to: '/financeiro/vendas?status=aberta' }
+  { id: 'n1', title: '3 vacinas atrasadas', meta: 'Agenda de vacinas', to: '/atendimento/agendamentos', permission: PERMISSIONS.appointmentsView },
+  { id: 'n2', title: '3 itens com estoque crítico', meta: 'Estoque', to: '/estoque/saldos?status=LOW', permission: PERMISSIONS.stockBalancesView },
+  { id: 'n3', title: 'R$ 3.550 em contas atrasadas', meta: 'Financeiro', to: '/financeiro/contas-a-pagar', permission: PERMISSIONS.accountsPayableView },
+  { id: 'n4', title: '3 vendas abertas', meta: 'Vendas', to: '/financeiro/vendas?status=aberta', permission: PERMISSIONS.salesView }
 ]
 
-const notificationCount = computed(() => notifications.length)
+const visibleNotifications = computed(() => filterByPermission(notifications))
+const notificationCount = computed(() => visibleNotifications.value.length)
 
-const searchableItems = [
-  { type: 'Clientes', label: 'Cadastro de clientes', meta: 'Clientes', to: '/clientes' },
-  { type: 'Pets', label: 'Cadastro de pets', meta: 'Pets', to: '/pets' },
-  { type: 'Boxes', label: 'Cadastro de boxes', meta: 'Cadastros', to: '/cadastros/boxes' },
-  { type: 'Vendas', label: 'Vendas', meta: 'Vendas', to: '/financeiro/vendas' },
-  { type: 'Vendas', label: 'Caixa', meta: 'Vendas', to: '/financeiro/caixa' },
-  { type: 'Vendas', label: 'Comissões', meta: 'Vendas', to: '/financeiro/comissoes' },
-  { type: 'Produtos', label: 'Produtos e serviços', meta: 'Cadastros', to: '/cadastros/produtos' },
-  { type: 'Estoque', label: 'Saldos de estoque', meta: 'Estoque', to: '/estoque/saldos' },
-  { type: 'Estoque', label: 'Histórico de movimentações', meta: 'Estoque', to: '/estoque/movimentacoes' },
-  { type: 'Estoque', label: 'Locais de estoque', meta: 'Cadastros', to: '/cadastros/locais-estoque' },
-  { type: 'Financeiro', label: 'Contas a pagar', meta: 'Financeiro', to: '/financeiro/contas-a-pagar' },
-  { type: 'Financeiro', label: 'Contas a receber', meta: 'Financeiro', to: '/financeiro/contas-a-receber' },
-  { type: 'Relatórios', label: 'Relatórios gerenciais', meta: 'Relatórios', to: '/relatorios' },
-  { type: 'Fornecedores', label: 'Fornecedores', meta: 'Cadastros', to: '/cadastros/fornecedores' },
-  { type: 'Agendamentos', label: 'Agendamentos', meta: 'Atendimentos', to: '/atendimento/agendamentos' },
-  { type: 'Configurações', label: 'Escalas e Disponibilidade', meta: 'Configurações', to: '/configuracoes/escalas-disponibilidade' },
-  { type: 'Usuários', label: 'Usuários e permissões', meta: 'Cadastros', to: '/usuarios' }
+const rawSearchableItems = [
+  { type: 'Clientes', label: 'Cadastro de clientes', meta: 'Clientes', to: '/clientes', permission: PERMISSIONS.clientsView },
+  { type: 'Pets', label: 'Cadastro de pets', meta: 'Pets', to: '/pets', permission: PERMISSIONS.petsView },
+  { type: 'Boxes', label: 'Cadastro de boxes', meta: 'Cadastros', to: '/cadastros/boxes', permission: PERMISSIONS.boxesView },
+  { type: 'Vendas', label: 'Vendas', meta: 'Vendas', to: '/financeiro/vendas', permission: PERMISSIONS.salesView },
+  { type: 'Vendas', label: 'Caixa', meta: 'Vendas', to: '/financeiro/caixa', permission: PERMISSIONS.cashRegistersView },
+  { type: 'Vendas', label: 'Comissões', meta: 'Vendas', to: '/financeiro/comissoes', permission: PERMISSIONS.commissionsView },
+  { type: 'Produtos', label: 'Produtos e serviços', meta: 'Cadastros', to: '/cadastros/produtos', permission: PERMISSIONS.productsView },
+  { type: 'Estoque', label: 'Saldos de estoque', meta: 'Estoque', to: '/estoque/saldos', permission: PERMISSIONS.stockBalancesView },
+  { type: 'Estoque', label: 'Histórico de movimentações', meta: 'Estoque', to: '/estoque/movimentacoes', permission: PERMISSIONS.stockMovementsView },
+  { type: 'Estoque', label: 'Locais de estoque', meta: 'Cadastros', to: '/cadastros/locais-estoque', permission: PERMISSIONS.stockLocationsView },
+  { type: 'Financeiro', label: 'Contas a pagar', meta: 'Financeiro', to: '/financeiro/contas-a-pagar', permission: PERMISSIONS.accountsPayableView },
+  { type: 'Financeiro', label: 'Contas a receber', meta: 'Financeiro', to: '/financeiro/contas-a-receber', permission: PERMISSIONS.accountsReceivableView },
+  { type: 'Relatórios', label: 'Relatórios gerenciais', meta: 'Relatórios', to: '/relatorios', permission: PERMISSIONS.reportsView },
+  { type: 'Fornecedores', label: 'Fornecedores', meta: 'Cadastros', to: '/cadastros/fornecedores', permission: PERMISSIONS.suppliersView },
+  { type: 'Agendamentos', label: 'Agendamentos', meta: 'Atendimentos', to: '/atendimento/agendamentos', permission: PERMISSIONS.appointmentsView },
+  { type: 'Configurações', label: 'Escalas e Disponibilidade', meta: 'Configurações', to: '/configuracoes/escalas-disponibilidade', permission: PERMISSIONS.availabilityView },
+  { type: 'Usuários', label: 'Usuários', meta: 'Cadastros', to: '/usuarios', permission: PERMISSIONS.usersView },
+  { type: 'Permissões', label: 'Permissões', meta: 'Segurança', to: '/cadastros/permissoes', permission: PERMISSIONS.permissionsView }
 ]
+
+const searchableItems = computed(() => filterByPermission(rawSearchableItems))
 
 const searchGroups = computed(() => {
   const term = searchQuery.value.trim().toLowerCase()
   const filtered = term
-    ? searchableItems.filter((item) => `${item.label} ${item.meta} ${item.type}`.toLowerCase().includes(term))
-    : searchableItems.slice(0, 6)
+    ? searchableItems.value.filter((item) => `${item.label} ${item.meta} ${item.type}`.toLowerCase().includes(term))
+    : searchableItems.value.slice(0, 6)
 
   const groupedMap = new Map()
   filtered.forEach((item) => {
@@ -403,6 +411,8 @@ const handleProfileAction = (key) => {
 }
 
 const goTo = (to) => {
+  const routePermissions = findRoutePermissions(String(to).split('?')[0])
+  if (routePermissions.length && !canAny(routePermissions)) return
   searchOpen.value = false
   notificationOpen.value = false
   mobileSearchOpen.value = false
@@ -459,89 +469,95 @@ onBeforeUnmount(() => {
   }
 })
 
-const menuItems = [
-  { label: 'Dashboard', icon: BarChart3, to: '/' },
+const rawMenuItems = [
+  { label: 'Dashboard', icon: BarChart3, to: '/', permission: PERMISSIONS.dashboardView },
   {
     label: 'Atendimentos',
     icon: Stethoscope,
     children: [
-      { label: 'Agendamentos', icon: CalendarDays, to: '/atendimento/agendamentos' },
-      { label: 'Consultas', icon: ClipboardList, to: '/atendimento/consultas' },
-      { label: 'Internação', icon: Hospital, to: '/atendimento/internacao' }
+      { label: 'Agendamentos', icon: CalendarDays, to: '/atendimento/agendamentos', permission: PERMISSIONS.appointmentsView },
+      { label: 'Consultas', icon: ClipboardList, to: '/atendimento/consultas', permission: PERMISSIONS.consultationsView },
+      { label: 'Internação', icon: Hospital, to: '/atendimento/internacao', permission: PERMISSIONS.inpatientView }
     ]
   },
   {
     label: 'Pets',
     icon: PawPrint,
-    to: '/pets'
+    to: '/pets',
+    permission: PERMISSIONS.petsView
   },
-  { label: 'Clientes', icon: Users, to: '/clientes' },
+  { label: 'Clientes', icon: Users, to: '/clientes', permission: PERMISSIONS.clientsView },
   {
     label: 'Vendas',
     icon: ShoppingCart,
     children: [
-      { label: 'Vendas', icon: ShoppingCart, to: '/financeiro/vendas' },
-      { label: 'Caixa', icon: CircleDollarSign, to: '/financeiro/caixa' },
-      { label: 'Comissões', icon: BadgePercent, to: '/financeiro/comissoes' }
+      { label: 'Vendas', icon: ShoppingCart, to: '/financeiro/vendas', permission: PERMISSIONS.salesView },
+      { label: 'Caixa', icon: CircleDollarSign, to: '/financeiro/caixa', permission: PERMISSIONS.cashRegistersView },
+      { label: 'Comissões', icon: BadgePercent, to: '/financeiro/comissoes', permission: PERMISSIONS.commissionsView }
     ]
   },
   {
     label: 'Financeiro',
     icon: CircleDollarSign,
     children: [
-      { label: 'Contas a pagar', icon: ReceiptText, to: '/financeiro/contas-a-pagar' },
-      { label: 'Contas a receber', icon: CreditCard, to: '/financeiro/contas-a-receber' }
+      { label: 'Contas a pagar', icon: ReceiptText, to: '/financeiro/contas-a-pagar', permission: PERMISSIONS.accountsPayableView },
+      { label: 'Contas a receber', icon: CreditCard, to: '/financeiro/contas-a-receber', permission: PERMISSIONS.accountsReceivableView }
     ]
   },
   {
     label: 'Fiscal',
     icon: ShieldCheck,
     children: [
-      { label: 'Documentos fiscais', icon: ReceiptText, to: '/fiscal/documentos' },
-      { label: 'Pendências fiscais', icon: ClipboardList, to: '/fiscal/pendencias' }
+      { label: 'Documentos fiscais', icon: ReceiptText, to: '/fiscal/documentos', permission: PERMISSIONS.fiscalDocumentsView },
+      { label: 'Pendências fiscais', icon: ClipboardList, to: '/fiscal/pendencias', permission: PERMISSIONS.fiscalPendingView },
+      { label: 'Configurações fiscais', icon: Settings, to: '/fiscal/configuracoes', permission: PERMISSIONS.fiscalSettingsView }
     ]
   },
   {
     label: 'Relatórios',
     icon: FileSpreadsheet,
-    to: '/relatorios'
+    to: '/relatorios',
+    permission: PERMISSIONS.reportsView
   },
   {
     label: 'Estoque',
     icon: Package,
     children: [
-      { label: 'Saldos', icon: Package, to: '/estoque/saldos' },
-      { label: 'Movimentações', icon: ClipboardList, to: '/estoque/movimentacoes' }
+      { label: 'Saldos', icon: Package, to: '/estoque/saldos', permission: PERMISSIONS.stockBalancesView },
+      { label: 'Movimentações', icon: ClipboardList, to: '/estoque/movimentacoes', permission: PERMISSIONS.stockMovementsView }
     ]
   },
   {
     label: 'Cadastros',
     icon: FolderKanban,
     children: [
-      { label: 'Usuários e permissões', icon: UserCog, to: '/usuarios' },
-      { label: 'Tipos de agendamento', icon: CalendarCog, to: '/cadastros/tipos-agendamento' },
-      { label: 'Categorias de produto', icon: Tags, to: '/cadastros/categorias-produto' },
-      { label: 'Fornecedores', icon: Truck, to: '/cadastros/fornecedores' },
-      { label: 'Boxes de internação', icon: Hospital, to: '/cadastros/boxes' },
-      { label: 'Locais de estoque', icon: MapPin, to: '/cadastros/locais-estoque' },
-      { label: 'Produtos e serviços', icon: Package, to: '/cadastros/produtos' },
-      { label: 'Procedimentos médicos', icon: Stethoscope, to: '/cadastros/procedimentos' },
-      { label: 'Exames', icon: ClipboardList, to: '/cadastros/exames' },
-      { label: 'Formas de pagamento', icon: CreditCard, to: '/cadastros/formas-pagamento' },
-      { label: 'Espécies', icon: Dna, to: '/tabelas/especies' },
-      { label: 'Raças', icon: Tags, to: '/tabelas/racas' },
-      { label: 'Status', icon: ClipboardList, to: '/tabelas/status' }
+      { label: 'Usuários', icon: UserCog, to: '/usuarios', permission: PERMISSIONS.usersView },
+      { label: 'Permissões', icon: ShieldCheck, to: '/cadastros/permissoes', permission: PERMISSIONS.permissionsView },
+      { label: 'Tipos de agendamento', icon: CalendarCog, to: '/cadastros/tipos-agendamento', permission: PERMISSIONS.appointmentTypesView },
+      { label: 'Categorias de produto', icon: Tags, to: '/cadastros/categorias-produto', permission: PERMISSIONS.productCategoriesView },
+      { label: 'Fornecedores', icon: Truck, to: '/cadastros/fornecedores', permission: PERMISSIONS.suppliersView },
+      { label: 'Boxes de internação', icon: Hospital, to: '/cadastros/boxes', permission: PERMISSIONS.boxesView },
+      { label: 'Locais de estoque', icon: MapPin, to: '/cadastros/locais-estoque', permission: PERMISSIONS.stockLocationsView },
+      { label: 'Produtos e serviços', icon: Package, to: '/cadastros/produtos', permission: PERMISSIONS.productsView },
+      { label: 'Procedimentos médicos', icon: Stethoscope, to: '/cadastros/procedimentos', permission: PERMISSIONS.proceduresView },
+      { label: 'Exames', icon: ClipboardList, to: '/cadastros/exames', permission: PERMISSIONS.examTypesView },
+      { label: 'Formas de pagamento', icon: CreditCard, to: '/cadastros/formas-pagamento', permission: PERMISSIONS.paymentMethodsView },
+      { label: 'Espécies', icon: Dna, to: '/tabelas/especies', permission: PERMISSIONS.speciesView },
+      { label: 'Raças', icon: Tags, to: '/tabelas/racas', permission: PERMISSIONS.breedsView },
+      { label: 'Status', icon: ClipboardList, to: '/tabelas/status', permission: PERMISSIONS.appointmentStatusesView }
     ]
   },
   {
     label: 'Configurações',
     icon: Settings,
     children: [
-      { label: 'Clínica', icon: Building2, to: '/configuracoes/clinica' },
-      { label: 'Escalas e Disponibilidade', icon: TimerReset, to: '/configuracoes/escalas-disponibilidade' },
+      { label: 'Clínica', icon: Building2, to: '/configuracoes/clinica', permission: PERMISSIONS.clinicSettingsView },
+      { label: 'Escalas e Disponibilidade', icon: TimerReset, to: '/configuracoes/escalas-disponibilidade', permission: PERMISSIONS.availabilityView },
     ]
   }
 ]
+
+const menuItems = computed(() => filterByPermission(rawMenuItems))
 </script>
 
 <style scoped>

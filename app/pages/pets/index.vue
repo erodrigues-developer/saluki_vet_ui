@@ -6,7 +6,7 @@
         <h1>Cadastro de pets</h1>
         <p class="subhead">Gerencie pacientes, tutores, espécies, raças e identificações da clínica.</p>
       </div>
-      <n-button type="primary" size="large" class="head-cta" @click="openCreate">
+      <n-button v-if="canCreatePets" type="primary" size="large" class="head-cta" @click="openCreate">
         Novo pet
       </n-button>
     </div>
@@ -109,7 +109,7 @@
         </div>
         <div class="card-actions" @click.stop>
           <n-button size="small" secondary type="primary" @click="openEdit(pet)">Ver ficha</n-button>
-          <n-dropdown trigger="click" :options="actionOptions" @select="(key: string) => handleActionSelect(key, pet)">
+          <n-dropdown v-if="petActionOptions.length" trigger="click" :options="petActionOptions" @select="(key: string) => handleActionSelect(key, pet)">
             <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
           </n-dropdown>
         </div>
@@ -276,13 +276,13 @@
       <template #footer>
         <div v-if="activePetTab === 'details' || !editingPet?.id" class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" @click="submitPetForm">
+          <n-button v-if="!editingPet || canUpdatePets" type="primary" :loading="saving" @click="submitPetForm">
             {{ editingPet ? 'Salvar alterações' : 'Criar pet' }}
           </n-button>
         </div>
         <div v-else class="modal-actions">
           <n-button tertiary @click="closeModal">Fechar</n-button>
-          <n-button type="primary" secondary @click="activePetTab = 'details'">Editar cadastro</n-button>
+          <n-button v-if="canUpdatePets" type="primary" secondary @click="activePetTab = 'details'">Editar cadastro</n-button>
         </div>
       </template>
     </n-modal>
@@ -293,6 +293,8 @@
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { NButton, NDropdown, NTag, useDialog, useMessage, type SelectOption } from 'naive-ui'
 import PetForm, { type Pet } from '~/components/pets/PetForm.vue'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 interface PetsResponse {
   data: Pet[]
@@ -337,6 +339,10 @@ interface PetHistoryResponse {
 
 const message = useMessage()
 const dialog = useDialog()
+const authStore = useAuthStore()
+const canCreatePets = computed(() => authStore.hasPermission(PERMISSIONS.petsCreate))
+const canUpdatePets = computed(() => authStore.hasPermission(PERMISSIONS.petsUpdate))
+const canDeletePets = computed(() => authStore.hasPermission(PERMISSIONS.petsDelete))
 
 const filters = reactive({
   name: '',
@@ -387,13 +393,11 @@ const clientLoading = ref(false)
 const speciesOptions = ref<SelectOption[]>([])
 const speciesLoading = ref(false)
 
-const actionOptions = [
-  { label: 'Editar', key: 'edit' },
-  { label: 'Vincular tutor', key: 'linkClient' },
+const petActionOptions = computed(() => [
+  ...(canUpdatePets.value ? [{ label: 'Editar', key: 'edit' }, { label: 'Vincular tutor', key: 'linkClient' }] : []),
   { label: 'Histórico clínico', key: 'history' },
-  { type: 'divider', key: 'divider' },
-  { label: 'Excluir', key: 'delete' }
-]
+  ...(canDeletePets.value ? [{ type: 'divider', key: 'divider' }, { label: 'Excluir', key: 'delete' }] : [])
+])
 
 const truncateHistoryText = (value?: string | null) => (value || '').slice(0, 40)
 
@@ -467,11 +471,13 @@ const summary = computed(() => {
 
 const handleActionSelect = (key: string, pet: Pet) => {
   if (key === 'edit') {
+    if (!canUpdatePets.value) return
     openEdit(pet)
     return
   }
 
   if (key === 'linkClient') {
+    if (!canUpdatePets.value) return
     message.info('Abra a ficha do pet para vincular ou trocar o tutor.')
     openEdit(pet)
     return
@@ -483,6 +489,7 @@ const handleActionSelect = (key: string, pet: Pet) => {
   }
 
   if (key === 'delete') {
+    if (!canDeletePets.value) return
     confirmDelete(pet)
   }
 }
@@ -561,7 +568,7 @@ const columns = [
           NDropdown,
           {
             trigger: 'click',
-            options: actionOptions,
+            options: petActionOptions.value,
             onSelect: (key: string) => handleActionSelect(key, row)
           },
           {
@@ -619,6 +626,7 @@ const fetchPets = async () => {
 }
 
 const handleSubmit = async (payload: Pet) => {
+  if ((payload.id && !canUpdatePets.value) || (!payload.id && !canCreatePets.value)) return
   saving.value = true
   const api = useApi()
   try {
@@ -687,6 +695,7 @@ const handlePetTabChange = (tab: 'details' | 'history') => {
 }
 
 const confirmDelete = (pet: Pet) => {
+  if (!canDeletePets.value) return
   dialog.warning({
     title: 'Confirmar exclusão',
     content: `Deseja excluir ${pet.name}?`,
@@ -708,6 +717,7 @@ const confirmDelete = (pet: Pet) => {
 }
 
 const openCreate = () => {
+  if (!canCreatePets.value) return
   editingPet.value = null
   activePetTab.value = 'details'
   resetPetHistory()
@@ -716,7 +726,7 @@ const openCreate = () => {
 
 const openEdit = (pet: Pet, tab: 'details' | 'history' = 'details') => {
   editingPet.value = pet
-  activePetTab.value = tab
+  activePetTab.value = tab === 'details' && !canUpdatePets.value ? 'history' : tab
   showModal.value = true
   if (tab === 'history') {
     void loadPetHistory(pet.id)

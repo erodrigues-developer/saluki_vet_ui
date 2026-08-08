@@ -6,7 +6,7 @@
         <h1>Fornecedores</h1>
         <p class="subhead">Gerencie fornecedores, contatos, documentos e status de relacionamento com a clínica.</p>
       </div>
-      <n-button type="primary" size="large" class="head-cta" @click="openCreate">Novo fornecedor</n-button>
+      <n-button v-if="canCreateSuppliers" type="primary" size="large" class="head-cta" @click="openCreate">Novo fornecedor</n-button>
     </div>
 
     <div :class="isMobile ? 'summary-grid-mobile summary-grid' : 'summary-grid'">
@@ -75,7 +75,7 @@
             <p class="card-subtitle card-subtitle-muted"><span class="card-line-label">Atualizado em:</span> {{ formatDate(item.updatedAt || '') || '—' }}</p>
             <div class="card-actions" @click.stop>
               <n-button size="small" secondary type="primary" @click="openEdit(item)">Ver fornecedor</n-button>
-              <n-dropdown trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
+              <n-dropdown v-if="buildActionOptions(item).length" trigger="click" :options="buildActionOptions(item)" @select="(key: string) => handleActionSelect(key, item)">
                 <n-button size="small" quaternary class="menu-button"><AppIcon name="ellipsis" :size="16" :stroke-width="2" /></n-button>
               </n-dropdown>
             </div>
@@ -94,7 +94,7 @@
         </template>
         <n-empty v-else description="Nenhum fornecedor encontrado.">
           <template #extra>
-            <n-button type="primary" @click="openCreate">Novo fornecedor</n-button>
+            <n-button v-if="canCreateSuppliers" type="primary" @click="openCreate">Novo fornecedor</n-button>
           </template>
         </n-empty>
       </div>
@@ -113,7 +113,7 @@
         />
         <n-empty v-else description="Nenhum fornecedor encontrado.">
           <template #extra>
-            <n-button type="primary" @click="openCreate">Novo fornecedor</n-button>
+            <n-button v-if="canCreateSuppliers" type="primary" @click="openCreate">Novo fornecedor</n-button>
           </template>
         </n-empty>
       </template>
@@ -156,7 +156,7 @@
       <template #footer>
         <div class="modal-actions">
           <n-button tertiary :disabled="saving" @click="closeModal">Cancelar</n-button>
-          <n-button type="primary" :loading="saving" :disabled="!canSubmitSupplierForm" @click="submitSupplierForm">
+          <n-button v-if="canSaveSupplier" type="primary" :loading="saving" :disabled="!canSubmitSupplierForm" @click="submitSupplierForm">
             {{ editingSupplier ? 'Salvar alterações' : 'Criar fornecedor' }}
           </n-button>
         </div>
@@ -170,6 +170,8 @@ import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { format } from 'date-fns'
 import { NButton, NDropdown, NTag, useDialog, useMessage } from 'naive-ui'
 import SupplierForm, { type Supplier } from '~/components/suppliers/SupplierForm.vue'
+import { PERMISSIONS } from '~/constants/permissions'
+import { useAuthStore } from '~/stores/auth'
 
 interface SuppliersResponse {
   data: Supplier[]
@@ -182,6 +184,7 @@ interface SuppliersResponse {
 
 const message = useMessage()
 const dialog = useDialog()
+const authStore = useAuthStore()
 
 const suppliers = ref<Supplier[]>([])
 const loading = ref(false)
@@ -228,6 +231,11 @@ const tablePagination = computed(() => ({
   pageSizes: [10, 20, 50]
 }))
 
+const canCreateSuppliers = computed(() => authStore.hasPermission(PERMISSIONS.suppliersCreate))
+const canUpdateSuppliers = computed(() => authStore.hasPermission(PERMISSIONS.suppliersUpdate))
+const canDeleteSuppliers = computed(() => authStore.hasPermission(PERMISSIONS.suppliersDelete))
+const canSaveSupplier = computed(() => editingSupplier.value ? canUpdateSuppliers.value : canCreateSuppliers.value)
+
 const formatDate = (value: string) => {
   if (!value) return ''
   return format(new Date(value), 'dd/MM/yyyy HH:mm')
@@ -257,13 +265,15 @@ const formatContactSingleLine = (item: Supplier) => {
 const canShowDeleteAction = (_item: Supplier) => false
 
 const buildActionOptions = (item: Supplier) => {
-  const options: Array<{ label?: string; key: string; type?: 'divider' }> = [
-    { label: 'Editar', key: 'edit' },
-    { label: item.isActive ? 'Inativar' : 'Ativar', key: 'toggleStatus' }
-  ]
+  const options: Array<{ label?: string; key: string; type?: 'divider' }> = []
 
-  if (canShowDeleteAction(item)) {
-    options.push({ type: 'divider', key: `divider-${item.id}` })
+  if (canUpdateSuppliers.value) {
+    options.push({ label: 'Editar', key: 'edit' })
+    options.push({ label: item.isActive ? 'Inativar' : 'Ativar', key: 'toggleStatus' })
+  }
+
+  if (canDeleteSuppliers.value && canShowDeleteAction(item)) {
+    if (options.length) options.push({ type: 'divider', key: `divider-${item.id}` })
     options.push({ label: 'Excluir', key: 'delete' })
   }
 
@@ -410,6 +420,7 @@ const fetchSummary = async () => {
 }
 
 const handleSubmit = async (payload: Supplier) => {
+  if ((payload.id && !canUpdateSuppliers.value) || (!payload.id && !canCreateSuppliers.value)) return
   saving.value = true
   const api = useApi()
 
@@ -444,10 +455,12 @@ const handleSubmit = async (payload: Supplier) => {
 }
 
 const submitSupplierForm = async () => {
+  if (!canSaveSupplier.value) return
   await supplierFormRef.value?.submit()
 }
 
 const confirmDeactivate = (supplier: Supplier) => {
+  if (!canUpdateSuppliers.value) return
   if (!supplier.id) return
 
   dialog.warning({
@@ -471,6 +484,7 @@ const confirmDeactivate = (supplier: Supplier) => {
 }
 
 const confirmReactivate = (supplier: Supplier) => {
+  if (!canUpdateSuppliers.value) return
   if (!supplier.id) return
 
   dialog.success({
@@ -497,6 +511,7 @@ const confirmReactivate = (supplier: Supplier) => {
 }
 
 const openCreate = () => {
+  if (!canCreateSuppliers.value) return
   editingSupplier.value = null
   showModal.value = true
 }
