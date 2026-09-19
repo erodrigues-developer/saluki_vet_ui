@@ -45,11 +45,11 @@
 
           <div v-if="activeTab === 'general'" class="form-grid">
             <n-form-item label="Nome da clínica" path="name" class="span-2">
-              <n-input v-model:value="model.name" placeholder="Ex: Clínica Veterinária Saluki" />
+              <n-input v-model:value="model.name" placeholder="Ex: Clínica Veterinária Sigma Vet" />
             </n-form-item>
 
             <n-form-item label="Nome curto" path="shortName">
-              <n-input v-model:value="model.shortName" placeholder="Ex: Saluki Vet" />
+              <n-input v-model:value="model.shortName" placeholder="Ex: Sigma Vet" />
             </n-form-item>
 
             <n-form-item label="CNPJ" path="cnpj">

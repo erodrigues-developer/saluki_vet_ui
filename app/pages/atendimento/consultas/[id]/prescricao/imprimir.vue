@@ -159,7 +159,7 @@ const clinic = computed(() => {
   const siteMatch = notes.match(/https?:\/\/\S+/i)
   return {
     logoUrl: safeText(clinicSettings.logoUrl) || '',
-    name: 'Clínica SalukiVet',
+    name: 'Clínica Sigma Vet',
     cnpj: cnpjMatch?.[0] || '',
     address: safeText(tutorRaw.street) ? `${tutorRaw.street}, ${tutorRaw.number || 's/n'} · ${tutorRaw.district || ''} · ${tutorRaw.city || ''}/${tutorRaw.state || ''}` : '',
     contactLine: [orFallback(tutorRaw.mobilePhone || tutorRaw.phone), orFallback(tutorRaw.email)].join(' · '),

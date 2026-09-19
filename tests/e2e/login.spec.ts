@@ -6,7 +6,7 @@ test.describe('Login flow', () => {
     await page.goto('/login');
 
     // Check we are on the login page
-    await expect(page.locator('text=Acesso ao Saluki ERP')).toBeVisible();
+    await expect(page.locator('text=Acesso ao Sigma Vet')).toBeVisible();
 
     // Fill the credentials
     await page.getByPlaceholder('Seu e-mail cadastrado').fill('admin@salukivet.com.br');

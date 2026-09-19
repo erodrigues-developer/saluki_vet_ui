@@ -84,7 +84,7 @@
                 </button>
                 <div class="mobile-brand">
                   <span class="brand-icon"><ShieldCheck :size="16" :stroke-width="2" /></span>
-                  <span class="brand-name">SalukiVet</span>
+                  <span class="brand-name">Sigma Vet</span>
                 </div>
                 <div class="mobile-actions">
                   <NButton quaternary circle class="icon-btn" @click="mobileSearchOpen = true"><AppIcon name="search" :size="16" :stroke-width="2" /></NButton>
@@ -207,6 +207,8 @@ const notificationRef = ref(null)
 const auth = useAuthStore()
 const router = useRouter()
 const { canAny, filterByPermission } = usePermissions()
+const dashboardOverview = useDashboardOverview()
+const overview = dashboardOverview.data
 let mediaQuery = null
 
 const updateIsMobile = () => {
@@ -305,7 +307,12 @@ const onDrawerTouchEnd = () => {
   drawerTracking = false
 }
 
-const clinicStatus = computed(() => 'Aberto até 20h')
+const clinicStatus = computed(() => {
+  const clinic = overview.value?.clinic
+  if (!clinic || clinic.status === 'UNCONFIGURED') return 'Horário não configurado'
+  if (clinic.status === 'CLOSED') return 'Clínica fechada'
+  return clinic.closesAt ? `Aberto até ${clinic.closesAt.replace(':', 'h')}` : 'Clínica aberta'
+})
 const userName = computed(() => auth.user?.name || 'Usuário')
 const userInitials = computed(() => {
   const name = userName.value.trim()
@@ -341,14 +348,21 @@ const profileOptions = computed(() => filterByPermission([
   { label: 'Sair', key: 'logout' }
 ]))
 
-const notifications = [
-  { id: 'n1', title: '3 vacinas atrasadas', meta: 'Agenda de vacinas', to: '/atendimento/agendamentos', permission: PERMISSIONS.appointmentsView },
-  { id: 'n2', title: '3 itens com estoque crítico', meta: 'Estoque', to: '/estoque/saldos?status=LOW', permission: PERMISSIONS.stockBalancesView },
-  { id: 'n3', title: 'R$ 3.550 em contas atrasadas', meta: 'Financeiro', to: '/financeiro/contas-a-pagar', permission: PERMISSIONS.accountsPayableView },
-  { id: 'n4', title: '3 vendas abertas', meta: 'Vendas', to: '/financeiro/vendas?status=aberta', permission: PERMISSIONS.salesView }
-]
+const formatNotificationCurrency = (value) => new Intl.NumberFormat('pt-BR', {
+  style: 'currency', currency: 'BRL', maximumFractionDigits: 0
+}).format(Number(value || 0))
+const notifications = computed(() => {
+  const data = overview.value
+  if (!data) return []
+  return [
+    data.today.vaccines.overdue > 0 && { id: 'vaccines', title: `${data.today.vaccines.overdue} vacinas atrasadas`, meta: 'Agenda de vacinas', to: '/atendimento/agendamentos', permission: PERMISSIONS.appointmentsView },
+    data.stock.criticalCount > 0 && { id: 'stock', title: `${data.stock.criticalCount} itens com estoque crítico`, meta: 'Estoque', to: '/estoque/saldos?status=LOW', permission: PERMISSIONS.stockBalancesView },
+    data.finance.payables.totalOverdue > 0 && { id: 'payables', title: `${formatNotificationCurrency(data.finance.payables.totalOverdue)} em contas atrasadas`, meta: 'Financeiro', to: '/financeiro/contas-a-pagar', permission: PERMISSIONS.accountsPayableView },
+    data.finance.openSales.count > 0 && { id: 'sales', title: `${data.finance.openSales.count} vendas abertas`, meta: 'Vendas', to: '/financeiro/vendas?status=aberta', permission: PERMISSIONS.salesView }
+  ].filter(Boolean)
+})
 
-const visibleNotifications = computed(() => filterByPermission(notifications))
+const visibleNotifications = computed(() => filterByPermission(notifications.value))
 const notificationCount = computed(() => visibleNotifications.value.length)
 
 const rawSearchableItems = [
@@ -452,6 +466,7 @@ onMounted(() => {
   }
   document.addEventListener('click', handleDocumentClick)
   document.addEventListener('keydown', handleDocumentKeydown)
+  if (canAny([PERMISSIONS.dashboardView])) dashboardOverview.ensureLoaded()
 })
 
 onBeforeUnmount(() => {

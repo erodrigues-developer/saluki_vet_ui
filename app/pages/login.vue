@@ -1,14 +1,30 @@
 <template>
   <div class="login-container">
-    <n-card class="login-card" title="Acesso ao Saluki ERP">
+    <n-card class="login-card" title="Acesso ao Sigma Vet">
+      <LoginPuppy
+        :field="activeField"
+        :progress="emailProgress"
+        :happy="isEmailComplete"
+        :peeking="passwordVisible"
+      />
       <n-form
         ref="formRef"
         :model="formValue"
         :rules="rules"
         @keyup.enter="handleLogin"
       >
-        <n-form-item path="email" label="Email">
+        <n-form-item
+          path="email"
+          label="Email"
+          @focusin="focusEmail"
+          @focusout="clearFieldFocus"
+          @input="trackEmailCaret"
+          @click="trackEmailCaret"
+          @keyup="trackEmailCaret"
+          @select="trackEmailCaret"
+        >
           <n-input
+            ref="emailInputRef"
             v-model:value="formValue.email"
             placeholder="Seu e-mail cadastrado"
             autofocus
@@ -16,13 +32,32 @@
           />
         </n-form-item>
 
-        <n-form-item path="password" label="Senha">
+        <n-form-item
+          path="password"
+          label="Senha"
+          @focusin="activeField = 'password'"
+          @focusout="clearFieldFocus"
+        >
           <n-input
+            ref="passwordInputRef"
             v-model:value="formValue.password"
-            type="password"
-            show-password-on="click"
+            :type="passwordVisible ? 'text' : 'password'"
             placeholder="Sua senha"
-          />
+          >
+            <template #suffix>
+              <button
+                class="password-visibility"
+                type="button"
+                :aria-label="passwordVisible ? 'Ocultar senha' : 'Mostrar senha'"
+                :aria-pressed="passwordVisible"
+                @mousedown.prevent
+                @click="togglePasswordVisibility"
+                @keyup.enter.stop
+              >
+                <component :is="passwordVisible ? Eye : EyeOff" :size="16" aria-hidden="true" />
+              </button>
+            </template>
+          </n-input>
         </n-form-item>
 
         <n-button
@@ -45,9 +80,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { Eye, EyeOff } from 'lucide-vue-next';
+import LoginPuppy from '~/components/LoginPuppy.vue';
 import { useAuthStore } from '~/stores/auth';
-import type { FormInst } from 'naive-ui';
+import type { FormInst, InputInst } from 'naive-ui';
 import { useMessage } from 'naive-ui';
 
 definePageMeta({
@@ -62,11 +99,54 @@ const config = useRuntimeConfig();
 
 const loading = ref(false);
 const error = ref('');
+const activeField = ref<'email' | 'password' | null>(null);
+const emailProgress = ref(0);
+const emailInputRef = ref<InputInst | null>(null);
+const passwordInputRef = ref<InputInst | null>(null);
+const passwordVisible = ref(false);
 
 const formValue = ref({
   email: '',
   password: ''
 });
+
+const isEmailComplete = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formValue.value.email));
+
+onMounted(() => {
+  // Native autofocus can happen before Vue attaches its focus listeners.
+  const input = emailInputRef.value?.inputElRef;
+  if (input && input === document.activeElement) {
+    activeField.value = 'email';
+    emailProgress.value = Math.min((input.selectionStart ?? input.value.length) / 32, 1);
+  }
+});
+
+function trackEmailCaret(event: Event) {
+  if (!(event.target instanceof HTMLInputElement)) return;
+  const input = event.target;
+  activeField.value = 'email';
+  // Only the email caret position is used; the mascot never receives the password.
+  emailProgress.value = Math.min((input.selectionStart ?? input.value.length) / 32, 1);
+}
+
+function focusEmail(event: FocusEvent) {
+  activeField.value = 'email';
+  trackEmailCaret(event);
+}
+
+function clearFieldFocus(event: FocusEvent) {
+  const field = event.currentTarget as HTMLElement;
+  // Keep the paws up when focus moves to the password visibility control.
+  if (event.relatedTarget instanceof Node && field.contains(event.relatedTarget)) return;
+  activeField.value = null;
+}
+
+function togglePasswordVisibility(event: MouseEvent) {
+  passwordVisible.value = !passwordVisible.value;
+  activeField.value = 'password';
+  // Pointer clicks keep typing uninterrupted; keyboard users keep button focus.
+  if (document.activeElement !== event.currentTarget) passwordInputRef.value?.focus();
+}
 
 const rules = {
   email: {
@@ -101,7 +181,7 @@ async function handleLogin(e: Event) {
 
         // Logado com sucesso
         authStore.setAuth(response.data.access_token, response.data.user);
-        message.success('Bem vindo ao Saluki ERP!');
+        message.success('Bem vindo ao Sigma Vet!');
         router.push('/');
 
       } catch (err: any) {
@@ -145,4 +225,19 @@ async function handleLogin(e: Event) {
 .error-msg {
   margin-top: 16px;
 }
+
+.password-visibility {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: #8b9098;
+  cursor: pointer;
+}
+
+.password-visibility:hover { color: #29976b; }
+.password-visibility:focus-visible { outline: 2px solid #29976b; outline-offset: 2px; }
 </style>

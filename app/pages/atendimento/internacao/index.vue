@@ -548,7 +548,7 @@ const lastRefreshLabel = computed(() =>
   lastRefreshAt.value ? format(lastRefreshAt.value, 'dd/MM/yyyy HH:mm') : 'Aguardando sincronização',
 )
 
-const clinicTitle = computed(() => clinicSettings.value?.notes || 'Saluki Vet')
+const clinicTitle = computed(() => clinicSettings.value?.notes || 'Sigma Vet')
 const drawerWidth = computed(() => (process.client && window.innerWidth < 900 ? '100%' : 720))
 const detailDrawerPlacement = computed(() => (isMobileView.value ? 'bottom' : 'right'))
 const detailDrawerHeight = computed(() => (isMobileView.value ? '100%' : undefined))

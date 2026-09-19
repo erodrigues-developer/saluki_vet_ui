@@ -10,11 +10,16 @@
         </p>
       </div>
       <div class="hero-tags">
-        <span class="badge success">Aberto até 20h</span>
-        <span class="badge neutral">Equipe: 5 vets · 3 recep</span>
+        <span class="badge" :class="clinicStatusClass">{{ clinicStatusLabel }}</span>
+        <span class="badge neutral">{{ teamSummary }}</span>
         <DashboardAiTrigger :is-mobile="isMobile" @open="openAiAssistant" />
       </div>
     </header>
+
+    <div v-if="dashboardError" class="error-state dashboard-error">
+      <p>{{ dashboardError }}</p>
+      <button class="action-link" @click="refreshDashboard">Tentar novamente</button>
+    </div>
 
     <section class="section-block section-hoje">
       <div class="section-head">
@@ -37,7 +42,7 @@
                   <small class="kpi-sub">agendados</small>
                 </div>
               </div>
-              <span class="pill info">+8% vs ontem</span>
+              <span class="pill info">{{ appointmentComparisonLabel }}</span>
             </div>
             <div v-if="totalAppointments" class="donut-wrapper">
               <EChartBase :option="appointmentOption" height="128px" class="donut-chart" />
@@ -70,7 +75,7 @@
                   <small class="kpi-sub">valor vendido</small>
                 </div>
               </div>
-              <span class="pill positive">Meta 82%</span>
+              <span class="pill positive">{{ salesComparisonLabel }}</span>
             </div>
             <div v-if="salesToday" class="sales-extra">
               <p class="micro sales-meta">Recebido: {{ formatCurrency(receivedToday) }} · Ticket médio: {{ formatCurrency(avgTicket) }}</p>
@@ -345,7 +350,7 @@
       title="Assistente inteligente"
       subtitle="Insights operacionais do dashboard atual."
       launcher-title="Analisar com IA"
-      context-line="Dashboard operacional · Clínica aberta até 20h"
+      :context-line="`Dashboard operacional · ${clinicStatusLabel}`"
       :context-chips="['Hoje', 'Financeiro', 'Estoque', 'Vacinas', 'Atendimentos']"
       :messages="aiMessages"
       :loading="aiLoading"
@@ -367,22 +372,20 @@
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import DashboardAiTrigger from '~/components/dashboard-ai/DashboardAiTrigger.vue'
 import AiChatFloating from '~/components/ai/AiChatFloating.vue'
-import { suggestedQuestions } from '~/mocks/dashboardAi.mock'
+import { dashboardSuggestedQuestions as suggestedQuestions } from '~/constants/dashboard'
 import { useAiConversation } from '~/composables/useAiConversation'
 import { findRoutePermissions } from '~/constants/permissions'
 
 const router = useRouter()
 const authStore = useAuthStore()
-const dashboardData = ref(null)
-const stockData = ref(null)
-const financeLoading = ref(false)
-const financeError = ref(false)
-const stockError = ref(false)
-const bootLoading = ref(true)
-const chartsLoading = ref(true)
-const alertsLoading = ref(true)
-const currentMonth = new Date().getMonth() + 1
-const currentYear = new Date().getFullYear()
+const dashboardOverview = useDashboardOverview()
+const overview = dashboardOverview.data
+const dashboardError = dashboardOverview.error
+const bootLoading = computed(() => dashboardOverview.pending.value && !overview.value)
+const chartsLoading = bootLoading
+const alertsLoading = bootLoading
+const financeLoading = bootLoading
+const financeError = computed(() => Boolean(dashboardError.value) && !overview.value)
 const isMobile = ref(false)
 const aiOpen = ref(false)
 const aiQuestion = ref('')
@@ -391,14 +394,16 @@ let mediaQueryListener = null
 
 const dashboardContextSnapshot = () => ({
   screen: 'dashboard',
-  clinicStatus: 'Aberto até 20h',
+  clinicStatus: clinicStatusLabel.value,
   appointmentsToday: totalAppointments.value,
-  salesToday,
-  receivedToday,
-  avgTicket,
+  salesToday: salesToday.value,
+  receivedToday: receivedToday.value,
+  avgTicket: avgTicket.value,
+  salesTrend: salesTrend.value,
+  revenueByDay: revenueData.value,
   criticalStockCount: criticalStockCount.value,
-  criticalStock: criticalStock.slice(0, 5),
-  vaccines: vaccinesSummary,
+  criticalStock: criticalStock.value.slice(0, 5),
+  vaccines: vaccinesSummary.value,
   finance: financeKpis.value,
   openSalesCount: openSalesCount.value,
   openSalesTotalPending: openSalesTotalPending.value
@@ -415,39 +420,8 @@ const dashboardConversation = useAiConversation({
 const aiMessages = dashboardConversation.messages
 const aiLoading = dashboardConversation.loading
 
-const fetchPayablesDash = async () => {
-  financeLoading.value = true
-  financeError.value = false
-  try {
-    const query = new URLSearchParams({ month: String(currentMonth), year: String(currentYear) })
-    const api = useApi()
-    const dashRes = await api(`/api/v1/accounts-payable/dashboard?${query.toString()}`)
-    dashboardData.value = dashRes?.data || dashRes || null
-  } catch (err) {
-    financeError.value = true
-    dashboardData.value = null
-  } finally {
-    financeLoading.value = false
-  }
-}
-
-const fetchStockDash = async () => {
-  stockError.value = false
-  try {
-    const api = useApi()
-    const response = await api('/api/v1/stock-movements/balance', {
-      query: {
-        page: 1,
-        limit: 5,
-        status: 'LOW'
-      }
-    })
-    stockData.value = response
-  } catch (err) {
-    stockError.value = true
-    stockData.value = null
-  }
-}
+const refreshDashboard = () => dashboardOverview.refresh()
+const fetchPayablesDash = refreshDashboard
 
 onMounted(async () => {
   if (typeof window !== 'undefined') {
@@ -457,10 +431,7 @@ onMounted(async () => {
     mediaQuery.addEventListener?.('change', mediaQueryListener)
     mediaQuery.addListener?.(mediaQueryListener)
   }
-  await Promise.all([fetchPayablesDash(), fetchStockDash(), new Promise((resolve) => setTimeout(resolve, 500))])
-  bootLoading.value = false
-  chartsLoading.value = false
-  alertsLoading.value = false
+  await dashboardOverview.ensureLoaded()
 })
 
 onBeforeUnmount(() => {
@@ -506,67 +477,85 @@ const palette = {
   chartGray: '#8795A1'
 }
 
-const todayAppointments = [
-  { label: 'Consultas', value: 18, color: palette.chartBlue },
-  { label: 'Vacinas', value: 9, color: palette.chartGreen },
-  { label: 'Retornos', value: 6, color: palette.chartOrange }
-]
-
-const attendance = [
-  { label: 'Seg', confirmed: 22, canceled: 3, missed: 2 },
-  { label: 'Ter', confirmed: 19, canceled: 4, missed: 1 },
-  { label: 'Qua', confirmed: 21, canceled: 2, missed: 3 },
-  { label: 'Qui', confirmed: 18, canceled: 5, missed: 2 },
-  { label: 'Sex', confirmed: 24, canceled: 2, missed: 1 },
-  { label: 'Sáb', confirmed: 12, canceled: 1, missed: 1 }
-]
-
-const consultations = [18, 21, 17, 22, 26, 15, 11, 20, 23, 19, 24, 27, 16, 12]
-const salesTrend = [8.5, 9.2, 7.4, 9.8, 10.1, 11.4, 9.6, 12.2, 11.8, 12.5, 13.2, 11.7, 12.9, 14.4]
-const salesToday = 12450
-const receivedToday = 10740
-const avgTicket = 294
-
-const vaccinesSummary = { today: 14, overdue: 3, upcoming: 22 }
-const vaccinesList = [
-  { name: 'Bella · Leptospirose', when: '08h30 · sala 2' },
-  { name: 'Thor · V10 reforço', when: '10h15 · sala 1' },
-  { name: 'Mia · Raiva', when: '14h00 · sala 3' }
-]
-const openSales = [
-  { id: 6, amount: 233 },
-  { id: 5, amount: 645 },
-  { id: 2, amount: 832 }
-]
-
-const revenueData = [12400, 14200, 15600, 14900, 16800, 17400, 18100, 16300, 17700]
-
-const procedures = [
-  { label: 'Consultas', value: 230, color: palette.chartBlue },
-  { label: 'Vacinas', value: 140, color: palette.chartGreen },
-  { label: 'Curativos', value: 95, color: palette.chartOrange },
-  { label: 'Exames', value: 80, color: palette.chartPurple },
-  { label: 'Banho/Tosa', value: 65, color: palette.chartGray }
-]
+const chartColors = [palette.chartBlue, palette.chartGreen, palette.chartOrange, palette.chartPurple, palette.chartGray]
+const todayAppointments = computed(() => (overview.value?.today.appointments.byType || []).map((item, index) => ({
+  ...item,
+  color: chartColors[index % chartColors.length]
+})))
+const attendance = computed(() => (overview.value?.operation.attendanceLast7Days || []).map((item) => ({
+  ...item,
+  label: weekdayLabel(item.date)
+})))
+const consultations = computed(() => overview.value?.operation.consultationsLast14Days || [])
+const salesTrend = computed(() => overview.value?.today.sales.trend || [])
+const salesToday = computed(() => Number(overview.value?.today.sales.sold || 0))
+const receivedToday = computed(() => Number(overview.value?.today.sales.received || 0))
+const avgTicket = computed(() => Number(overview.value?.today.sales.averageTicket || 0))
+const vaccinesSummary = computed(() => overview.value?.today.vaccines || { today: 0, overdue: 0, upcoming: 0, items: [] })
+const vaccinesList = computed(() => vaccinesSummary.value.items.map((item) => ({
+  id: item.id,
+  name: `${item.petName} · ${item.vaccineName}`,
+  when: formatDueDate(item.dueDate)
+})))
+const openSales = computed(() => overview.value?.finance.openSales.items || [])
+const revenueData = computed(() => overview.value?.finance.revenueByDay || [])
+const procedures = computed(() => (overview.value?.operation.procedureMix || []).map((item, index) => ({
+  ...item,
+  color: chartColors[index % chartColors.length]
+})))
 
 const todayLabel = computed(() =>
   new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date())
 )
+const clinicStatusLabel = computed(() => {
+  const clinic = overview.value?.clinic
+  if (!clinic || clinic.status === 'UNCONFIGURED') return 'Horário não configurado'
+  if (clinic.status === 'CLOSED') return 'Clínica fechada'
+  return clinic.closesAt ? `Aberto até ${clinic.closesAt.replace(':', 'h')}` : 'Clínica aberta'
+})
+const clinicStatusClass = computed(() => overview.value?.clinic.status === 'OPEN' ? 'success' : 'neutral')
+const teamSummary = computed(() => {
+  const team = overview.value?.clinic.team
+  return `Equipe: ${team?.veterinarians || 0} vets · ${team?.receptionists || 0} recep`
+})
+const comparisonLabel = (value) => value === null || value === undefined
+  ? 'Sem comparação'
+  : `${value > 0 ? '+' : ''}${value}% vs ontem`
+const appointmentComparisonLabel = computed(() => comparisonLabel(overview.value?.today.appointments.comparisonPercentage))
+const salesComparisonLabel = computed(() => comparisonLabel(overview.value?.today.sales.comparisonPercentage))
 
-const totalAppointments = computed(() => todayAppointments.reduce((sum, item) => sum + item.value, 0))
-const consultationsTotal = computed(() => consultations.reduce((sum, item) => sum + item, 0))
-const proceduresTotal = computed(() => procedures.reduce((sum, item) => sum + item.value, 0))
+const weekdayLabel = (date) => new Intl.DateTimeFormat('pt-BR', {
+  weekday: 'short',
+  timeZone: 'UTC'
+}).format(new Date(`${date}T12:00:00Z`)).replace('.', '')
+const formatDayLabel = (date) => {
+  const [, month, day] = String(date || '').split('-')
+  return day && month ? `${day}/${month}` : '—'
+}
+const dashboardToday = computed(() => new Intl.DateTimeFormat('en-CA', {
+  timeZone: overview.value?.timezone || 'America/Sao_Paulo',
+  year: 'numeric', month: '2-digit', day: '2-digit'
+}).format(new Date()))
+const formatDueDate = (date) => {
+  if (date === dashboardToday.value) return 'Vence hoje'
+  const label = formatDayLabel(date)
+  return date < dashboardToday.value ? `Vencida em ${label}` : `Vence em ${label}`
+}
+
+const totalAppointments = computed(() => Number(overview.value?.today.appointments.total || 0))
+const consultationsTotal = computed(() => consultations.value.reduce((sum, item) => sum + item.value, 0))
+const proceduresTotal = computed(() => procedures.value.reduce((sum, item) => sum + item.value, 0))
 const proceduresWithPercentage = computed(() =>
-  procedures.map((item) => ({
+  procedures.value.map((item) => ({
     ...item,
     percentage: proceduresTotal.value ? Math.round((item.value / proceduresTotal.value) * 100) : 0
   }))
 )
 const attendanceRate = computed(() => {
-  const totals = attendance.reduce(
+  const totals = attendance.value.reduce(
     (acc, day) => {
-      acc.confirmed += day.confirmed
-      acc.total += day.confirmed + day.canceled + day.missed
+      acc.confirmed += day.attended
+      acc.total += day.attended + day.canceled + day.missed
       return acc
     },
     { confirmed: 0, total: 0 }
@@ -574,27 +563,27 @@ const attendanceRate = computed(() => {
   return totals.total ? Math.round((totals.confirmed / totals.total) * 100) : 0
 })
 const openSalesTotalPending = computed(() =>
-  openSales.reduce((sum, sale) => sum + Number(sale.amount || 0), 0)
+  Number(overview.value?.finance.openSales.totalPending || 0)
 )
-const openSalesCount = computed(() => openSales.length)
+const openSalesCount = computed(() => Number(overview.value?.finance.openSales.count || 0))
 const criticalStock = computed(() =>
-  (stockData.value?.data || []).map((item) => ({
+  (overview.value?.stock.items || []).map((item) => ({
     ...item,
     currentStockLabel: formatQuantity(item.currentStock),
     minimumStockLabel: formatQuantity(item.minimumStock)
   }))
 )
-const criticalStockCount = computed(() => Number(stockData.value?.meta?.total || 0))
+const criticalStockCount = computed(() => Number(overview.value?.stock.criticalCount || 0))
 
 const financeKpis = computed(() => ({
-  totalPending: dashboardData.value?.kpis?.totalPending || 0,
-  totalPaid: dashboardData.value?.kpis?.totalPaid || 0,
-  expectedTotal: dashboardData.value?.kpis?.expectedTotal || 0,
-  totalOverdue: dashboardData.value?.kpis?.totalOverdue || 0
+  totalPending: overview.value?.finance.payables.totalPending || 0,
+  totalPaid: overview.value?.finance.payables.totalPaid || 0,
+  expectedTotal: overview.value?.finance.payables.expectedTotal || 0,
+  totalOverdue: overview.value?.finance.payables.totalOverdue || 0
 }))
 
 const hasFinanceData = computed(() => Object.values(financeKpis.value).some((value) => value > 0))
-const expenseCategories = computed(() => dashboardData.value?.charts?.categoryPie || [])
+const expenseCategories = computed(() => overview.value?.finance.expenseCategories || [])
 const totalExpenses = computed(() =>
   expenseCategories.value.reduce((sum, item) => sum + Number(item?.value || 0), 0)
 )
@@ -613,7 +602,7 @@ const topExpenseCategory = computed(() => {
 const hasExpenseSummary = computed(() => totalExpenses.value > 0)
 
 const appointmentOption = computed(() => ({
-  color: todayAppointments.map((item) => item.color),
+  color: todayAppointments.value.map((item) => item.color),
   tooltip: { trigger: 'item' },
   legend: { show: false },
   series: [
@@ -631,54 +620,54 @@ const appointmentOption = computed(() => ({
         }
       },
       labelLine: { show: false },
-      data: todayAppointments.map((item) => ({ value: item.value, name: item.label }))
+      data: todayAppointments.value.map((item) => ({ value: item.value, name: item.label }))
     }
   ]
 }))
 
 const proceduresOption = computed(() => ({
-  color: procedures.map((item) => item.color),
+  color: procedures.value.map((item) => item.color),
   tooltip: { trigger: 'item' },
-  series: [{ type: 'pie', radius: ['58%', '78%'], label: { show: false }, data: procedures.map((item) => ({ value: item.value, name: item.label })) }]
+  series: [{ type: 'pie', radius: ['58%', '78%'], label: { show: false }, data: procedures.value.map((item) => ({ value: item.value, name: item.label })) }]
 }))
 
 const salesOption = computed(() => ({
   color: [palette.accent],
   tooltip: { trigger: 'axis' },
   grid: { left: 0, right: 0, top: 8, bottom: 0 },
-  xAxis: { type: 'category', boundaryGap: false, show: false, data: salesTrend.map((_, idx) => idx + 1) },
+  xAxis: { type: 'category', boundaryGap: false, show: false, data: salesTrend.value.map((item) => item.label) },
   yAxis: { type: 'value', show: false },
-  series: [{ type: 'line', data: salesTrend, smooth: true, symbol: 'none', areaStyle: { opacity: 0.12 }, lineStyle: { width: 2 } }]
+  series: [{ type: 'line', data: salesTrend.value.map((item) => item.value), smooth: true, symbol: 'none', areaStyle: { opacity: 0.12 }, lineStyle: { width: 2 } }]
 }))
 
 const consultationsOption = computed(() => ({
   color: [palette.chartBlue],
   tooltip: { trigger: 'axis' },
   grid: { left: '4%', right: '4%', top: 20, bottom: 28, containLabel: true },
-  xAxis: { type: 'category', data: ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10', 'D11', 'D12', 'D13', 'D14'] },
+  xAxis: { type: 'category', data: consultations.value.map((item) => item.label) },
   yAxis: { type: 'value' },
-  series: [{ name: 'Consultas', type: 'line', data: consultations, smooth: true, symbol: 'circle', symbolSize: 6, areaStyle: { opacity: 0.14 }, lineStyle: { width: 3 } }]
+  series: [{ name: 'Consultas', type: 'line', data: consultations.value.map((item) => item.value), smooth: true, symbol: 'circle', symbolSize: 6, areaStyle: { opacity: 0.14 }, lineStyle: { width: 3 } }]
 }))
 
 const revenueOption = computed(() => ({
   tooltip: { trigger: 'axis' },
   grid: { left: '5%', right: '5%', top: 20, bottom: 28, containLabel: true },
-  xAxis: { type: 'category', data: ['1', '4', '7', '10', '13', '16', '19', '22', '25'] },
+  xAxis: { type: 'category', data: revenueData.value.map((item) => item.label) },
   yAxis: { type: 'value' },
-  series: [{ name: 'Faturamento', type: 'bar', barWidth: '45%', data: revenueData, itemStyle: { color: palette.chartBlue } }]
+  series: [{ name: 'Faturamento', type: 'bar', barWidth: '45%', data: revenueData.value.map((item) => item.value), itemStyle: { color: palette.chartBlue } }]
 }))
 
 const pieChartOptions = computed(() => ({
   tooltip: { trigger: 'item', formatter: '{b}: R$ {c} ({d}%)' },
-  series: [{ name: 'Categoria', type: 'pie', radius: '52%', data: dashboardData.value?.charts?.categoryPie || [] }]
+  series: [{ name: 'Categoria', type: 'pie', radius: '52%', data: expenseCategories.value }]
 }))
 
 const barChartOptions = computed(() => {
-  const data = dashboardData.value?.charts?.flowBar || []
+  const data = overview.value?.finance.paymentForecast || []
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     legend: { data: ['Pago', 'Pendente', 'Atrasado'] },
-    xAxis: { type: 'category', data: data.map((d) => `Dia ${d.day}`) },
+    xAxis: { type: 'category', data: data.map((d) => formatDayLabel(d.date)) },
     yAxis: { type: 'value' },
     series: [
       { name: 'Pago', type: 'bar', stack: 'total', itemStyle: { color: '#18a058' }, data: data.map((d) => d.paid) },
@@ -693,12 +682,12 @@ const attendanceOption = computed(() => ({
   tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
   grid: { left: '6%', right: '6%', top: 16, bottom: 28, containLabel: true },
   legend: { show: false },
-  xAxis: { type: 'category', data: attendance.map((item) => item.label) },
+  xAxis: { type: 'category', data: attendance.value.map((item) => item.label) },
   yAxis: { type: 'value' },
   series: [
-    { name: 'Confirmado', type: 'bar', stack: 'attendance', data: attendance.map((item) => item.confirmed), barWidth: '55%' },
-    { name: 'Cancelado', type: 'bar', stack: 'attendance', data: attendance.map((item) => item.canceled) },
-    { name: 'Faltou', type: 'bar', stack: 'attendance', data: attendance.map((item) => item.missed) }
+    { name: 'Compareceu', type: 'bar', stack: 'attendance', data: attendance.value.map((item) => item.attended), barWidth: '55%' },
+    { name: 'Cancelado', type: 'bar', stack: 'attendance', data: attendance.value.map((item) => item.canceled) },
+    { name: 'Faltou', type: 'bar', stack: 'attendance', data: attendance.value.map((item) => item.missed) }
   ]
 }))
 

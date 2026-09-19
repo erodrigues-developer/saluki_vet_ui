@@ -10,7 +10,7 @@
         <div class="brand-icon">
           <ShieldCheck :size="18" :stroke-width="2" />
         </div>
-        <span v-if="!isCollapsedComputed" class="brand-name">SalukiVet</span>
+        <span v-if="!isCollapsedComputed" class="brand-name">Sigma Vet</span>
       </div>
       <button
         v-if="!isCollapsedComputed && !isMobile"

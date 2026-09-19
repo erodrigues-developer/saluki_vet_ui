@@ -113,7 +113,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import DashboardAiMessage from './DashboardAiMessage.vue'
 import DashboardAiSuggestedQuestions from './DashboardAiSuggestedQuestions.vue'
-import { suggestedQuestions } from '~/mocks/dashboardAi.mock'
+import { dashboardSuggestedQuestions as suggestedQuestions } from '~/constants/dashboard'
 import type { AiAction, AiMessage } from '~/types/aiInsight.types'
 
 const props = defineProps<{

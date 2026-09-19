@@ -13,6 +13,36 @@ interface AuthState {
   user: User | null;
 }
 
+interface JwtPayload {
+  exp?: number;
+}
+
+const refreshRequests = new WeakMap<object, Promise<User | null>>();
+
+const isTokenUsable = (token: string) => {
+  try {
+    const payloadPart = token.split('.')[1];
+    if (!payloadPart) return false;
+
+    const normalizedPayload = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedPayload = normalizedPayload.padEnd(
+      Math.ceil(normalizedPayload.length / 4) * 4,
+      '=',
+    );
+    const decodedPayload = atob(paddedPayload);
+    const payloadBytes = Uint8Array.from(decodedPayload, (character) =>
+      character.charCodeAt(0),
+    );
+    const payload = JSON.parse(
+      new TextDecoder().decode(payloadBytes),
+    ) as JwtPayload;
+
+    return typeof payload.exp === 'number' && payload.exp * 1000 > Date.now();
+  } catch {
+    return false;
+  }
+};
+
 export const useAuthStore = defineStore('auth', {
   state: (): AuthState => ({
     token: null,
@@ -78,17 +108,34 @@ export const useAuthStore = defineStore('auth', {
     },
     async refreshUser() {
       if (!this.token) return null;
-      const config = useRuntimeConfig();
-      const response = await $fetch<{ data: { user: User } }>('/api/v1/auth/me', {
-        baseURL: config.public.apiBaseUrl,
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-        },
-      });
-      this.setUser(response.data.user);
-      return this.user;
+
+      const pendingRequest = refreshRequests.get(this);
+      if (pendingRequest) return pendingRequest;
+
+      const request = (async () => {
+        const config = useRuntimeConfig();
+        const response = await $fetch<{ data: { user: User } }>('/api/v1/auth/me', {
+          baseURL: config.public.apiBaseUrl,
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+          },
+        });
+        this.setUser(response.data.user);
+        return this.user;
+      })();
+
+      refreshRequests.set(this, request);
+
+      try {
+        return await request;
+      } finally {
+        refreshRequests.delete(this);
+      }
     },
     clearPersistedAuth() {
+      this.token = null;
+      this.user = null;
+
       const tokenCookie = useCookie<string | null>('auth_token', this.cookieOptions());
       // Remove cookie legado que armazenava usuário completo.
       const legacyUserCookie = useCookie<string | null>('auth_user', this.cookieOptions());
@@ -101,6 +148,11 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     setAuth(token: string, user: User) {
+      if (!isTokenUsable(token)) {
+        this.clearPersistedAuth();
+        return;
+      }
+
       this.token = token;
       this.user = user;
 
@@ -128,25 +180,32 @@ export const useAuthStore = defineStore('auth', {
 
       // Fluxo principal: token vem de cookie, compatível com SSR/CSR.
       if (tokenCookie.value) {
-        this.token = tokenCookie.value;
-        if (process.client) {
-          this.setUserFromStorage(localStorage.getItem('auth_user'));
+        if (isTokenUsable(tokenCookie.value)) {
+          this.token = tokenCookie.value;
+          if (process.client && !this.user) {
+            this.setUserFromStorage(localStorage.getItem('auth_user'));
+          }
+          return;
         }
-        return;
+
+        this.clearPersistedAuth();
       }
 
       this.token = null;
       this.user = null;
 
-      // Migração legada: se só existir localStorage, sobe token para cookie.
+      // Migra apenas tokens legados válidos. Tokens expirados ou malformados são
+      // removidos para não serem regravados no cookie em um ciclo de autenticação.
       if (process.client) {
         const token = localStorage.getItem('auth_token');
         const userStr = localStorage.getItem('auth_user');
 
-        if (token) {
+        if (token && isTokenUsable(token)) {
           this.token = token;
           tokenCookie.value = token;
           this.setUserFromStorage(userStr);
+        } else if (token) {
+          this.clearPersistedAuth();
         }
       }
     }

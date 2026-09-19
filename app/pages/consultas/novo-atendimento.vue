@@ -809,6 +809,7 @@ interface ConsultationBillingProcedureRow {
 const message = useMessage()
 const authStore = useAuthStore()
 const route = useRoute()
+const router = useRouter()
 const saving = ref(false)
 const currentStep = ref(0)
 const isMobile = ref(false)
@@ -1421,6 +1422,29 @@ const readQueryNumber = (key: string) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
+const syncConsultationProgressUrl = async () => {
+  const consultationId = Number(model.id || 0)
+  if (!consultationId || isHydratingConsultation.value) return
+
+  const nextQuery = {
+    ...route.query,
+    id: String(consultationId),
+    step: String(currentStep.value + 1),
+  }
+
+  if (
+    String(route.query.id || '') === nextQuery.id &&
+    String(route.query.step || '') === nextQuery.step
+  ) {
+    return
+  }
+
+  await router.replace({
+    path: route.path,
+    query: nextQuery,
+  })
+}
+
 const resolveInitialStepFromModel = () => {
   const hasAnamnesis = String(model.aiOrganizedComplaint || model.originalComplaint || '').trim().length > 0
   const hasDiagnosis = String(model.diagnosis || '').trim().length > 0 || String(model.treatmentPlan || '').trim().length > 0
@@ -1538,6 +1562,7 @@ const loadConsultationFromRoute = async () => {
     message.error(error?.data?.message || 'Erro ao carregar atendimento clínico')
   } finally {
     isHydratingConsultation.value = false
+    void syncConsultationProgressUrl()
   }
 }
 
@@ -1934,10 +1959,15 @@ const persist = async ({ finalize = false }: { finalize?: boolean } = {}) => {
       const created = await api<any>('/api/v1/consultations', { method: 'POST', body: payload })
       Object.assign(model, { ...model, ...created, id: Number(created.id) })
     }
+    await syncConsultationProgressUrl()
 
-    const inpatientResult = await ensureInpatientReferralCreated()
-    if (inpatientResult === 'created') {
-      message.success('Internação criada automaticamente a partir da consulta.')
+    try {
+      const inpatientResult = await ensureInpatientReferralCreated()
+      if (inpatientResult === 'created') {
+        message.success('Internação criada automaticamente a partir da consulta.')
+      }
+    } catch (error: any) {
+      message.warning(error?.message || 'Atendimento salvo, mas não foi possível criar a internação automaticamente.')
     }
 
     saveStatus.value = 'saved'
@@ -1970,20 +2000,15 @@ const ensureInpatientReferralCreated = async () => {
     if (!String(inpatientReferral.reason || '').trim()) {
       throw new Error('Motivo clínico da internação é obrigatório.')
     }
-    const selectedBox = availableInpatientBoxOptions.value.find((item) => Number(item.value) === Number(inpatientReferral.boxId))
-    if (!selectedBox) {
-      throw new Error('O box selecionado não está mais disponível para internação.')
-    }
 
     const usedConsultationRes = await api<any>('/api/v1/inpatient-records', {
       query: { consultationId: model.id, page: 1, limit: 1 },
     })
     const usedRows = Array.isArray(usedConsultationRes?.data) ? usedConsultationRes.data : []
     if (usedRows.length > 0) {
-      const reused = usedRows.find((item: any) => Number(item.id) !== Number(linkedInpatientRecordId.value || 0))
-      if (reused) {
-        throw new Error('A consulta de origem já foi utilizada em outra internação.')
-      }
+      const currentRecord = usedRows[0]
+      linkedInpatientRecordId.value = Number(currentRecord.id)
+      return 'exists' as const
     }
 
     const existingRes = await api<any>('/api/v1/inpatient-records', {
@@ -1999,6 +2024,11 @@ const ensureInpatientReferralCreated = async () => {
 
     if (rows.length > 0) {
       throw new Error('Paciente já possui uma internação ativa.')
+    }
+
+    const selectedBox = availableInpatientBoxOptions.value.find((item) => Number(item.value) === Number(inpatientReferral.boxId))
+    if (!selectedBox) {
+      throw new Error('Atendimento salvo, mas o box selecionado não está mais disponível para internação.')
     }
 
     const created = await api<any>('/api/v1/inpatient-records', {
@@ -2771,7 +2801,8 @@ const fetchExamSupportData = async () => {
 }
 
 const refreshExamRequestStatus = async () => {
-  if (!model.id) {
+  const consultationId = Number(model.id || 0)
+  if (!consultationId) {
     hasExistingExamRequest.value = false
     consultationExamRequests.value = []
     return
@@ -2784,7 +2815,7 @@ const refreshExamRequestStatus = async () => {
   try {
     const api = useApi()
     const response = await api<any>('/api/v1/exam-requests', {
-      query: { consultationId: model.id },
+      query: { consultationId },
     })
     consultationExamRequests.value = Array.isArray(response?.data) ? response.data : []
     hasExistingExamRequest.value = consultationExamRequests.value.length > 0
@@ -3092,7 +3123,9 @@ const confirmGeneratePrescription = async () => {
 
 const confirmGenerateExamRequest = async () => {
   if (!canCreateExamRequest.value) return
-  if (!model.id || !model.petId) {
+  const consultationId = Number(model.id || 0)
+  const petId = Number(model.petId || 0)
+  if (!consultationId || !petId) {
     message.warning('Salve a consulta com paciente vinculado antes de gerar o pedido.')
     return
   }
@@ -3102,7 +3135,7 @@ const confirmGenerateExamRequest = async () => {
     return
   }
 
-  const examRequestPath = `/atendimento/consultas/${model.id}/exames/imprimir`
+  const examRequestPath = `/atendimento/consultas/${consultationId}/exames/imprimir`
 
   try {
     creatingExamRequest.value = true
@@ -3110,8 +3143,8 @@ const confirmGenerateExamRequest = async () => {
     await api('/api/v1/exam-requests', {
       method: 'POST',
       body: {
-        consultationId: model.id,
-        petId: model.petId,
+        consultationId,
+        petId,
         examTypeIds: selectedIds,
         notes: String(examRequestNotes.value || '').trim() || null,
         requestedAt: new Date().toISOString(),
@@ -3155,6 +3188,14 @@ watch(
     if (step !== 3 || !normalizedSupport) return
     if (lastOpenedClinicalSupportText.value === normalizedSupport) return
     openClinicalSupportChat()
+  },
+  { flush: 'post' },
+)
+
+watch(
+  [() => model.id, currentStep],
+  () => {
+    void syncConsultationProgressUrl()
   },
   { flush: 'post' },
 )
