@@ -95,7 +95,6 @@ const formRef = ref<FormInst | null>(null);
 const message = useMessage();
 const router = useRouter();
 const authStore = useAuthStore();
-const config = useRuntimeConfig();
 
 const loading = ref(false);
 const error = ref('');
@@ -171,8 +170,9 @@ async function handleLogin(e: Event) {
       error.value = '';
 
       try {
-        const response = await $fetch<any>(`${config.public.apiBaseUrl}/api/v1/auth/login`, {
+        const response = await $fetch<any>('/api/v1/auth/login', {
           method: 'POST',
+          headers: { 'X-Sigmavet-Request': '1' },
           body: {
             email: formValue.value.email,
             password: formValue.value.password,
@@ -180,7 +180,7 @@ async function handleLogin(e: Event) {
         });
 
         // Logado com sucesso
-        authStore.setAuth(response.data.access_token, response.data.user);
+        authStore.setAuth(response.data.user, response.data.csrfToken);
         message.success('Bem vindo ao Sigma Vet!');
         router.push('/');
 

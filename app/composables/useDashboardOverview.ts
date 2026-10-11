@@ -1,3 +1,4 @@
+import { useAuthStore } from '~/stores/auth'
 import type { DashboardOverview } from '~/types/dashboard.types'
 
 export const useDashboardOverview = () => {
@@ -5,6 +6,9 @@ export const useDashboardOverview = () => {
   const pending = useState('dashboard-overview:pending', () => false)
   const error = useState<string | null>('dashboard-overview:error', () => null)
   const loaded = useState('dashboard-overview:loaded', () => false)
+  const owner = useState<number | null>('dashboard-overview:owner', () => null)
+  const auth = useAuthStore()
+  if (owner.value !== (auth.user?.id ?? null)) { data.value = null; loaded.value = false; owner.value = auth.user?.id ?? null }
   let activeRequest: Promise<DashboardOverview | null> | null = null
 
   const refresh = async () => {

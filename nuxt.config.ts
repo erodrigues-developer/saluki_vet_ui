@@ -11,7 +11,7 @@ export default defineNuxtConfig({
     port: 3001
   },
   modules: ['nuxtjs-naive-ui', '@pinia/nuxt'],
-  css: ['vfonts/Lato.css', 'vfonts/FiraCode.css'],
+  css: ['~/assets/fonts.css'],
   build: {
     transpile: [
       'naive-ui',
@@ -23,12 +23,7 @@ export default defineNuxtConfig({
     ],
   },
   runtimeConfig: {
-    public: {
-      apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'
-    }
-  },
-  routeRules: {
-    '/api/**': { proxy: `${process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/api/**` }
+    apiUpstream: process.env.NUXT_API_UPSTREAM || process.env.NUXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:3000',
   },
   vite: {
     server: {

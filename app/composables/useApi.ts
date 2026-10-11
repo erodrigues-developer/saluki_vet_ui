@@ -1,38 +1,16 @@
-import { useAuthStore } from '~/stores/auth'
-
+import { useAuthStore } from '~/stores/auth';
+import { createSessionFetch } from '~/utils/session-fetch';
 export const useApi = () => {
-  const authStore = useAuthStore()
-  const config = useRuntimeConfig()
-
-  const apiFetch = $fetch.create({
-    baseURL: config.public.apiBaseUrl,
-    onRequest({ options }) {
-      // Garante reidratação da sessão em refresh/hard reload antes do primeiro request.
-      if (process.client && !authStore.token) {
-        authStore.initAuth()
-      }
-
-      if (authStore.token) {
-        options.headers = {
-          ...options.headers,
-          Authorization: `Bearer ${authStore.token}`,
-        }
-      }
-    },
-    onResponseError({ response }) {
-      if (response.status === 401) {
-        authStore.logout()
-        return
-      }
-
-      if (response.status === 403 && process.client) {
-        const route = useRoute()
-        if (route.path !== '/403') {
-          navigateTo('/403')
-        }
-      }
+  const auth = useAuthStore();
+  const requestFetch = useRequestFetch();
+  const router = useRouter();
+  return createSessionFetch(requestFetch, auth, ({ response }) => {
+    if (response?.status === 401) {
+      auth.clearPersistedAuth();
+      if (import.meta.client) void router.push('/login');
     }
-  })
-
-  return apiFetch
-}
+    if (response?.status === 403 && import.meta.client && router.currentRoute.value.path !== '/403') {
+      void router.push('/403');
+    }
+  });
+};

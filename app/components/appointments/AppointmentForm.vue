@@ -221,7 +221,7 @@ const loadDependencies = async () => {
       api<any>('/api/v1/pets?limit=1000'),
       api<any>('/api/v1/appointment-types?limit=100'),
       api<any>('/api/v1/appointment-statuses?limit=100'),
-      api<any>('/api/v1/users?limit=100')
+      api<any>('/api/v1/users/lookup?limit=100')
     ])
 
     const clients = toArray(clientsRes)

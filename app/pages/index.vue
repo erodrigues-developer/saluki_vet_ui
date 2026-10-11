@@ -26,7 +26,7 @@
         <h2>Hoje</h2>
       </div>
       <div class="kpi-grid">
-        <article class="card kpi-card is-primary" role="button" tabindex="0" @click="goTo('/atendimento/agendamentos')" @keydown.enter="goTo('/atendimento/agendamentos')">
+        <article v-if="overview?.today?.sales" class="card kpi-card is-primary" role="button" tabindex="0" @click="goTo('/atendimento/agendamentos')" @keydown.enter="goTo('/atendimento/agendamentos')">
           <template v-if="bootLoading">
             <div class="skeleton h16 w40"></div>
             <div class="skeleton h34 w30"></div>
@@ -59,7 +59,7 @@
           </template>
         </article>
 
-        <article class="card kpi-card is-primary" role="button" tabindex="0" @click="goTo('/financeiro/vendas')" @keydown.enter="goTo('/financeiro/vendas')">
+        <article v-if="overview?.today?.sales" class="card kpi-card is-primary" role="button" tabindex="0" @click="goTo('/financeiro/vendas')" @keydown.enter="goTo('/financeiro/vendas')">
           <template v-if="bootLoading">
             <div class="skeleton h16 w36"></div>
             <div class="skeleton h34 w42"></div>
@@ -87,7 +87,7 @@
           </template>
         </article>
 
-        <article class="card kpi-card is-primary" role="button" tabindex="0" @click="goTo('/atendimento/agendamentos')" @keydown.enter="goTo('/atendimento/agendamentos')">
+        <article v-if="overview?.today?.sales" class="card kpi-card is-primary" role="button" tabindex="0" @click="goTo('/atendimento/agendamentos')" @keydown.enter="goTo('/atendimento/agendamentos')">
           <template v-if="bootLoading">
             <div class="skeleton h16 w44"></div>
             <div class="skeleton h34 w35"></div>
@@ -121,7 +121,7 @@
           </template>
         </article>
 
-        <article class="card kpi-card is-primary" role="button" tabindex="0" @click="goTo('/estoque/saldos?status=LOW')" @keydown.enter="goTo('/estoque/saldos?status=LOW')">
+        <article v-if="overview?.today?.sales" class="card kpi-card is-primary" role="button" tabindex="0" @click="goTo('/estoque/saldos?status=LOW')" @keydown.enter="goTo('/estoque/saldos?status=LOW')">
           <template v-if="bootLoading">
             <div class="skeleton h16 w36"></div>
             <div class="skeleton h34 w30"></div>
@@ -158,7 +158,7 @@
         <h2>Financeiro</h2>
       </div>
       <div class="mid-grid">
-        <article class="card section-card finance-card">
+        <article v-if="overview?.finance?.payables" class="card section-card finance-card">
           <div class="card-head">
             <div>
               <p class="label">Resumo financeiro</p>
@@ -203,7 +203,7 @@
           <button v-if="canGo('/atendimento/consultas')" class="action-link" @click="goTo('/atendimento/consultas')">Ver atendimentos</button>
         </article>
 
-        <article class="card section-card">
+        <article v-if="overview?.finance?.revenueByDay" class="card section-card">
           <div class="card-head">
             <div>
               <p class="label">Faturamento do mês</p>
@@ -216,7 +216,7 @@
           <button v-if="canGo('/financeiro/vendas')" class="action-link" @click="goTo('/financeiro/vendas')">Ver relatório financeiro</button>
         </article>
 
-        <article class="card section-card">
+        <article v-if="overview?.finance?.expenseCategories" class="card section-card">
           <div class="card-head">
             <div>
               <p class="label">Distribuição de custos</p>
@@ -275,7 +275,7 @@
           <button v-if="canGo('/atendimento/agendamentos')" class="action-link" @click="goTo('/atendimento/agendamentos')">Ver vacinas</button>
         </article>
 
-        <article class="card section-card alert-priority">
+        <article v-if="overview?.finance?.paymentForecast" class="card section-card alert-priority">
           <div class="card-head">
             <div>
               <p class="label">Previsão de pagamentos</p>
@@ -319,7 +319,7 @@
           <button v-if="canGo('/cadastros/procedimentos')" class="action-link" @click="goTo('/cadastros/procedimentos')">Ver procedimentos</button>
         </article>
 
-        <article class="card section-card">
+        <article v-if="overview?.finance?.openSales" class="card section-card">
           <div class="card-head">
             <div>
               <p class="label">Recebimentos pendentes</p>
@@ -487,18 +487,18 @@ const attendance = computed(() => (overview.value?.operation.attendanceLast7Days
   label: weekdayLabel(item.date)
 })))
 const consultations = computed(() => overview.value?.operation.consultationsLast14Days || [])
-const salesTrend = computed(() => overview.value?.today.sales.trend || [])
-const salesToday = computed(() => Number(overview.value?.today.sales.sold || 0))
-const receivedToday = computed(() => Number(overview.value?.today.sales.received || 0))
-const avgTicket = computed(() => Number(overview.value?.today.sales.averageTicket || 0))
+const salesTrend = computed(() => overview.value?.today.sales?.trend || [])
+const salesToday = computed(() => Number(overview.value?.today.sales?.sold || 0))
+const receivedToday = computed(() => Number(overview.value?.today.sales?.received || 0))
+const avgTicket = computed(() => Number(overview.value?.today.sales?.averageTicket || 0))
 const vaccinesSummary = computed(() => overview.value?.today.vaccines || { today: 0, overdue: 0, upcoming: 0, items: [] })
 const vaccinesList = computed(() => vaccinesSummary.value.items.map((item) => ({
   id: item.id,
   name: `${item.petName} · ${item.vaccineName}`,
   when: formatDueDate(item.dueDate)
 })))
-const openSales = computed(() => overview.value?.finance.openSales.items || [])
-const revenueData = computed(() => overview.value?.finance.revenueByDay || [])
+const openSales = computed(() => overview.value?.finance?.openSales?.items || [])
+const revenueData = computed(() => overview.value?.finance?.revenueByDay || [])
 const procedures = computed(() => (overview.value?.operation.procedureMix || []).map((item, index) => ({
   ...item,
   color: chartColors[index % chartColors.length]
@@ -522,7 +522,7 @@ const comparisonLabel = (value) => value === null || value === undefined
   ? 'Sem comparação'
   : `${value > 0 ? '+' : ''}${value}% vs ontem`
 const appointmentComparisonLabel = computed(() => comparisonLabel(overview.value?.today.appointments.comparisonPercentage))
-const salesComparisonLabel = computed(() => comparisonLabel(overview.value?.today.sales.comparisonPercentage))
+const salesComparisonLabel = computed(() => comparisonLabel(overview.value?.today.sales?.comparisonPercentage))
 
 const weekdayLabel = (date) => new Intl.DateTimeFormat('pt-BR', {
   weekday: 'short',
@@ -563,9 +563,9 @@ const attendanceRate = computed(() => {
   return totals.total ? Math.round((totals.confirmed / totals.total) * 100) : 0
 })
 const openSalesTotalPending = computed(() =>
-  Number(overview.value?.finance.openSales.totalPending || 0)
+  Number(overview.value?.finance?.openSales?.totalPending || 0)
 )
-const openSalesCount = computed(() => Number(overview.value?.finance.openSales.count || 0))
+const openSalesCount = computed(() => Number(overview.value?.finance?.openSales?.count || 0))
 const criticalStock = computed(() =>
   (overview.value?.stock.items || []).map((item) => ({
     ...item,
@@ -576,14 +576,14 @@ const criticalStock = computed(() =>
 const criticalStockCount = computed(() => Number(overview.value?.stock.criticalCount || 0))
 
 const financeKpis = computed(() => ({
-  totalPending: overview.value?.finance.payables.totalPending || 0,
-  totalPaid: overview.value?.finance.payables.totalPaid || 0,
-  expectedTotal: overview.value?.finance.payables.expectedTotal || 0,
-  totalOverdue: overview.value?.finance.payables.totalOverdue || 0
+  totalPending: overview.value?.finance?.payables?.totalPending || 0,
+  totalPaid: overview.value?.finance?.payables?.totalPaid || 0,
+  expectedTotal: overview.value?.finance?.payables?.expectedTotal || 0,
+  totalOverdue: overview.value?.finance?.payables?.totalOverdue || 0
 }))
 
 const hasFinanceData = computed(() => Object.values(financeKpis.value).some((value) => value > 0))
-const expenseCategories = computed(() => overview.value?.finance.expenseCategories || [])
+const expenseCategories = computed(() => overview.value?.finance?.expenseCategories || [])
 const totalExpenses = computed(() =>
   expenseCategories.value.reduce((sum, item) => sum + Number(item?.value || 0), 0)
 )
@@ -663,7 +663,7 @@ const pieChartOptions = computed(() => ({
 }))
 
 const barChartOptions = computed(() => {
-  const data = overview.value?.finance.paymentForecast || []
+  const data = overview.value?.finance?.paymentForecast || []
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     legend: { data: ['Pago', 'Pendente', 'Atrasado'] },

@@ -1,213 +1,56 @@
 import { defineStore } from 'pinia';
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  roles: any[];
-  permissions?: string[];
-}
-
-interface AuthState {
-  token: string | null;
-  user: User | null;
-}
-
-interface JwtPayload {
-  exp?: number;
-}
-
-const refreshRequests = new WeakMap<object, Promise<User | null>>();
-
-const isTokenUsable = (token: string) => {
-  try {
-    const payloadPart = token.split('.')[1];
-    if (!payloadPart) return false;
-
-    const normalizedPayload = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
-    const paddedPayload = normalizedPayload.padEnd(
-      Math.ceil(normalizedPayload.length / 4) * 4,
-      '=',
-    );
-    const decodedPayload = atob(paddedPayload);
-    const payloadBytes = Uint8Array.from(decodedPayload, (character) =>
-      character.charCodeAt(0),
-    );
-    const payload = JSON.parse(
-      new TextDecoder().decode(payloadBytes),
-    ) as JwtPayload;
-
-    return typeof payload.exp === 'number' && payload.exp * 1000 > Date.now();
-  } catch {
-    return false;
-  }
-};
-
+interface User { id: number; name: string; email: string; roles: any[]; permissions?: string[] }
+const pending = new WeakMap<object, Promise<User | null>>();
 export const useAuthStore = defineStore('auth', {
-  state: (): AuthState => ({
-    token: null,
-    user: null,
-  }),
+  state: () => ({ user: null as User | null, csrfToken: null as string | null, initialized: false }),
   getters: {
-    isAuthenticated: (state) => !!state.token,
-    isAdmin: (state) => {
-      if (!state.user || !state.user.roles) return false;
-      return state.user.roles.some((r) => r.code === 'ADMIN');
-    },
+    isAuthenticated: (state) => !!state.user,
+    isAdmin: (state) => (state.user?.roles || []).some((r) => r.code === 'ADMIN'),
     permissionSet: (state) => new Set(state.user?.permissions || []),
-    hasPermission: (state) => (permission: string) => {
-      if (!permission) return true;
-      const roles = state.user?.roles || [];
-      if (roles.some((r) => r.code === 'ADMIN')) return true;
-      return (state.user?.permissions || []).includes(permission);
-    },
-    hasAnyPermission: (state) => (permissions: string[]) => {
-      if (!permissions || permissions.length === 0) return true;
-      const roles = state.user?.roles || [];
-      if (roles.some((r) => r.code === 'ADMIN')) return true;
-      return permissions.some((permission) =>
-        (state.user?.permissions || []).includes(permission)
-      );
-    },
-    hasAllPermissions: (state) => (permissions: string[]) => {
-      if (!permissions || permissions.length === 0) return true;
-      const roles = state.user?.roles || [];
-      if (roles.some((r) => r.code === 'ADMIN')) return true;
-      return permissions.every((permission) =>
-        (state.user?.permissions || []).includes(permission)
-      );
-    },
+    hasPermission: (state) => (p: string) => !p || (state.user?.roles || []).some((r) => r.code === 'ADMIN') || (state.user?.permissions || []).includes(p),
+    hasAnyPermission: (state) => (ps: string[]) => !ps.length || (state.user?.roles || []).some((r) => r.code === 'ADMIN') || ps.some((p) => (state.user?.permissions || []).includes(p)),
+    hasAllPermissions: (state) => (ps: string[]) => (state.user?.roles || []).some((r) => r.code === 'ADMIN') || ps.every((p) => (state.user?.permissions || []).includes(p)),
   },
   actions: {
-    cookieOptions() {
-      return {
-        sameSite: 'lax' as const,
-        path: '/',
-      };
-    },
-    setUserFromStorage(userStr: string | null) {
-      if (!userStr) {
-        this.user = null;
-        return;
-      }
-
-      try {
-        this.user = JSON.parse(userStr);
-      } catch (e) {
-        this.user = null;
-        if (process.client) {
-          localStorage.removeItem('auth_user');
-        }
+    removeLegacyStorage() {
+      if (import.meta.client) for (const name of ['auth_token', 'auth_user']) {
+        localStorage.removeItem(name); sessionStorage.removeItem(name);
+        document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
       }
     },
-    setUser(user: User) {
-      this.user = user;
-      if (process.client) {
-        localStorage.setItem('auth_user', JSON.stringify(user));
-      }
+    setAuth(user: User, csrfToken: string) { this.removeLegacyStorage(); this.user = user; this.csrfToken = csrfToken; this.initialized = true; },
+    setUser(user: User) { this.user = user; },
+    clearPersistedAuth() {
+      this.user = null; this.csrfToken = null; this.initialized = true;
+      this.removeLegacyStorage();
     },
     async refreshUser() {
-      if (!this.token) return null;
-
-      const pendingRequest = refreshRequests.get(this);
-      if (pendingRequest) return pendingRequest;
-
+      const existing = pending.get(this); if (existing) return existing;
+      const requestFetch = useRequestFetch();
       const request = (async () => {
-        const config = useRuntimeConfig();
-        const response = await $fetch<{ data: { user: User } }>('/api/v1/auth/me', {
-          baseURL: config.public.apiBaseUrl,
-          headers: {
-            Authorization: `Bearer ${this.token}`,
-          },
-        });
-        this.setUser(response.data.user);
-        return this.user;
+        try {
+          const response = await requestFetch<{ data: { user: User; csrfToken: string } }>('/api/v1/auth/me', { credentials: 'same-origin' });
+          this.setAuth(response.data.user, response.data.csrfToken); return this.user;
+        } catch (error: any) {
+          if (error?.statusCode === 401 || error?.response?.status === 401) { this.clearPersistedAuth(); return null; }
+          throw error;
+        }
       })();
-
-      refreshRequests.set(this, request);
-
-      try {
-        return await request;
-      } finally {
-        refreshRequests.delete(this);
-      }
+      pending.set(this, request);
+      try { return await request; } finally { pending.delete(this); }
     },
-    clearPersistedAuth() {
-      this.token = null;
-      this.user = null;
-
-      const tokenCookie = useCookie<string | null>('auth_token', this.cookieOptions());
-      // Remove cookie legado que armazenava usuário completo.
-      const legacyUserCookie = useCookie<string | null>('auth_user', this.cookieOptions());
-      tokenCookie.value = null;
-      legacyUserCookie.value = null;
-
-      if (process.client) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
-      }
+    async initAuth() { this.removeLegacyStorage(); if (!this.initialized) await this.refreshUser(); },
+    async renew() {
+      const response = await $fetch<{data: {user: User; csrfToken: string}}>('/api/v1/auth/renew', {
+        method: 'POST', headers: { 'X-Sigmavet-Request': '1', 'X-CSRF-Token': this.csrfToken || '' },
+      });
+      this.setAuth(response.data.user, response.data.csrfToken);
     },
-    setAuth(token: string, user: User) {
-      if (!isTokenUsable(token)) {
-        this.clearPersistedAuth();
-        return;
-      }
-
-      this.token = token;
-      this.user = user;
-
-      // Cookie do token é a fonte de verdade para SSR.
-      const tokenCookie = useCookie<string | null>('auth_token', this.cookieOptions());
-      tokenCookie.value = token;
-
-      // Remove cookie legado para não depender de payload grande em cookie.
-      const legacyUserCookie = useCookie<string | null>('auth_user', this.cookieOptions());
-      legacyUserCookie.value = null;
-
-      if (process.client) {
-        localStorage.setItem('auth_token', token);
-        localStorage.setItem('auth_user', JSON.stringify(user));
-      }
-    },
-    logout() {
-      this.token = null;
-      this.user = null;
+    async logout() {
+      // Keep UI session intact if revocation fails; do not pretend logout succeeded.
+      if (this.user) await $fetch('/api/v1/auth/logout', { method: 'POST', headers: { 'X-Sigmavet-Request': '1', 'X-CSRF-Token': this.csrfToken || '' } });
       this.clearPersistedAuth();
-      if (process.client) navigateTo('/login');
+      if (import.meta.client) await navigateTo('/login');
     },
-    initAuth() {
-      const tokenCookie = useCookie<string | null>('auth_token', this.cookieOptions());
-
-      // Fluxo principal: token vem de cookie, compatível com SSR/CSR.
-      if (tokenCookie.value) {
-        if (isTokenUsable(tokenCookie.value)) {
-          this.token = tokenCookie.value;
-          if (process.client && !this.user) {
-            this.setUserFromStorage(localStorage.getItem('auth_user'));
-          }
-          return;
-        }
-
-        this.clearPersistedAuth();
-      }
-
-      this.token = null;
-      this.user = null;
-
-      // Migra apenas tokens legados válidos. Tokens expirados ou malformados são
-      // removidos para não serem regravados no cookie em um ciclo de autenticação.
-      if (process.client) {
-        const token = localStorage.getItem('auth_token');
-        const userStr = localStorage.getItem('auth_user');
-
-        if (token && isTokenUsable(token)) {
-          this.token = token;
-          tokenCookie.value = token;
-          this.setUserFromStorage(userStr);
-        } else if (token) {
-          this.clearPersistedAuth();
-        }
-      }
-    }
   },
 });

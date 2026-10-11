@@ -63,8 +63,7 @@
           <div v-for="message in normalizedMessages" :key="message.id" class="ai-chat-message" :class="messageRoleClass(message.role)">
             <span v-if="message.role !== 'USER'" class="ai-chat-mark small"><AppIcon name="sparkles" :size="12" :stroke-width="2" /></span>
             <div class="ai-chat-bubble" :class="{ action: message.role === 'ACTION' }">
-              <div v-if="message.metadata?.html" v-html="message.content" />
-              <div v-else-if="shouldRenderMarkdown(message.role)" class="ai-chat-markdown" v-html="renderMarkdown(message.content)" />
+              <div v-if="shouldRenderMarkdown(message.role)" class="ai-chat-markdown" v-html="renderMarkdown(message.content)" />
               <p v-else>{{ message.content }}</p>
             </div>
           </div>

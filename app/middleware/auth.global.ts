@@ -8,7 +8,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   // Assegura que recuperou sessão persistida antes de validar a rota.
   if (!authStore.isAuthenticated) {
-    authStore.initAuth();
+    await authStore.initAuth();
   }
 
   if (publicRoutes.includes(to.path)) {

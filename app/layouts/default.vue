@@ -357,8 +357,8 @@ const notifications = computed(() => {
   return [
     data.today.vaccines.overdue > 0 && { id: 'vaccines', title: `${data.today.vaccines.overdue} vacinas atrasadas`, meta: 'Agenda de vacinas', to: '/atendimento/agendamentos', permission: PERMISSIONS.appointmentsView },
     data.stock.criticalCount > 0 && { id: 'stock', title: `${data.stock.criticalCount} itens com estoque crítico`, meta: 'Estoque', to: '/estoque/saldos?status=LOW', permission: PERMISSIONS.stockBalancesView },
-    data.finance.payables.totalOverdue > 0 && { id: 'payables', title: `${formatNotificationCurrency(data.finance.payables.totalOverdue)} em contas atrasadas`, meta: 'Financeiro', to: '/financeiro/contas-a-pagar', permission: PERMISSIONS.accountsPayableView },
-    data.finance.openSales.count > 0 && { id: 'sales', title: `${data.finance.openSales.count} vendas abertas`, meta: 'Vendas', to: '/financeiro/vendas?status=aberta', permission: PERMISSIONS.salesView }
+    data.finance.payables?.totalOverdue > 0 && { id: 'payables', title: `${formatNotificationCurrency(data.finance.payables?.totalOverdue)} em contas atrasadas`, meta: 'Financeiro', to: '/financeiro/contas-a-pagar', permission: PERMISSIONS.accountsPayableView },
+    data.finance.openSales?.count > 0 && { id: 'sales', title: `${data.finance.openSales?.count} vendas abertas`, meta: 'Vendas', to: '/financeiro/vendas?status=aberta', permission: PERMISSIONS.salesView }
   ].filter(Boolean)
 })
 

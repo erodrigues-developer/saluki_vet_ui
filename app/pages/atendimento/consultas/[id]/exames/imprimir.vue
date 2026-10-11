@@ -233,7 +233,7 @@ const fetchData = async () => {
     const [petRes, tutorRes, veterinarianRes] = await Promise.all([
       api<any>(`/api/v1/pets/${consultation.petId}`),
       api<any>(`/api/v1/clients/${consultation.clientId}`),
-      api<any>(`/api/v1/users/${consultation.veterinarianId}`),
+      api<any>(`/api/v1/users/lookup/${consultation.veterinarianId}`),
     ])
 
     Object.assign(pet, petRes || {})

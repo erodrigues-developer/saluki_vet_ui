@@ -184,19 +184,7 @@
 
         <div class="chief-complaint-footer">
           <span class="ai-inline-status" :class="{ live: aiStatusIsLive }">{{ aiHelperText }}</span>
-          <div class="chief-meta">
-            <span v-if="latestAudioBlob" class="meta-chip">
-              {{ audioDurationLabel }}
-            </span>
-            <button
-              v-if="latestAudioBlob"
-              type="button"
-              class="text-action"
-              @click="discardAudioCapture"
-            >
-              Descartar áudio
-            </button>
-          </div>
+
         </div>
       </div>
 
@@ -483,23 +471,16 @@ const appointmentsOptions = ref<{ label: string; value: number; data: any }[]>(
 
 const dictations = ref<any[]>([]);
 const dictationsLoading = ref(false);
-const sendingDictation = ref(false);
-const latestAudioUrl = ref<string | null>(null);
-const latestAudioBlob = ref<Blob | null>(null);
-const latestAudioFileName = ref<string | null>(null);
+const sendingDictation = ref(false)
+const hasBrowserTranscript = ref(false);
 const isRecording = ref(false);
 const isRecordingPaused = ref(false);
-const audioDurationSeconds = ref<number | null>(null);
-const recordingStartedAt = ref<number | null>(null);
 const dismissedSuggestionId = ref<number | null>(null);
 const aiInputDirty = ref(false);
 
-let mediaRecorder: MediaRecorder | null = null;
-let mediaStream: MediaStream | null = null;
 let speechRecognition: BrowserSpeechRecognition | null = null;
 let dictationPoller: ReturnType<typeof setInterval> | null = null;
 let autoSuggestionTimer: ReturnType<typeof setTimeout> | null = null;
-let audioChunks: Blob[] = [];
 
 const model = reactive<ConsultationPayload>({
   appointmentId: null,
@@ -559,13 +540,7 @@ const visibleSuggestion = computed(() => {
   return latestCompletedDictation.value;
 });
 
-const canUseAudioCapture = computed(
-  () =>
-    process.client &&
-    typeof MediaRecorder !== "undefined" &&
-    typeof navigator !== "undefined" &&
-    !!navigator.mediaDevices?.getUserMedia,
-);
+const canUseAudioCapture = computed(() => process.client && !!getSpeechRecognitionCtor());
 
 const canUseSpeechRecognition = computed(
   () => process.client && !!getSpeechRecognitionCtor(),
@@ -586,8 +561,7 @@ const cleanedMainComplaint = computed(() =>
 const canAutoGenerate = computed(
   () =>
     Boolean(model.id) &&
-    (cleanedMainComplaint.value.length >= MIN_AUTOMATION_LENGTH ||
-      !!latestAudioBlob.value),
+    (cleanedMainComplaint.value.length >= MIN_AUTOMATION_LENGTH),
 );
 
 const aiStatusIsLive = computed(
@@ -606,19 +580,6 @@ const aiStatusTagType = computed<"success" | "warning" | "info">(() => {
   if (!model.id) return "warning";
   if (isRecording.value || hasPendingSuggestion.value) return "info";
   return "success";
-});
-
-const audioDurationLabel = computed(() => {
-  if (isRecording.value && isRecordingPaused.value) {
-    return "Gravação pausada";
-  }
-  if (isRecording.value) {
-    return "Gravando áudio";
-  }
-  if (!audioDurationSeconds.value) {
-    return "Áudio capturado";
-  }
-  return `Áudio capturado · ${audioDurationSeconds.value}s`;
 });
 
 const aiHelperText = computed(() => {
@@ -745,7 +706,7 @@ const loadLookups = async () => {
     const [clientsRes, petsRes, usersRes, apptsRes] = await Promise.all([
       api<any>("/api/v1/clients?limit=500"),
       api<any>("/api/v1/pets?limit=1000"),
-      api<any>("/api/v1/users?limit=100"),
+      api<any>("/api/v1/users/lookup?limit=100"),
       api<any>(
         "/api/v1/appointments?sortBy=startsAt&sortDirection=desc&limit=50",
       ),
@@ -859,160 +820,96 @@ const clearAutoSuggestionTimer = () => {
   }
 };
 
-const revokeAudioPreview = () => {
-  if (latestAudioUrl.value) {
-    URL.revokeObjectURL(latestAudioUrl.value);
-    latestAudioUrl.value = null;
-  }
-  latestAudioBlob.value = null;
-  latestAudioFileName.value = null;
-};
-
 const cleanupRecordingResources = () => {
-  if (speechRecognition) {
-    speechRecognition.onresult = null;
-    speechRecognition.onerror = null;
-    speechRecognition.onend = null;
-    speechRecognition = null;
-  }
-
-  if (mediaStream) {
-    mediaStream.getTracks().forEach((track) => track.stop());
-    mediaStream = null;
-  }
-
-  mediaRecorder = null;
   isRecording.value = false;
   isRecordingPaused.value = false;
+  if (speechRecognition) {
+    const recognition = speechRecognition;
+    speechRecognition = null;
+    recognition.onresult = null;
+    recognition.onerror = null;
+    recognition.onend = null;
+    recognition.stop();
+  }
 };
 
 const startSpeechRecognitionSession = () => {
   const recognitionCtor = getSpeechRecognitionCtor();
-  if (!recognitionCtor) {
-    return;
-  }
-
-  speechRecognition = new recognitionCtor();
-  speechRecognition.continuous = true;
-  speechRecognition.interimResults = true;
-  speechRecognition.lang = "pt-BR";
-  speechRecognition.onresult = (event) => {
-    let chunk = "";
-    for (
-      let index = event.resultIndex;
-      index < event.results.length;
-      index += 1
-    ) {
-      const result = event.results[index];
-      if (result?.isFinal) {
-        chunk += `${result[0]?.transcript || ""} `;
-      }
+  if (!recognitionCtor || speechRecognition) return;
+  const baseTranscript = model.mainComplaint || '';
+  const recognition = new recognitionCtor();
+  speechRecognition = recognition;
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'pt-BR';
+  recognition.onresult = (event: BrowserSpeechRecognitionEvent) => {
+    // Results contain the entire session: replace partial text instead of appending it.
+    const parts = [];
+    for (let index = 0; index < event.results.length; index += 1) {
+      parts.push(event.results[index]?.[0]?.transcript || '');
     }
-
-    if (chunk.trim()) {
-      handleChiefComplaintInput(
-        `${model.mainComplaint || ""} ${chunk}`.replace(/\s+/g, " ").trim(),
-      );
-    }
+    hasBrowserTranscript.value = true;
+    handleChiefComplaintInput([baseTranscript, ...parts].join(' ').replace(/\s+/g, ' ').trim());
   };
-  speechRecognition.onerror = () => {
-    message.warning(
-      "Reconhecimento de fala indisponível. Continue digitando ou finalize o áudio para transcrição no backend.",
-    );
+  recognition.onerror = (event: { error?: string }) => {
+    if (event.error === 'no-speech') return;
+    isRecording.value = false;
+    isRecordingPaused.value = false;
+    message.warning('Reconhecimento de fala indisponível. Verifique a permissão do microfone ou continue digitando a transcrição.');
   };
-  speechRecognition.onend = () => {
+  recognition.onend = () => {
+    if (speechRecognition !== recognition) return;
     speechRecognition = null;
+    if (isRecording.value && !isRecordingPaused.value) {
+      try {
+        startSpeechRecognitionSession();
+      } catch (_error) {
+        cleanupRecordingResources();
+        message.warning('Não foi possível retomar o reconhecimento de fala. Inicie o ditado novamente.');
+        scheduleAutoSuggestion(250);
+      }
+    } else if (!isRecording.value) {
+      cleanupRecordingResources();
+      scheduleAutoSuggestion(250);
+    }
   };
-  speechRecognition.start();
+  recognition.start();
 };
 
 const startRecording = async () => {
   if (!canUseAudioCapture.value) {
-    message.warning("O navegador atual não suporta captura de áudio");
+    message.warning('Este navegador não suporta reconhecimento de fala. Digite a transcrição original.');
     return;
   }
-
+  clearAutoSuggestionTimer();
+  isRecording.value = true;
+  isRecordingPaused.value = false;
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    audioChunks = [];
-    revokeAudioPreview();
-    audioDurationSeconds.value = null;
-    recordingStartedAt.value = Date.now();
-
-    mediaRecorder = new MediaRecorder(mediaStream);
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        audioChunks.push(event.data);
-      }
-    };
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(audioChunks, {
-        type: mediaRecorder?.mimeType || "audio/webm",
-      });
-      latestAudioBlob.value = blob;
-      latestAudioFileName.value = `consultation-dictation-${Date.now()}.webm`;
-      latestAudioUrl.value = URL.createObjectURL(blob);
-      if (recordingStartedAt.value) {
-        audioDurationSeconds.value = Math.max(
-          1,
-          Math.round((Date.now() - recordingStartedAt.value) / 1000),
-        );
-      }
-      aiInputDirty.value = true;
-      cleanupRecordingResources();
-      scheduleAutoSuggestion(250);
-    };
-    mediaRecorder.start();
-
-    if (canUseSpeechRecognition.value) {
-      startSpeechRecognitionSession();
-    }
-
-    isRecording.value = true;
-    isRecordingPaused.value = false;
-  } catch (error) {
+    startSpeechRecognitionSession();
+  } catch (_error) {
     cleanupRecordingResources();
-    message.error("Não foi possível acessar o microfone");
+    message.error('Não foi possível iniciar o reconhecimento de fala');
   }
 };
 
 const stopRecording = () => {
+  isRecording.value = false;
+  isRecordingPaused.value = false;
   if (speechRecognition) {
     speechRecognition.stop();
-  }
-  if (mediaRecorder && mediaRecorder.state !== "inactive") {
-    mediaRecorder.stop();
   } else {
     cleanupRecordingResources();
+    scheduleAutoSuggestion(250);
   }
 };
 
 const toggleRecordingPause = () => {
-  if (!mediaRecorder) {
-    return;
-  }
-
-  if (
-    mediaRecorder.state === "recording" &&
-    typeof mediaRecorder.pause === "function"
-  ) {
-    mediaRecorder.pause();
-    if (speechRecognition) {
-      speechRecognition.stop();
-    }
-    isRecordingPaused.value = true;
-    return;
-  }
-
-  if (
-    mediaRecorder.state === "paused" &&
-    typeof mediaRecorder.resume === "function"
-  ) {
-    mediaRecorder.resume();
-    if (!speechRecognition && canUseSpeechRecognition.value) {
-      startSpeechRecognitionSession();
-    }
-    isRecordingPaused.value = false;
+  if (!isRecording.value) return;
+  isRecordingPaused.value = !isRecordingPaused.value;
+  if (isRecordingPaused.value) {
+    speechRecognition?.stop();
+  } else if (!speechRecognition) {
+    startSpeechRecognitionSession();
   }
 };
 
@@ -1033,11 +930,6 @@ const triggerTextImprove = async () => {
   await submitDictation({ silent: false });
 };
 
-const discardAudioCapture = () => {
-  audioDurationSeconds.value = null;
-  revokeAudioPreview();
-};
-
 const handleChiefComplaintInput = (value: string) => {
   model.mainComplaint = value;
   aiInputDirty.value = true;
@@ -1051,7 +943,7 @@ const handleChiefComplaintInput = (value: string) => {
 const submitDictation = async ({
   silent = true,
 }: { silent?: boolean } = {}) => {
-  if (!model.id || !canAutoGenerate.value || hasPendingSuggestion.value) {
+  if (isRecording.value || !model.id || !canAutoGenerate.value || hasPendingSuggestion.value) {
     return;
   }
 
@@ -1065,29 +957,15 @@ const submitDictation = async ({
     }
     formData.append(
       "captureSource",
-      latestAudioBlob.value ? "BROWSER_AUDIO" : "MANUAL_TEXT",
+      hasBrowserTranscript.value ? "BROWSER_AUDIO" : "MANUAL_TEXT",
     );
     formData.append("language", "pt-BR");
-    if (audioDurationSeconds.value) {
-      formData.append(
-        "audioDurationSeconds",
-        String(audioDurationSeconds.value),
-      );
-    }
-    if (latestAudioBlob.value) {
-      formData.append(
-        "audioFile",
-        latestAudioBlob.value,
-        latestAudioFileName.value || "consultation-dictation.webm",
-      );
-    }
-
     await api(`/api/v1/consultations/${model.id}/dictations`, {
       method: "POST",
       body: formData,
     });
     aiInputDirty.value = false;
-    discardAudioCapture();
+    hasBrowserTranscript.value = false;
     if (!silent) {
       message.success("Sugestão automática atualizada");
     }
@@ -1104,6 +982,7 @@ const submitDictation = async ({
 const scheduleAutoSuggestion = (delay = 1100) => {
   clearAutoSuggestionTimer();
   if (
+    isRecording.value ||
     !canAutoGenerate.value ||
     hasPendingSuggestion.value ||
     !aiInputDirty.value
@@ -1257,7 +1136,7 @@ watch(
 
     const hasAutomationInput =
       normalizeFreeText(value?.mainComplaint ?? "").length >=
-        MIN_AUTOMATION_LENGTH || !!latestAudioBlob.value;
+        MIN_AUTOMATION_LENGTH;
     const hasProcessedSuggestion = dictations.value.some((item) =>
       ["PENDING", "PROCESSING", "COMPLETED"].includes(item.status),
     );
@@ -1292,7 +1171,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   stopRecording();
   cleanupRecordingResources();
-  revokeAudioPreview();
+
   stopDictationPolling();
   clearAutoSuggestionTimer();
 });

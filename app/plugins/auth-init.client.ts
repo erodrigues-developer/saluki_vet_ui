@@ -1,6 +1,2 @@
 import { useAuthStore } from '~/stores/auth'
-
-export default defineNuxtPlugin(() => {
-  const authStore = useAuthStore()
-  authStore.initAuth()
-})
+export default defineNuxtPlugin(async () => { await useAuthStore().initAuth() })

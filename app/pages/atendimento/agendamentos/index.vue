@@ -1408,7 +1408,7 @@ const loadLookups = async () => {
   const [statusesRes, typesRes, usersRes, clientsRes, petsRes, speciesRes, breedsRes] = await Promise.all([
     api<any>('/api/v1/appointment-statuses?limit=100'),
     api<any>('/api/v1/appointment-types?limit=100'),
-    api<any>('/api/v1/users?limit=100'),
+    api<any>('/api/v1/users/lookup?limit=100'),
     api<any>('/api/v1/clients?limit=500'),
     api<any>('/api/v1/pets?limit=1000'),
     api<any>('/api/v1/species?limit=100'),

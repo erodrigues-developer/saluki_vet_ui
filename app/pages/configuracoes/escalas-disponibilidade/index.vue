@@ -431,11 +431,9 @@ const removeEditingPeriod = () => {
 
 const loadLookups = async () => {
   const api = useApi()
-  const usersRes = await api<any>('/api/v1/users', { query: { page: 1, limit: 200 } })
+  const usersRes = await api<any>('/api/v1/users/lookup', { query: { page: 1, limit: 200 } })
   const users = Array.isArray(usersRes?.data) ? usersRes.data : []
-  const veterinarians = users.filter((u: any) =>
-    Array.isArray(u?.roles) && u.roles.some((role: any) => String(role?.code || '').toUpperCase() === 'VET'),
-  )
+  const veterinarians = users
   veterinarianOptions.value = veterinarians.map((u: any) => ({ label: u.name, value: Number(u.id) }))
 }
 

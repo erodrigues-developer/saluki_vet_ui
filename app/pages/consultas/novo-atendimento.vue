@@ -148,29 +148,33 @@
 
           <div class="manual-input-box complaint-split">
             <p class="textarea-label">Transcrição original da consulta</p>
-            <n-input
-              v-model:value="model.originalComplaint"
-              type="textarea"
-              :autosize="{ minRows: 4, maxRows: 8 }"
-              :readonly="isOriginalTranscriptReadonly"
-              :disabled="isConsultationReadOnly"
-              placeholder="Disponível para digitação manual apenas antes da primeira gravação."
-              @update:value="onOriginalComplaintChange"
-            />
-            <div v-if="model.aiOrganizedComplaint" class="accepted-anamnesis-box">
+            <div class="transcript-preview-row">
+              <n-input
+                :value="model.originalComplaint"
+                type="textarea"
+                :autosize="{ minRows: 2, maxRows: 3 }"
+                readonly
+                placeholder="A transcrição aparecerá aqui durante o ditado."
+              />
+              <n-button tertiary size="small" @click="transcriptModalVisible = true">Ver transcrição completa</n-button>
+            </div>
+            <div v-if="hasPendingSuggestion" class="anamnesis-loading" role="status" aria-live="polite">
+              <n-spin :size="16" />
+              <span>Carregando sugestão de anamnese</span>
+            </div>
+            <div class="accepted-anamnesis-box">
               <div class="accepted-anamnesis-head">
                 <div>
-                  <p class="textarea-label">Anamnese em uso no prontuário</p>
-                  <span>O texto sugerido foi aplicado e pode ser editado livremente pelo veterinário.</span>
+                  <p class="textarea-label">Anamnese</p>
+                  <span>Digite a anamnese ou utilize a sugestão da IA e edite o texto conforme necessário.</span>
                 </div>
-                <n-tag type="success" size="small" round>Texto utilizado</n-tag>
               </div>
               <n-input
                 :value="model.aiOrganizedComplaint"
                 type="textarea"
                 :autosize="{ minRows: 5, maxRows: 10 }"
                 :disabled="isConsultationReadOnly"
-                placeholder="Edite a anamnese antes de avançar."
+                placeholder="Digite a anamnese da consulta..."
                 @update:value="onAiOrganizedComplaintChange"
               />
             </div>
@@ -181,6 +185,20 @@
           </div>
           <n-alert v-if="aiHasError" type="error" class="ai-error" :show-icon="false">{{ aiErrorMessage || 'Erro ao processar' }}</n-alert>
         </n-card>
+        <n-modal v-model:show="transcriptModalVisible" preset="card" class="prescription-modal transcript-modal" :mask-closable="false">
+          <template #header>
+            <div class="modal-head">
+              <h3 class="modal-title">Transcrição original da consulta</h3>
+              <p class="modal-subtitle">Texto completo para leitura.</p>
+            </div>
+          </template>
+          <p class="transcript-full-text">{{ model.originalComplaint || 'Nenhuma transcrição disponível.' }}</p>
+          <template #footer>
+            <div class="modal-actions">
+              <n-button tertiary @click="transcriptModalVisible = false">Fechar</n-button>
+            </div>
+          </template>
+        </n-modal>
         <n-modal v-model:show="suggestionModalVisible" preset="card" class="suggestion-modal" title="Texto completo" :mask-closable="true">
           <div class="suggestion-modal-body">
             <p class="suggestion-modal-label">{{ suggestionModalTitle }}</p>
@@ -561,8 +579,7 @@
             <section class="review-block">
               <div class="review-block-head"><h4>Relato clínico</h4><button type="button" class="edit-link" @click="setCurrentStep(2)">{{ reviewNavigationLabel }}</button></div>
               <p><strong>Relato original:</strong> {{ model.originalComplaint || 'Ainda não registrado' }}</p>
-              <p><strong>Queixa final:</strong> {{ model.mainComplaint || 'Ainda não registrado' }}</p>
-              <p><strong>Anamnese organizada:</strong> {{ model.aiOrganizedComplaint || 'Ainda não registrado' }}</p>
+              <p><strong>Anamnese:</strong> {{ model.aiOrganizedComplaint || 'Ainda não registrado' }}</p>
               <p><strong>Texto sugerido:</strong> {{ model.anamnesisApproved ? 'Utilizado' : 'Pendente' }}</p>
             </section>
             <section class="review-block">
@@ -696,6 +713,8 @@
           <h4>Resumo do paciente</h4>
           <p><strong>Tutor:</strong> {{ clientLabel }}</p>
           <p><strong>Paciente:</strong> {{ petLabel }}</p>
+          <p><strong>Espécie:</strong> {{ selectedPet?.species?.name || 'Não informado' }}</p>
+          <p><strong>Raça:</strong> {{ selectedPet?.breed?.name || 'Não informado' }}</p>
           <p><strong>Veterinário:</strong> {{ veterinarianLabel }}</p>
           <p><strong>Peso:</strong> {{ model.weightKg || 'N/I' }} kg</p>
           <p><strong>Temperatura:</strong> {{ model.temperatureC || 'N/I' }} °C</p>
@@ -820,6 +839,8 @@ const showOptionalVitals = ref(false)
 const recordingElapsedSeconds = ref(0)
 const completedSteps = ref<Set<number>>(new Set())
 const appointmentPrefilledFeedback = ref(false)
+const transcriptModalVisible = ref(false)
+const manualAnamnesis = ref(false)
 const suggestionModalVisible = ref(false)
 const suggestionModalTitle = ref('')
 const suggestionModalContent = ref('')
@@ -1007,11 +1028,9 @@ const hasExistingPrescription = ref(false)
 
 const dictations = ref<any[]>([])
 const sendingDictation = ref(false)
-const latestAudioBlob = ref<Blob | null>(null)
-const latestAudioFileName = ref<string | null>(null)
+const hasBrowserTranscript = ref(false)
 const isRecording = ref(false)
 const isRecordingPaused = ref(false)
-const audioDurationSeconds = ref<number | null>(null)
 const aiInputDirty = ref(false)
 const isHydratingConsultation = ref(false)
 const lastSubmittedSuggestionText = ref('')
@@ -1024,12 +1043,9 @@ const blockDecisions = reactive<{ complaint: 'pending' | 'confirmed' | 'edited' 
   anamnesis: 'pending'
 })
 let recordingStartedAt: number | null = null
-let mediaRecorder: MediaRecorder | null = null
-let mediaStream: MediaStream | null = null
 let dictationPoller: ReturnType<typeof setInterval> | null = null
 let autoSuggestionTimer: ReturnType<typeof setTimeout> | null = null
 let speechRecognition: any = null
-let audioChunks: Blob[] = []
 let recordingTicker: ReturnType<typeof setInterval> | null = null
 
 const billingProcedureForm = reactive<{
@@ -1083,12 +1099,10 @@ const cleanedMainComplaint = computed(() =>
     .trim(),
 )
 const normalizedAutoSuggestionText = computed(() => normalizeSuggestionText(cleanedMainComplaint.value))
-const canUseAudioCapture = computed(() => canUseConsultationAi.value && process.client && typeof MediaRecorder !== 'undefined' && typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia)
+const canUseAudioCapture = computed(() => canUseConsultationAi.value && process.client && !!getSpeechRecognitionCtor())
 const hasPendingSuggestion = computed(() => sendingDictation.value || dictations.value.some((item) => ['PENDING', 'PROCESSING'].includes(item.status)))
-const canAutoGenerate = computed(() => canUseConsultationAi.value && Boolean(model.id) && (cleanedMainComplaint.value.length >= MIN_AUTOMATION_LENGTH || !!latestAudioBlob.value))
+const canAutoGenerate = computed(() => canUseConsultationAi.value && Boolean(model.id) && (cleanedMainComplaint.value.length >= MIN_AUTOMATION_LENGTH))
 const hasExistingTranscript = computed(() => String(model.originalComplaint || '').trim().length > 0)
-const hasPersistedAudio = computed(() => dictations.value.some((item) => Boolean(item.audioFileName)))
-const isOriginalTranscriptReadonly = computed(() => hasPersistedAudio.value || isRecording.value || hasPendingSuggestion.value)
 const latestCompletedDictation = computed(() => dictations.value.find((item) => item.status === 'COMPLETED') || null)
 const visibleSuggestion = computed(() => {
   if (!latestCompletedDictation.value) return null
@@ -1127,9 +1141,9 @@ const aiHelperText = computed(() => {
   if (!model.id) return 'Salve os dados do contexto para liberar o ditado com IA.'
   if (aiHasError.value) return 'Erro no processamento do ditado. Tente novamente.'
   if (isRecording.value) return 'Fale naturalmente.'
-  if (hasPendingSuggestion.value) return 'A IA está transcrevendo e estruturando a queixa.'
+  if (hasPendingSuggestion.value) return 'Carregando sugestão de anamnese'
   if (showSuggestionReadyActions.value) return 'Revise a anamnese sugerida no chat e utilize o texto se estiver correto.'
-  return 'Dite a conversa da anamnese. A IA irá transcrever e organizar o conteúdo.'
+  return 'Digite a anamnese ou use o ditado para receber uma sugestão da IA.'
 })
 const saveStatusLabel = computed(() => {
   if (saveStatus.value === 'saving') return 'Salvando alterações...'
@@ -1345,6 +1359,7 @@ const triageRiskLabel = (value: string | null | undefined) => {
 
 const clientLabel = computed(() => clientOptions.value.find((c) => c.value === model.clientId)?.label || 'Não informado')
 const petLabel = computed(() => petOptions.value.find((p) => p.value === model.petId)?.label || 'Não informado')
+const selectedPet = computed(() => allPets.value.find((pet) => Number(pet.id) === model.petId))
 const veterinarianLabel = computed(() => veterinarianOptions.value.find((v) => v.value === model.veterinarianId)?.label || 'Não informado')
 const inpatientBoxLabel = computed(() => availableInpatientBoxOptions.value.find((item) => item.value === inpatientReferral.boxId)?.label || '')
 const isExistingConsultation = computed(() => Boolean(model.id))
@@ -1379,7 +1394,7 @@ const loadLookups = async () => {
     const [clientsRes, petsRes, usersRes, apptsRes, boxesRes, proceduresRes] = await Promise.all([
       canViewClients.value ? api<any>('/api/v1/clients?limit=500') : Promise.resolve({ data: [] }),
       canViewPets.value ? api<any>('/api/v1/pets?limit=1000') : Promise.resolve({ data: [] }),
-      api<any>('/api/v1/users?limit=100'),
+      api<any>('/api/v1/users/lookup?limit=100'),
       canViewAppointments.value ? api<any>('/api/v1/appointments?sortBy=startsAt&sortDirection=desc&limit=50') : Promise.resolve({ data: [] }),
       api<any>('/api/v1/boxes?isActive=true'),
       api<any>('/api/v1/procedures?limit=500'),
@@ -1864,7 +1879,7 @@ const buildAiReviewAudit = () => {
   return [
     {
       blockType: 'anamnesis',
-      aiSuggestedText: String(model.aiOrganizedComplaint || '').trim() || null,
+      aiSuggestedText: String(suggestedAnamnesisText.value || '').trim() || null,
       finalText: String(model.mainComplaint || '').trim() || null,
       action: model.anamnesisApproved ? 'confirmed' : 'pending',
       timestamp: now
@@ -2228,7 +2243,7 @@ const hydrateDraftFromLatestSuggestion = () => {
     const normalizedSuggestion = String(organizedAnamnesis).trim()
     suggestedAnamnesisText.value = normalizedSuggestion
     suggestedAnamnesisDictationId.value = Number(latest.id)
-    if (String(model.aiOrganizedComplaint || '').trim() !== normalizedSuggestion) {
+    if (!manualAnamnesis.value && String(model.aiOrganizedComplaint || '').trim() !== normalizedSuggestion) {
       model.anamnesisApproved = false
       model.anamnesisApprovedAt = null
       model.anamnesisApprovedByUserId = null
@@ -2251,32 +2266,21 @@ const clearAutoSuggestionTimer = () => {
   }
 }
 
-const discardAudioCapture = () => {
-  latestAudioBlob.value = null
-  latestAudioFileName.value = null
-  audioDurationSeconds.value = null
-}
-
 const cleanupRecordingResources = () => {
-  if (recordingTicker) {
-    clearInterval(recordingTicker)
-    recordingTicker = null
-  }
+  isRecording.value = false;
+  isRecordingPaused.value = false;
   if (speechRecognition) {
-    speechRecognition.onresult = null
-    speechRecognition.onerror = null
-    speechRecognition.onend = null
-    speechRecognition = null
+    const recognition = speechRecognition;
+    speechRecognition = null;
+    recognition.onresult = null;
+    recognition.onerror = null;
+    recognition.onend = null;
+    recognition.stop();
   }
-  if (mediaStream) {
-    mediaStream.getTracks().forEach((track) => track.stop())
-    mediaStream = null
-  }
-  mediaRecorder = null
-  isRecording.value = false
-  isRecordingPaused.value = false
-  recordingElapsedSeconds.value = 0
-}
+  if (recordingTicker) clearInterval(recordingTicker);
+  recordingTicker = null;
+  recordingElapsedSeconds.value = 0;
+};
 
 const getSpeechRecognitionCtor = () => {
   if (!process.client) return null
@@ -2285,93 +2289,89 @@ const getSpeechRecognitionCtor = () => {
 }
 
 const startSpeechRecognitionSession = () => {
-  const recognitionCtor = getSpeechRecognitionCtor()
-  if (!recognitionCtor) return
-  speechRecognition = new recognitionCtor()
-  speechRecognition.continuous = true
-  speechRecognition.interimResults = true
-  speechRecognition.lang = 'pt-BR'
-  speechRecognition.onresult = (event: any) => {
-    let chunk = ''
-    for (let index = event.resultIndex; index < event.results.length; index += 1) {
-      const result = event.results[index]
-      if (result?.isFinal) chunk += `${result[0]?.transcript || ''} `
+  const recognitionCtor = getSpeechRecognitionCtor();
+  if (!recognitionCtor || speechRecognition) return;
+  const baseTranscript = model.originalComplaint || '';
+  const recognition = new recognitionCtor();
+  speechRecognition = recognition;
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'pt-BR';
+  recognition.onresult = (event: any) => {
+    // Results contain the entire session: replace partial text instead of appending it.
+    const parts = [];
+    for (let index = 0; index < event.results.length; index += 1) {
+      parts.push(event.results[index]?.[0]?.transcript || '');
     }
-    if (chunk.trim()) onOriginalComplaintChange(`${model.originalComplaint || ''} ${chunk}`.replace(/\s+/g, ' ').trim())
-  }
-  speechRecognition.onerror = () => {
-    message.warning('Reconhecimento de fala indisponível. Continue digitando ou finalize o áudio para transcrição no backend.')
-  }
-  speechRecognition.onend = () => { speechRecognition = null }
-  speechRecognition.start()
-}
+    hasBrowserTranscript.value = true;
+    onOriginalComplaintChange([baseTranscript, ...parts].join(' ').replace(/\s+/g, ' ').trim(), true);
+  };
+  recognition.onerror = (event: { error?: string }) => {
+    if (event.error === 'no-speech') return;
+    isRecording.value = false;
+    isRecordingPaused.value = false;
+    message.warning('Reconhecimento de fala indisponível. Verifique a permissão do microfone ou continue digitando a transcrição.');
+  };
+  recognition.onend = () => {
+    if (speechRecognition !== recognition) return;
+    speechRecognition = null;
+    if (isRecording.value && !isRecordingPaused.value) {
+      try {
+        startSpeechRecognitionSession();
+      } catch (_error) {
+        cleanupRecordingResources();
+        message.warning('Não foi possível retomar o reconhecimento de fala. Inicie o ditado novamente.');
+        scheduleAutoSuggestion(250);
+      }
+    } else if (!isRecording.value) {
+      cleanupRecordingResources();
+      scheduleAutoSuggestion(250);
+    }
+  };
+  recognition.start();
+};
 
 const startRecording = async () => {
   if (!canUseAudioCapture.value) {
-    message.warning('O navegador atual não suporta captura de áudio')
-    return
+    message.warning('Este navegador não suporta reconhecimento de fala. Digite a transcrição original.');
+    return;
   }
-
+  clearAutoSuggestionTimer();
+  isRecording.value = true;
+  isRecordingPaused.value = false;
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    audioChunks = []
-    audioDurationSeconds.value = null
-    recordingStartedAt = Date.now()
-
-    mediaRecorder = new MediaRecorder(mediaStream)
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) audioChunks.push(event.data)
-    }
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(audioChunks, { type: mediaRecorder?.mimeType || 'audio/webm' })
-      latestAudioBlob.value = blob
-      latestAudioFileName.value = `consultation-dictation-${Date.now()}.webm`
-      if (recordingStartedAt) audioDurationSeconds.value = Math.max(1, Math.round((Date.now() - recordingStartedAt) / 1000))
-      aiInputDirty.value = true
-      cleanupRecordingResources()
-      scheduleAutoSuggestion(250)
-    }
-    mediaRecorder.start()
-    recordingElapsedSeconds.value = 0
+    startSpeechRecognitionSession();
+    recordingStartedAt = Date.now();
+    recordingElapsedSeconds.value = 0;
     recordingTicker = setInterval(() => {
-      if (!recordingStartedAt) return
-      recordingElapsedSeconds.value = Math.max(0, Math.round((Date.now() - recordingStartedAt) / 1000))
-    }, 1000)
-
-    if (getSpeechRecognitionCtor()) startSpeechRecognitionSession()
-
-    isRecording.value = true
-    isRecordingPaused.value = false
+      if (recordingStartedAt && !isRecordingPaused.value) recordingElapsedSeconds.value += 1;
+    }, 1000);
   } catch (_error) {
-    cleanupRecordingResources()
-    aiErrorMessage.value = 'Erro ao processar'
-    message.error('Não foi possível acessar o microfone')
+    cleanupRecordingResources();
+    message.error('Não foi possível iniciar o reconhecimento de fala');
   }
-}
+};
 
 const stopRecording = () => {
-  if (speechRecognition) speechRecognition.stop()
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop()
+  isRecording.value = false;
+  isRecordingPaused.value = false;
+  if (speechRecognition) {
+    speechRecognition.stop();
   } else {
-    cleanupRecordingResources()
+    cleanupRecordingResources();
+    scheduleAutoSuggestion(250);
   }
-}
+};
 
 const toggleRecordingPause = () => {
-  if (!mediaRecorder) return
-  if (mediaRecorder.state === 'recording' && typeof mediaRecorder.pause === 'function') {
-    mediaRecorder.pause()
-    if (speechRecognition) speechRecognition.stop()
-    isRecordingPaused.value = true
-    return
+  if (!isRecording.value) return;
+  isRecordingPaused.value = !isRecordingPaused.value;
+  if (isRecordingPaused.value) {
+    speechRecognition?.stop();
+  } else if (!speechRecognition) {
+    startSpeechRecognitionSession();
   }
-  if (mediaRecorder.state === 'paused' && typeof mediaRecorder.resume === 'function') {
-    mediaRecorder.resume()
-    if (!speechRecognition && getSpeechRecognitionCtor()) startSpeechRecognitionSession()
-    isRecordingPaused.value = false
-  }
-}
+};
 
 const handleMicrophoneAction = async () => {
   if (!canUseConsultationAi.value) return
@@ -2382,8 +2382,8 @@ const handleMicrophoneAction = async () => {
   await startRecording()
 }
 
-const onOriginalComplaintChange = (value: string) => {
-  if (isOriginalTranscriptReadonly.value) return
+const onOriginalComplaintChange = (value: string, fromSpeechRecognition = false) => {
+  if (isConsultationReadOnly.value || !fromSpeechRecognition) return
   model.originalComplaint = value
   if (isHydratingConsultation.value) return
   const normalizedValue = normalizeSuggestionText(value)
@@ -2397,12 +2397,15 @@ const onOriginalComplaintChange = (value: string) => {
 }
 
 const onAiOrganizedComplaintChange = (value: string) => {
+  if (isConsultationReadOnly.value) return
   model.aiOrganizedComplaint = value
   model.mainComplaint = value
   model.assistedAnamnesisSummary = value
   model.clinicalFindings = value
-  aiInputDirty.value = true
-  dismissedSuggestionId.value = null
+  manualAnamnesis.value = true
+  model.anamnesisApproved = Boolean(value.trim())
+  model.anamnesisApprovedAt = null
+  model.anamnesisApprovedByUserId = null
 }
 
 const openConsultationChat = async () => {
@@ -2539,6 +2542,7 @@ const useSuggestedAnamnesis = async () => {
   }
   try {
     savingAnamnesisApproval.value = true
+    manualAnamnesis.value = false
     model.aiOrganizedComplaint = suggestion
     model.mainComplaint = suggestion
     model.assistedAnamnesisSummary = suggestion
@@ -2564,9 +2568,9 @@ const useSuggestedAnamnesis = async () => {
 }
 
 const submitDictation = async ({ silent = true }: { silent?: boolean } = {}) => {
-  if (!model.id || !canAutoGenerate.value || hasPendingSuggestion.value) return
+  if (isRecording.value || !model.id || !canAutoGenerate.value || hasPendingSuggestion.value) return
   const draftText = normalizedAutoSuggestionText.value
-  if (!latestAudioBlob.value && draftText === lastSubmittedSuggestionText.value) {
+  if (draftText === lastSubmittedSuggestionText.value) {
     aiInputDirty.value = false
     return
   }
@@ -2577,15 +2581,13 @@ const submitDictation = async ({ silent = true }: { silent?: boolean } = {}) => 
     const api = useApi()
     const formData = new FormData()
     if (draftText) formData.append('transcriptDraft', draftText)
-    formData.append('captureSource', latestAudioBlob.value ? 'BROWSER_AUDIO' : 'MANUAL_TEXT')
+    formData.append('captureSource', hasBrowserTranscript.value ? 'BROWSER_AUDIO' : 'MANUAL_TEXT')
     formData.append('language', 'pt-BR')
-    if (audioDurationSeconds.value) formData.append('audioDurationSeconds', String(audioDurationSeconds.value))
-    if (latestAudioBlob.value) formData.append('audioFile', latestAudioBlob.value, latestAudioFileName.value || 'consultation-dictation.webm')
 
     await api(`/api/v1/consultations/${model.id}/dictations`, { method: 'POST', body: formData })
     aiInputDirty.value = false
     lastSubmittedSuggestionText.value = draftText
-    discardAudioCapture()
+    hasBrowserTranscript.value = false
     if (!silent) message.success('Sugestão automática atualizada')
     await loadDictations()
   } catch (error: any) {
@@ -2598,8 +2600,8 @@ const submitDictation = async ({ silent = true }: { silent?: boolean } = {}) => 
 
 const scheduleAutoSuggestion = (delay = 1100) => {
   clearAutoSuggestionTimer()
-  if (!canAutoGenerate.value || hasPendingSuggestion.value || !aiInputDirty.value) return
-  if (!latestAudioBlob.value && normalizedAutoSuggestionText.value === lastSubmittedSuggestionText.value) {
+  if (isRecording.value || !canAutoGenerate.value || hasPendingSuggestion.value || !aiInputDirty.value) return
+  if (normalizedAutoSuggestionText.value === lastSubmittedSuggestionText.value) {
     aiInputDirty.value = false
     return
   }
@@ -3173,7 +3175,7 @@ const confirmGenerateExamRequest = async () => {
 watch(
   [currentStep, suggestedAnamnesisText, () => model.anamnesisApproved],
   ([step, suggestion, approved]) => {
-    if (step !== 2 || approved) return
+    if (step !== 2 || approved || manualAnamnesis.value) return
     if (!String(suggestion || '').trim()) return
     if (consultationAiChatVisible.value && consultationAiMode.value === 'anamnesis') return
     openAnamnesisChat()
@@ -3461,6 +3463,10 @@ h1 { margin: 0; font-size: 22px; line-height: 1.1; }
 .suggestion-action-btn { min-height: 30px; padding: 0 8px; }
 .state-box { border: 1px dashed #cbd5e1; border-radius: 12px; padding: 14px; color: #475569; }
 .responsibility-note { margin: 10px 0 0; font-size: 12px; color: #475569; }
+.transcript-preview-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.transcript-preview-row > .n-input { flex: 1 1 260px; min-width: 0; }
+.transcript-full-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; color: #334155; }
+.anamnesis-loading { display: flex; align-items: center; gap: 8px; padding: 10px 0; color: #475569; font-size: 13px; }
 .suggestion-modal { max-width: 640px; }
 .suggestion-modal-body { display: flex; flex-direction: column; gap: 8px; }
 .suggestion-modal-label { margin: 0; font-size: 12px; color: #64748b; }

@@ -697,7 +697,7 @@ const payoutColumns = [
 const fetchUsers = async () => {
   try {
     const api = useApi();
-    const response = await api<any>('/api/v1/users', {
+    const response = await api<any>('/api/v1/users/lookup', {
       query: {
         page: 1,
         limit: 200,

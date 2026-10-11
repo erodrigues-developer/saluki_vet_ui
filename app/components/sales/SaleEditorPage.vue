@@ -1215,7 +1215,7 @@ const loadLookups = async () => {
         ? api<any>("/api/v1/clients?limit=500")
         : Promise.resolve({ data: [] }),
       canViewUsers.value
-        ? api<any>("/api/v1/users?limit=100")
+        ? api<any>("/api/v1/users/lookup?limit=100")
         : Promise.resolve({ data: [] }),
       canViewProducts.value
         ? api<any>("/api/v1/products?limit=500")
@@ -2520,7 +2520,7 @@ const updateIsMobile = () => {
 };
 
 onMounted(async () => {
-  if (!auth.token) auth.initAuth();
+  if (!auth.isAuthenticated) await auth.initAuth();
   mediaQuery = window.matchMedia("(max-width: 768px)");
   updateIsMobile();
   mediaQuery.addEventListener("change", updateIsMobile);

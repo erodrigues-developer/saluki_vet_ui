@@ -154,7 +154,7 @@ const loadLookups = async () => {
   try {
     const [clientsRes, usersRes, productsRes, proceduresRes] = await Promise.all([
       api<any>('/api/v1/clients?limit=500'),
-      api<any>('/api/v1/users?limit=100'),
+      api<any>('/api/v1/users/lookup?limit=100'),
       api<any>('/api/v1/products?limit=500'),
       api<any>('/api/v1/procedures?limit=500')
     ]);
