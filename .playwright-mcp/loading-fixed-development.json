@@ -1,0 +1,71 @@
+[
+  {
+    "cssrInHTML": true,
+    "requests": 269,
+    "bytes": 24855719,
+    "ttfb": 52.69999998807907,
+    "lastResource": 668.8999999761581,
+    "firstSample": {
+      "t": 103.39999997615814,
+      "cssr": 7,
+      "bg": "rgb(255, 255, 255)"
+    },
+    "paint": [
+      {
+        "name": "first-paint",
+        "t": 104
+      },
+      {
+        "name": "first-contentful-paint",
+        "t": 104
+      }
+    ],
+    "naiveRaw": 0
+  },
+  {
+    "cssrInHTML": true,
+    "requests": 269,
+    "bytes": 24855719,
+    "ttfb": 44,
+    "lastResource": 773.3999999761581,
+    "firstSample": {
+      "t": 82.09999996423721,
+      "cssr": 7,
+      "bg": "rgb(255, 255, 255)"
+    },
+    "paint": [
+      {
+        "name": "first-paint",
+        "t": 80
+      },
+      {
+        "name": "first-contentful-paint",
+        "t": 80
+      }
+    ],
+    "naiveRaw": 0
+  },
+  {
+    "cssrInHTML": true,
+    "requests": 269,
+    "bytes": 24855719,
+    "ttfb": 46.5,
+    "lastResource": 727.1999999880791,
+    "firstSample": {
+      "t": 91.79999995231628,
+      "cssr": 7,
+      "bg": "rgb(255, 255, 255)"
+    },
+    "paint": [
+      {
+        "name": "first-paint",
+        "t": 88
+      },
+      {
+        "name": "first-contentful-paint",
+        "t": 88
+      }
+    ],
+    "naiveRaw": 0
+  }
+]

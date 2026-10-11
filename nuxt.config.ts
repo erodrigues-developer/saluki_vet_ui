@@ -10,16 +10,22 @@ export default defineNuxtConfig({
   devServer: {
     port: 3001
   },
-  modules: ['nuxtjs-naive-ui', '@pinia/nuxt'],
+  modules: ['@pinia/nuxt'],
   css: ['~/assets/fonts.css'],
   build: {
     transpile: [
-      'naive-ui',
-      'vueuc',
-      '@css-render/vue3-ssr',
-      '@juggle/resize-observer',
-      'date-fns',
-      'lodash-es',
+      // Nuxt excludes transpiled packages from Vite's dependency optimizer.
+      // Keep SSR/build compatibility while allowing client dev pre-bundling.
+      ...[
+        'naive-ui',
+        'vueuc',
+        '@css-render/vue3-ssr',
+        '@juggle/resize-observer',
+        'date-fns',
+        'lodash-es',
+      ].map((dependency) => ({ isDev, isClient }: { isDev: boolean; isClient?: boolean }) =>
+        !(isDev && isClient) && dependency,
+      ),
     ],
   },
   runtimeConfig: {
@@ -47,9 +53,7 @@ export default defineNuxtConfig({
       }),
       Components({
         resolvers: [
-          NaiveUiResolver({
-            importStyle: 'css',
-          }),
+          NaiveUiResolver(),
         ],
       }),
     ],

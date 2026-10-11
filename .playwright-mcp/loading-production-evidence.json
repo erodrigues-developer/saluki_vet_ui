@@ -1,0 +1,1274 @@
+[
+  {
+    "network": "local",
+    "hasCssr": false,
+    "headers": {
+      "cache-control": "no-store",
+      "connection": "keep-alive",
+      "content-length": "23005",
+      "content-security-policy": "default-src 'self'; script-src 'self' 'nonce-8UoJZi1NjtzU1VfYiZtWocNfn9fvX1FV'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+      "date": "Sun, 11 Oct 2026 20:17:24 GMT",
+      "keep-alive": "timeout=5",
+      "referrer-policy": "strict-origin-when-cross-origin",
+      "server-timing": "-;dur=23;desc=\"Generate\", -;dur=3;desc=\"Load%20chunks%2Fnitro%2Fnitro\", -;dur=0;desc=\"Nitro%20Start\", -;dur=0;desc=\"Load%20chunks%2Froutes%2F%2Frenderer\", -;dur=3;desc=\"Load%20chunks%2Fvirtual%2Fentry\", -;dur=1;desc=\"Load%20chunks%2Fvirtual%2Fprecomputed\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2FButton-Dx72gZE5\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Ffade-in.cssr-DmTgogei\", -;dur=1;desc=\"Load%20chunks%2Fbuild%2FCard-DQd1WU6x\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2FFormItem-Bu6PzHF4\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2FAlert-klMmujVJ\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Fuse-message-D1ZeHSuG\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Flogin-R1WIUbVu\", -;dur=0;desc=\"Load%20chunks%2Froutes%2Fapi%2F_...path_\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Fblank-BUCDRWhA\", -;dur=0;desc=\"Load%20chunks%2Fvirtual%2Fstyles\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Fentry-styles.DA85I7sZ\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Fblank-styles.8t6cRZlU\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Flogin-styles-1-Dy7UiHxw.mjs\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Flogin-styles.Cm06Cc2I\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2FLoginPuppy-styles.bqEUVn15\"",
+      "strict-transport-security": "max-age=300",
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "DENY",
+      "content-type": "text/html;charset=utf-8"
+    },
+    "data": {
+      "nav": {
+        "name": "http://127.0.0.1:3101/login",
+        "entryType": "navigation",
+        "startTime": 0,
+        "duration": 109.10000002384186,
+        "navigationId": 2842,
+        "initiatorType": "navigation",
+        "deliveryType": "",
+        "nextHopProtocol": "http/1.1",
+        "renderBlockingStatus": "non-blocking",
+        "contentType": "text/html",
+        "contentEncoding": "",
+        "workerStart": 0,
+        "workerRouterEvaluationStart": 0,
+        "workerCacheLookupStart": 0,
+        "workerMatchedSourceType": "",
+        "workerFinalSourceType": "",
+        "redirectStart": 0,
+        "redirectEnd": 0,
+        "fetchStart": 1.300000011920929,
+        "domainLookupStart": 1.300000011920929,
+        "domainLookupEnd": 1.300000011920929,
+        "connectStart": 1.300000011920929,
+        "secureConnectionStart": 0,
+        "connectEnd": 1.300000011920929,
+        "requestStart": 2,
+        "responseStart": 25.69999998807907,
+        "firstInterimResponseStart": 0,
+        "finalResponseHeadersStart": 25.69999998807907,
+        "responseEnd": 26.900000035762787,
+        "transferSize": 23305,
+        "encodedBodySize": 23005,
+        "decodedBodySize": 23005,
+        "responseStatus": 200,
+        "serverTiming": [
+          {
+            "name": "-",
+            "duration": 23,
+            "description": "Generate"
+          },
+          {
+            "name": "-",
+            "duration": 3,
+            "description": "Load%20chunks%2Fnitro%2Fnitro"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Nitro%20Start"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Froutes%2F%2Frenderer"
+          },
+          {
+            "name": "-",
+            "duration": 3,
+            "description": "Load%20chunks%2Fvirtual%2Fentry"
+          },
+          {
+            "name": "-",
+            "duration": 1,
+            "description": "Load%20chunks%2Fvirtual%2Fprecomputed"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2FButton-Dx72gZE5"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Ffade-in.cssr-DmTgogei"
+          },
+          {
+            "name": "-",
+            "duration": 1,
+            "description": "Load%20chunks%2Fbuild%2FCard-DQd1WU6x"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2FFormItem-Bu6PzHF4"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2FAlert-klMmujVJ"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Fuse-message-D1ZeHSuG"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Flogin-R1WIUbVu"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Froutes%2Fapi%2F_...path_"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Fblank-BUCDRWhA"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fvirtual%2Fstyles"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Fentry-styles.DA85I7sZ"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Fblank-styles.8t6cRZlU"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Flogin-styles-1-Dy7UiHxw.mjs"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Flogin-styles.Cm06Cc2I"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2FLoginPuppy-styles.bqEUVn15"
+          }
+        ],
+        "unloadEventStart": 0,
+        "unloadEventEnd": 0,
+        "domInteractive": 49,
+        "domContentLoadedEventStart": 97.90000003576279,
+        "domContentLoadedEventEnd": 97.90000003576279,
+        "domComplete": 109,
+        "loadEventStart": 109.10000002384186,
+        "loadEventEnd": 109.10000002384186,
+        "type": "navigate",
+        "redirectCount": 0,
+        "activationStart": 0,
+        "criticalCHRestart": 0,
+        "notRestoredReasons": null,
+        "confidence": {
+          "randomizedTriggerRate": 0.4994798,
+          "value": "high"
+        }
+      },
+      "paints": [
+        {
+          "name": "first-paint",
+          "entryType": "paint",
+          "startTime": 104,
+          "duration": 0,
+          "navigationId": 2842,
+          "paintTime": 65.90000003576279,
+          "presentationTime": 104
+        },
+        {
+          "name": "first-contentful-paint",
+          "entryType": "paint",
+          "startTime": 104,
+          "duration": 0,
+          "navigationId": 2842,
+          "paintTime": 65.90000003576279,
+          "presentationTime": 104
+        }
+      ],
+      "firstStyled": {
+        "t": 167.19999998807907,
+        "styles": 7,
+        "card": true,
+        "cardBg": "rgba(0, 0, 0, 0)",
+        "inputHeight": 34,
+        "hydrated": true
+      },
+      "samples": [
+        {
+          "t": 107.60000002384186,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": false
+        },
+        {
+          "t": 167.19999998807907,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 187.9000000357628,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgba(255, 255, 255, 0.008)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 238,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgba(255, 255, 255, 0.176)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 287.9000000357628,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgba(255, 255, 255, 0.592)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 337.9000000357628,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgba(255, 255, 255, 0.84)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 387.9000000357628,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgba(255, 255, 255, 0.95)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 437.9000000357628,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgba(255, 255, 255, 0.992)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 487.9000000357628,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgb(255, 255, 255)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 538,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgb(255, 255, 255)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 587.9000000357628,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgb(255, 255, 255)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 637.9000000357628,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgb(255, 255, 255)",
+          "inputHeight": 34,
+          "hydrated": true
+        }
+      ],
+      "requests": 37,
+      "bytes": 760784,
+      "resources": [
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/entry.BL9tmwjL.css",
+          "start": 32,
+          "end": 34.60000002384186,
+          "bytes": 1744,
+          "duration": 2.600000023841858
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/VgaOZLWK.js",
+          "start": 32.10000002384186,
+          "end": 35.69999998807907,
+          "bytes": 151139,
+          "duration": 3.599999964237213
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/sECIiC6w.js",
+          "start": 32.19999998807907,
+          "end": 51.90000003576279,
+          "bytes": 8975,
+          "duration": 19.700000047683716
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/Bx0N7_kR.js",
+          "start": 32.40000003576279,
+          "end": 52.90000003576279,
+          "bytes": 87494,
+          "duration": 20.5
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/DJ1i7kBu.js",
+          "start": 32.5,
+          "end": 52.40000003576279,
+          "bytes": 13024,
+          "duration": 19.900000035762787
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/GbfveA6P.js",
+          "start": 32.69999998807907,
+          "end": 53.19999998807907,
+          "bytes": 9541,
+          "duration": 20.5
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/Cqvcc5gG.js",
+          "start": 32.69999998807907,
+          "end": 54.40000003576279,
+          "bytes": 6036,
+          "duration": 21.700000047683716
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/OH6WwTrJ.js",
+          "start": 32.69999998807907,
+          "end": 54.10000002384186,
+          "bytes": 38433,
+          "duration": 21.400000035762787
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/C4pE9leG.js",
+          "start": 32.80000001192093,
+          "end": 62.10000002384186,
+          "bytes": 442,
+          "duration": 29.30000001192093
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/hC16SqRK.js",
+          "start": 32.90000003576279,
+          "end": 63.80000001192093,
+          "bytes": 460,
+          "duration": 30.899999976158142
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/B2uwy5BF.js",
+          "start": 33,
+          "end": 63.90000003576279,
+          "bytes": 1584,
+          "duration": 30.900000035762787
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/iEkMi_3B.js",
+          "start": 33,
+          "end": 64.10000002384186,
+          "bytes": 4340,
+          "duration": 31.100000023841858
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/Hf5Hhyiy.js",
+          "start": 33.10000002384186,
+          "end": 64.10000002384186,
+          "bytes": 568,
+          "duration": 31
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/DeXwmjuH.js",
+          "start": 33.19999998807907,
+          "end": 64.5,
+          "bytes": 9326,
+          "duration": 31.30000001192093
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/BHLwyXK4.js",
+          "start": 33.19999998807907,
+          "end": 69.19999998807907,
+          "bytes": 79955,
+          "duration": 36
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/BYRM5WBs.js",
+          "start": 33.30000001192093,
+          "end": 67.40000003576279,
+          "bytes": 1476,
+          "duration": 34.10000002384186
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/DZRskszK.js",
+          "start": 33.30000001192093,
+          "end": 68.80000001192093,
+          "bytes": 21615,
+          "duration": 35.5
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/BmJWDAke.js",
+          "start": 33.30000001192093,
+          "end": 69.10000002384186,
+          "bytes": 33540,
+          "duration": 35.80000001192093
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/HZAnkuIK.js",
+          "start": 33.40000003576279,
+          "end": 69.5,
+          "bytes": 7613,
+          "duration": 36.09999996423721
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/CE7zP4l0.js",
+          "start": 33.40000003576279,
+          "end": 68.30000001192093,
+          "bytes": 739,
+          "duration": 34.89999997615814
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/PfOm0Wda.js",
+          "start": 33.5,
+          "end": 71.40000003576279,
+          "bytes": 1231,
+          "duration": 37.90000003576279
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/CNs_Ozdc.js",
+          "start": 33.5,
+          "end": 71.10000002384186,
+          "bytes": 327,
+          "duration": 37.60000002384186
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/CjXitSi3.js",
+          "start": 43,
+          "end": 80.69999998807907,
+          "bytes": 48963,
+          "duration": 37.69999998807907
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/Dnf5-2we.js",
+          "start": 43.19999998807907,
+          "end": 79,
+          "bytes": 444,
+          "duration": 35.80000001192093
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/BOjvGemD.js",
+          "start": 43.19999998807907,
+          "end": 81.60000002384186,
+          "bytes": 122021,
+          "duration": 38.40000003576279
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/C-UqxuR0.js",
+          "start": 43.30000001192093,
+          "end": 81.30000001192093,
+          "bytes": 19461,
+          "duration": 38
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/zpufpj1X.js",
+          "start": 43.40000003576279,
+          "end": 79.60000002384186,
+          "bytes": 1332,
+          "duration": 36.19999998807907
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/Db1MDn_u.js",
+          "start": 43.5,
+          "end": 82,
+          "bytes": 20833,
+          "duration": 38.5
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/BMIKSSmz.js",
+          "start": 43.5,
+          "end": 91,
+          "bytes": 6051,
+          "duration": 47.5
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/DyHuD2uF.js",
+          "start": 43.60000002384186,
+          "end": 91.5,
+          "bytes": 4151,
+          "duration": 47.89999997615814
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/bDWdc9c9.js",
+          "start": 43.80000001192093,
+          "end": 89.69999998807907,
+          "bytes": 1190,
+          "duration": 45.89999997615814
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/DazmuSD2.js",
+          "start": 43.80000001192093,
+          "end": 90.30000001192093,
+          "bytes": 1020,
+          "duration": 46.5
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/CtvhSP9Z.js",
+          "start": 43.90000003576279,
+          "end": 91.69999998807907,
+          "bytes": 3999,
+          "duration": 47.799999952316284
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/Bu6aSsSA.js",
+          "start": 43.90000003576279,
+          "end": 92.40000003576279,
+          "bytes": 3678,
+          "duration": 48.5
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/login.BTfRG3BO.css",
+          "start": 97.80000001192093,
+          "end": 99.69999998807907,
+          "bytes": 3593,
+          "duration": 1.899999976158142
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/blank.BW1ex7i3.css",
+          "start": 129.9000000357628,
+          "end": 131.69999998807907,
+          "bytes": 386,
+          "duration": 1.7999999523162842
+        },
+        {
+          "url": "http://127.0.0.1:3101/fonts/LatoLatin-Regular.woff2",
+          "start": 157.10000002384186,
+          "end": 159.60000002384186,
+          "bytes": 44060,
+          "duration": 2.5
+        }
+      ]
+    }
+  },
+  {
+    "network": "10 Mbps, 100 ms",
+    "hasCssr": false,
+    "headers": {
+      "cache-control": "no-store",
+      "connection": "keep-alive",
+      "content-length": "23005",
+      "content-security-policy": "default-src 'self'; script-src 'self' 'nonce-rtLzau506JfgZvW6Pa2E/lrnjiOLfTNT'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+      "date": "Sun, 11 Oct 2026 20:17:25 GMT",
+      "keep-alive": "timeout=5",
+      "referrer-policy": "strict-origin-when-cross-origin",
+      "server-timing": "-;dur=11;desc=\"Generate\", -;dur=3;desc=\"Load%20chunks%2Fnitro%2Fnitro\", -;dur=0;desc=\"Nitro%20Start\", -;dur=0;desc=\"Load%20chunks%2Froutes%2F%2Frenderer\", -;dur=3;desc=\"Load%20chunks%2Fvirtual%2Fentry\", -;dur=1;desc=\"Load%20chunks%2Fvirtual%2Fprecomputed\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2FButton-Dx72gZE5\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Ffade-in.cssr-DmTgogei\", -;dur=1;desc=\"Load%20chunks%2Fbuild%2FCard-DQd1WU6x\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2FFormItem-Bu6PzHF4\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2FAlert-klMmujVJ\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Fuse-message-D1ZeHSuG\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Flogin-R1WIUbVu\", -;dur=0;desc=\"Load%20chunks%2Froutes%2Fapi%2F_...path_\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Fblank-BUCDRWhA\", -;dur=0;desc=\"Load%20chunks%2Fvirtual%2Fstyles\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Fentry-styles.DA85I7sZ\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Fblank-styles.8t6cRZlU\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Flogin-styles-1-Dy7UiHxw.mjs\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2Flogin-styles.Cm06Cc2I\", -;dur=0;desc=\"Load%20chunks%2Fbuild%2FLoginPuppy-styles.bqEUVn15\"",
+      "strict-transport-security": "max-age=300",
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "DENY",
+      "content-type": "text/html;charset=utf-8"
+    },
+    "data": {
+      "nav": {
+        "name": "http://127.0.0.1:3101/login",
+        "entryType": "navigation",
+        "startTime": 0,
+        "duration": 678.8999999761581,
+        "navigationId": 7992,
+        "initiatorType": "navigation",
+        "deliveryType": "",
+        "nextHopProtocol": "http/1.1",
+        "renderBlockingStatus": "non-blocking",
+        "contentType": "text/html",
+        "contentEncoding": "",
+        "workerStart": 0,
+        "workerRouterEvaluationStart": 0,
+        "workerCacheLookupStart": 0,
+        "workerMatchedSourceType": "",
+        "workerFinalSourceType": "",
+        "redirectStart": 0,
+        "redirectEnd": 0,
+        "fetchStart": 0.5,
+        "domainLookupStart": 0.5,
+        "domainLookupEnd": 0.5,
+        "connectStart": 0.5,
+        "secureConnectionStart": 0,
+        "connectEnd": 0.5,
+        "requestStart": 1.800000011920929,
+        "responseStart": 13.800000011920929,
+        "firstInterimResponseStart": 0,
+        "finalResponseHeadersStart": 13.800000011920929,
+        "responseEnd": 123.09999996423721,
+        "transferSize": 23305,
+        "encodedBodySize": 23005,
+        "decodedBodySize": 23005,
+        "responseStatus": 200,
+        "serverTiming": [
+          {
+            "name": "-",
+            "duration": 11,
+            "description": "Generate"
+          },
+          {
+            "name": "-",
+            "duration": 3,
+            "description": "Load%20chunks%2Fnitro%2Fnitro"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Nitro%20Start"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Froutes%2F%2Frenderer"
+          },
+          {
+            "name": "-",
+            "duration": 3,
+            "description": "Load%20chunks%2Fvirtual%2Fentry"
+          },
+          {
+            "name": "-",
+            "duration": 1,
+            "description": "Load%20chunks%2Fvirtual%2Fprecomputed"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2FButton-Dx72gZE5"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Ffade-in.cssr-DmTgogei"
+          },
+          {
+            "name": "-",
+            "duration": 1,
+            "description": "Load%20chunks%2Fbuild%2FCard-DQd1WU6x"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2FFormItem-Bu6PzHF4"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2FAlert-klMmujVJ"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Fuse-message-D1ZeHSuG"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Flogin-R1WIUbVu"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Froutes%2Fapi%2F_...path_"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Fblank-BUCDRWhA"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fvirtual%2Fstyles"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Fentry-styles.DA85I7sZ"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Fblank-styles.8t6cRZlU"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Flogin-styles-1-Dy7UiHxw.mjs"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2Flogin-styles.Cm06Cc2I"
+          },
+          {
+            "name": "-",
+            "duration": 0,
+            "description": "Load%20chunks%2Fbuild%2FLoginPuppy-styles.bqEUVn15"
+          }
+        ],
+        "unloadEventStart": 127.19999998807907,
+        "unloadEventEnd": 127.19999998807907,
+        "domInteractive": 243.69999998807907,
+        "domContentLoadedEventStart": 532.5999999642372,
+        "domContentLoadedEventEnd": 532.5999999642372,
+        "domComplete": 678.8000000119209,
+        "loadEventStart": 678.8999999761581,
+        "loadEventEnd": 678.8999999761581,
+        "type": "navigate",
+        "redirectCount": 0,
+        "activationStart": 0,
+        "criticalCHRestart": 0,
+        "notRestoredReasons": null,
+        "confidence": {
+          "randomizedTriggerRate": 0.4994798,
+          "value": "low"
+        }
+      },
+      "paints": [
+        {
+          "name": "first-paint",
+          "entryType": "paint",
+          "startTime": 268,
+          "duration": 0,
+          "navigationId": 7992,
+          "paintTime": 242.30000001192093,
+          "presentationTime": 268
+        },
+        {
+          "name": "first-contentful-paint",
+          "entryType": "paint",
+          "startTime": 268,
+          "duration": 0,
+          "navigationId": 7992,
+          "paintTime": 242.30000001192093,
+          "presentationTime": 268
+        }
+      ],
+      "firstStyled": {
+        "t": 938,
+        "styles": 7,
+        "card": true,
+        "cardBg": "rgba(0, 0, 0, 0)",
+        "inputHeight": 34,
+        "hydrated": true
+      },
+      "samples": [
+        {
+          "t": 186.5999999642372,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": false
+        },
+        {
+          "t": 235.69999998807907,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": false
+        },
+        {
+          "t": 285.80000001192093,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": false
+        },
+        {
+          "t": 335.5999999642372,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": false
+        },
+        {
+          "t": 385.69999998807907,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": false
+        },
+        {
+          "t": 435.5,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": false
+        },
+        {
+          "t": 485.5999999642372,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": false
+        },
+        {
+          "t": 535.5,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": false
+        },
+        {
+          "t": 585.6999999880791,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": false
+        },
+        {
+          "t": 635.5,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": false
+        },
+        {
+          "t": 685.5999999642372,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": false
+        },
+        {
+          "t": 735.5,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": false
+        },
+        {
+          "t": 796.5999999642372,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": true
+        },
+        {
+          "t": 835.5,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": true
+        },
+        {
+          "t": 885.5,
+          "styles": 0,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 39,
+          "hydrated": true
+        },
+        {
+          "t": 938,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgba(0, 0, 0, 0)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 985.6999999880791,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgba(255, 255, 255, 0.086)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 1035.5999999642372,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgba(255, 255, 255, 0.46)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 1086.0999999642372,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgba(255, 255, 255, 0.776)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 1135.5,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgba(255, 255, 255, 0.92)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 1188,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgba(255, 255, 255, 0.984)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 1235.5999999642372,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgb(255, 255, 255)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 1285.699999988079,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgb(255, 255, 255)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 1335.699999988079,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgb(255, 255, 255)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 1385.800000011921,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgb(255, 255, 255)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 1435.5999999642372,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgb(255, 255, 255)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 1485.800000011921,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgb(255, 255, 255)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 1535.5999999642372,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgb(255, 255, 255)",
+          "inputHeight": 34,
+          "hydrated": true
+        },
+        {
+          "t": 1585.699999988079,
+          "styles": 7,
+          "card": true,
+          "cardBg": "rgb(255, 255, 255)",
+          "inputHeight": 34,
+          "hydrated": true
+        }
+      ],
+      "requests": 37,
+      "bytes": 760784,
+      "resources": [
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/entry.BL9tmwjL.css",
+          "start": 130.69999998807907,
+          "end": 239.0999999642372,
+          "bytes": 1744,
+          "duration": 108.39999997615814
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/VgaOZLWK.js",
+          "start": 130.80000001192093,
+          "end": 515.5,
+          "bytes": 151139,
+          "duration": 384.69999998807907
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/sECIiC6w.js",
+          "start": 130.89999997615814,
+          "end": 273.69999998807907,
+          "bytes": 8975,
+          "duration": 142.80000001192093
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/Bx0N7_kR.js",
+          "start": 131,
+          "end": 451.89999997615814,
+          "bytes": 87494,
+          "duration": 320.89999997615814
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/DJ1i7kBu.js",
+          "start": 131.0999999642372,
+          "end": 290.5,
+          "bytes": 13024,
+          "duration": 159.4000000357628
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/GbfveA6P.js",
+          "start": 131.19999998807907,
+          "end": 282.69999998807907,
+          "bytes": 9541,
+          "duration": 151.5
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/Cqvcc5gG.js",
+          "start": 131.19999998807907,
+          "end": 401.19999998807907,
+          "bytes": 6036,
+          "duration": 270
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/OH6WwTrJ.js",
+          "start": 131.19999998807907,
+          "end": 447.30000001192093,
+          "bytes": 38433,
+          "duration": 316.10000002384186
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/C4pE9leG.js",
+          "start": 131.30000001192093,
+          "end": 394.39999997615814,
+          "bytes": 442,
+          "duration": 263.0999999642372
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/hC16SqRK.js",
+          "start": 131.39999997615814,
+          "end": 403.89999997615814,
+          "bytes": 460,
+          "duration": 272.5
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/iEkMi_3B.js",
+          "start": 131.39999997615814,
+          "end": 503.80000001192093,
+          "bytes": 4340,
+          "duration": 372.4000000357628
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/B2uwy5BF.js",
+          "start": 131.5,
+          "end": 509.0999999642372,
+          "bytes": 1584,
+          "duration": 377.5999999642372
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/Hf5Hhyiy.js",
+          "start": 131.5,
+          "end": 511.5,
+          "bytes": 568,
+          "duration": 380
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/DeXwmjuH.js",
+          "start": 131.5999999642372,
+          "end": 564.8999999761581,
+          "bytes": 9326,
+          "duration": 433.30000001192093
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/BHLwyXK4.js",
+          "start": 131.5999999642372,
+          "end": 668,
+          "bytes": 79955,
+          "duration": 536.4000000357628
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/BYRM5WBs.js",
+          "start": 131.69999998807907,
+          "end": 608.1999999880791,
+          "bytes": 1476,
+          "duration": 476.5
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/DZRskszK.js",
+          "start": 131.69999998807907,
+          "end": 671.5999999642372,
+          "bytes": 21615,
+          "duration": 539.8999999761581
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/HZAnkuIK.js",
+          "start": 131.89999997615814,
+          "end": 645,
+          "bytes": 7613,
+          "duration": 513.1000000238419
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/BmJWDAke.js",
+          "start": 131.89999997615814,
+          "end": 688.1999999880791,
+          "bytes": 33540,
+          "duration": 556.3000000119209
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/CE7zP4l0.js",
+          "start": 131.89999997615814,
+          "end": 711.8000000119209,
+          "bytes": 739,
+          "duration": 579.9000000357628
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/PfOm0Wda.js",
+          "start": 132.0999999642372,
+          "end": 749.0999999642372,
+          "bytes": 1231,
+          "duration": 617
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/CNs_Ozdc.js",
+          "start": 132.0999999642372,
+          "end": 772.1999999880791,
+          "bytes": 327,
+          "duration": 640.1000000238419
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/CjXitSi3.js",
+          "start": 140.5,
+          "end": 873.6999999880791,
+          "bytes": 48963,
+          "duration": 733.1999999880791
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/Dnf5-2we.js",
+          "start": 140.69999998807907,
+          "end": 797,
+          "bytes": 444,
+          "duration": 656.3000000119209
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/C-UqxuR0.js",
+          "start": 140.69999998807907,
+          "end": 865,
+          "bytes": 19461,
+          "duration": 724.3000000119209
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/BOjvGemD.js",
+          "start": 140.69999998807907,
+          "end": 958.1999999880791,
+          "bytes": 122021,
+          "duration": 817.5
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/zpufpj1X.js",
+          "start": 140.80000001192093,
+          "end": 859.6999999880791,
+          "bytes": 1332,
+          "duration": 718.8999999761581
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/Db1MDn_u.js",
+          "start": 140.80000001192093,
+          "end": 912.0999999642372,
+          "bytes": 20833,
+          "duration": 771.2999999523163
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/BMIKSSmz.js",
+          "start": 140.80000001192093,
+          "end": 968.5,
+          "bytes": 6051,
+          "duration": 827.6999999880791
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/DyHuD2uF.js",
+          "start": 140.89999997615814,
+          "end": 973.3000000119209,
+          "bytes": 4151,
+          "duration": 832.4000000357628
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/bDWdc9c9.js",
+          "start": 140.89999997615814,
+          "end": 977.8999999761581,
+          "bytes": 1190,
+          "duration": 837
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/DazmuSD2.js",
+          "start": 140.89999997615814,
+          "end": 1010,
+          "bytes": 1020,
+          "duration": 869.1000000238419
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/CtvhSP9Z.js",
+          "start": 141,
+          "end": 1019.6999999880791,
+          "bytes": 3999,
+          "duration": 878.6999999880791
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/Bu6aSsSA.js",
+          "start": 141.0999999642372,
+          "end": 1078,
+          "bytes": 3678,
+          "duration": 936.9000000357628
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/login.BTfRG3BO.css",
+          "start": 532.3999999761581,
+          "end": 677.5,
+          "bytes": 3593,
+          "duration": 145.10000002384186
+        },
+        {
+          "url": "http://127.0.0.1:3101/_nuxt/blank.BW1ex7i3.css",
+          "start": 793,
+          "end": 906.1999999880791,
+          "bytes": 386,
+          "duration": 113.19999998807907
+        },
+        {
+          "url": "http://127.0.0.1:3101/fonts/LatoLatin-Regular.woff2",
+          "start": 934.8999999761581,
+          "end": 1102.8999999761581,
+          "bytes": 44060,
+          "duration": 168
+        }
+      ]
+    }
+  }
+]
