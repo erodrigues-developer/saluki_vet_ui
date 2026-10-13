@@ -5,6 +5,9 @@ test.describe('Server-rendered Naive UI styles', () => {
 
   test('login is styled without executing JavaScript, including after reload', async ({ page }) => {
     const response = await page.goto('/login')
+    // Production must not inherit Nitro's build-time DEBUG instrumentation:
+    // its growing Server-Timing header can exceed Nginx's upstream buffer.
+    expect(response!.headers()['server-timing']).toBeUndefined()
     const html = await response!.text()
     expect(html.slice(0, html.indexOf('</head>'))).toContain('cssr-id="n-card"')
     await expect(page.locator('.n-card')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
@@ -18,6 +21,7 @@ test.describe('Server-rendered Naive UI styles', () => {
     const responses = await Promise.all(Array.from({ length: 4 }, () => request.get('/login')))
     for (const response of responses) {
       expect(response.status()).toBe(200)
+      expect(response.headers()['server-timing']).toBeUndefined()
       const html = await response.text()
       expect(html).toContain('cssr-id="n-card"')
       expect(html).toContain('cssr-id="n-input"')
