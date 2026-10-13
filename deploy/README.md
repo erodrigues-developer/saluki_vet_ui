@@ -4,6 +4,8 @@ O workflow `.github/workflows/deploy-ec2.yml` executa testes e compila a aplica�
 
 A build Nuxt limpa `DEBUG` e `NUXT_DEBUG_PERF` para não embutir instrumentação de desenvolvimento. Nitro pode gerar cabeçalhos `Server-Timing` grandes quando DEBUG está habilitado na build; isso excedeu o buffer do Nginx na imagem anterior. O health check HTTPS detecta esse caso e reprova a troca.
 
+Os testes de renderização iniciam uma API simulada local que responde 401 à consulta da sessão. O SSR do login faz essa consulta antes de renderizar; o runner do GitHub não tem a API real. A fixture é usada somente pelo Playwright e fica fora da imagem de produção.
+
 Publicar uma release (evento `release: published`) faz deploy automático do commit apontado pela tag da release. Salvar um rascunho não inicia o deploy. Pull requests para `main` executam a validação e a build, sem deploy. Também é possível executar manualmente em **Actions → Build and deploy UI to EC2 → Run workflow**, selecionando `main`.
 
 ## Ativação
